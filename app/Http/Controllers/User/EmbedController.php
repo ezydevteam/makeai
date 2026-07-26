@@ -336,8 +336,13 @@ class EmbedController extends Controller
             return '*';
         }
 
+        // 'self' so the owner can preview the embed from their own dashboard. Without it an
+        // origin-locked embed is unframeable anywhere except the customer's site, which made
+        // the preview a permanently blank frame. Our own origin framing our own embed grants
+        // nothing an attacker could use — third-party framing stays restricted to the list.
         return collect($allowed)
             ->map(fn (string $origin) => str_contains($origin, '://') ? $origin : "https://{$origin} https://*.{$origin}")
+            ->prepend("'self'")
             ->implode(' ');
     }
 
@@ -348,6 +353,12 @@ class EmbedController extends Controller
      */
     private function recordEmbedUsage(ToolEmbed $embed): void
     {
+        // The owner previewing their own embed from the dashboard is not a visitor — counting
+        // it would inflate the usage figure the dashboard reports back to them.
+        if (auth()->id() === $embed->user_id) {
+            return;
+        }
+
         ToolEmbed::where('id', $embed->id)->update([
             'usage_count' => DB::raw('usage_count + 1'),
             'last_used_at' => now(),

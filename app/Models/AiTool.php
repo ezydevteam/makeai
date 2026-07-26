@@ -106,7 +106,7 @@ class AiTool extends Model
      */
     public function fallbackModel(): string
     {
-        return $this->model_override ?: settings('default_ai_model', 'gpt-4o-mini');
+        return $this->model_override ?: settings('default_ai_model', config('ai.fallback_model'));
     }
 
     public function getFieldsAttribute($value)

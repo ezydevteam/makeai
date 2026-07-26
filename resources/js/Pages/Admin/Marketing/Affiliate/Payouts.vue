@@ -213,7 +213,7 @@ onBeforeUnmount(() => {
     <Head :title="t('Affiliate Payouts')" />
 
     <AdminLayout>
-                <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
             <div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Payouts') }}</h1>
@@ -298,12 +298,12 @@ onBeforeUnmount(() => {
                     <table class="min-w-full divide-y divide-gray-100 text-left dark:divide-gray-800">
                         <thead class="bg-gray-50 dark:bg-gray-900/60">
                             <tr>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('User') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Method') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Payout details') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Action') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('User') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Amount') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Method') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Payout details') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Action') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
                                     <button
                                         type="button"
                                         :disabled="processing[p.id]"
-                                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium disabled:opacity-50"
+                                        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium disabled:opacity-50"
                                         :class="isFinalized(p.status)
                                             ? 'border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
                                             : 'bg-primary-600 text-white transition hover:bg-primary-700'"
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </div>
-    
+
 
         <AppModal
             :open="Boolean(reviewModal.open && reviewModal.payout)"

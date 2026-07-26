@@ -11,6 +11,7 @@ import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { modelLabel, operationLabel, type Model, type Op } from '../../Composables/useImageJobs'
+import { toastImageError } from '../../Composables/useImageErrors'
 
 defineOptions({ layout: UserDashboardLayout })
 
@@ -82,14 +83,16 @@ const props = defineProps<{
     models: string[]
     /** The admin's catalogue, used to turn those slugs into display names. */
     modelCatalog: Model[]
+    /** Slug/alias => name for every model on record, including ones no longer offered. */
+    modelNames: Record<string, string>
     /** Off = which model ran is not the user's decision, so the preview does not name it. */
     allowModelChoice: boolean
     /** The live operation list — turns an asset's `bg_remove` key into its real name. */
     operations: Op[]
 }>()
 
-/** Display name for a stored slug, falling back to the slug for a retired model. */
-const nameOf = (slug: string | null) => modelLabel(props.modelCatalog, slug)
+/** Display name for a stored slug — the catalogue first, then every model on record. */
+const nameOf = (slug: string | null) => modelLabel(props.modelCatalog, slug, props.modelNames)
 
 const studioRoute = route('addon.aip.user.studio')
 const libraryRoute = route('addon.aip.user.library')
@@ -224,7 +227,7 @@ async function runBulk(action: 'delete' | 'favorite' | 'unfavorite' | 'move', fo
         moveModalOpen.value = false
         router.reload({ only: ['assets', 'folders', 'storage'] })
     } catch (e) {
-        bulkError.value = t('Bulk action failed. Please try again.')
+        bulkError.value = toastImageError(e, t("Bulk action failed. Please try again."))
     } finally {
         bulkBusy.value = false
     }
@@ -261,7 +264,7 @@ async function toggleFavorite(asset: Asset) {
             lightboxAsset.value.is_favorite = asset.is_favorite
         }
     } catch (e) {
-        rowError.value = t('Could not update favorite.')
+        rowError.value = toastImageError(e, t("Could not update favorite."))
     } finally {
         rowBusy.value = null
     }
@@ -282,7 +285,7 @@ async function confirmDelete() {
         deleteTarget.value = null
         router.reload({ only: ['assets', 'folders', 'storage'] })
     } catch (e) {
-        rowError.value = t('Could not delete image.')
+        rowError.value = toastImageError(e, t("Could not delete image."))
     } finally {
         deleteBusy.value = false
     }
@@ -356,7 +359,7 @@ async function submitFolder() {
         folderModalOpen.value = false
         router.reload({ only: ['folders'] })
     } catch (e) {
-        folderError.value = t('Could not save folder.')
+        folderError.value = toastImageError(e, t("Could not save folder."))
     } finally {
         folderBusy.value = false
     }
@@ -377,7 +380,7 @@ async function confirmDeleteFolder() {
         folderDeleteTarget.value = null
         router.reload({ only: ['folders', 'assets'] })
     } catch (e) {
-        folderError.value = t('Could not delete folder.')
+        folderError.value = toastImageError(e, t("Could not delete folder."))
     } finally {
         folderDeleteBusy.value = false
     }
@@ -787,32 +790,32 @@ function formatDate(value: string): string {
     />
 
     <!-- Delete asset confirm -->
-    <AppModal
+    <ActionConfirmModal
         :open="deleteTarget !== null"
-        max-width="max-w-sm"
         :title="t('Delete image?')"
-        :subtitle="t('This cannot be undone.')"
-        :confirm-text="t('Delete')"
-        confirm-variant="delete"
-        :confirm-loading="deleteBusy"
-        @close="deleteTarget = null"
+        :message="t('The image and its file will be permanently removed. This cannot be undone.')"
+        :confirm-label="t('Delete')"
+        :cancel-label="t('Cancel')"
+        :processing="deleteBusy"
+        :processing-label="t('Deleting…')"
+        variant="danger"
+        @cancel="deleteTarget = null"
         @confirm="confirmDelete"
-    >
-        <p class="text-sm text-gray-600 dark:text-gray-300">{{ t('The image and its file will be permanently removed.') }}</p>
-    </AppModal>
+    />
 
-    <!-- Delete folder confirm -->
-    <AppModal
+    <!-- Delete folder confirm. The folder error is not lost with the body slot: a failure
+         here now arrives as a toast (useImageErrors), which is visible after the modal
+         closes as well as while it is open. -->
+    <ActionConfirmModal
         :open="folderDeleteTarget !== null"
-        max-width="max-w-sm"
         :title="t('Delete folder?')"
-        :confirm-text="t('Delete')"
-        confirm-variant="delete"
-        :confirm-loading="folderDeleteBusy"
-        @close="folderDeleteTarget = null"
+        :message="t('Images inside this folder will not be deleted, only unfiled.')"
+        :confirm-label="t('Delete')"
+        :cancel-label="t('Cancel')"
+        :processing="folderDeleteBusy"
+        :processing-label="t('Deleting…')"
+        variant="danger"
+        @cancel="folderDeleteTarget = null"
         @confirm="confirmDeleteFolder"
-    >
-        <p class="text-sm text-gray-600 dark:text-gray-300">{{ t('Images inside this folder will not be deleted, only unfiled.') }}</p>
-        <p v-if="folderError" class="mt-2 text-sm text-danger-600 dark:text-danger-400">{{ folderError }}</p>
-    </AppModal>
+    />
 </template>

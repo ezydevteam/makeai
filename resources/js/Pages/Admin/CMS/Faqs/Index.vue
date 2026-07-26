@@ -67,6 +67,22 @@ const aiForm = ref({
     category_id: null as number | null,
 })
 
+// Categories are addressable from CMS pages via the [faqs] shortcode, so make the
+// exact snippet one click away instead of making admins guess the id.
+const copiedShortcodeId = ref<number | null>(null)
+let copyResetTimer: ReturnType<typeof setTimeout> | null = null
+
+const copyShortcode = async (categoryId: number) => {
+    try {
+        await navigator.clipboard.writeText(`[faqs category="${categoryId}"]`)
+        copiedShortcodeId.value = categoryId
+        if (copyResetTimer) clearTimeout(copyResetTimer)
+        copyResetTimer = setTimeout(() => { copiedShortcodeId.value = null }, 2000)
+    } catch {
+        // Clipboard is unavailable over plain HTTP; the snippet is visible either way.
+    }
+}
+
 const totalFaqs = computed(() => props.categories.reduce((sum, category) => sum + category.faqs.length, 0) + props.uncategorized.length)
 const categoryCount = computed(() => props.categories.length)
 
@@ -334,10 +350,22 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
             >
                 <div class="rounded-t-2xl flex flex-col gap-4 border-b border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/60 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h2 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ category.name }}</h2>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ category.name }}</h2>
+                        </div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             {{ t(':count FAQs in this category', { count: String(category.faqs.length) }) }}
                         </p>
+                        <!-- The id/name pair is what the [faqs] page shortcode filters on. -->
+                        <button
+                            type="button"
+                            class="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] text-gray-400 transition hover:text-primary-600 dark:text-gray-500 dark:hover:text-primary-400"
+                            :title="t('Copy shortcode')"
+                            @click="copyShortcode(category.id)"
+                        >
+                            <i :class="copiedShortcodeId === category.id ? 'ti ti-check' : 'ti ti-code'"></i>
+                            <span>[faqs category="{{ category.id }}"]</span>
+                        </button>
                     </div>
 
                     <div class="flex items-center gap-2">

@@ -25,9 +25,11 @@ const props = withDefaults(
         allowModelChoice?: boolean
         /** The live operation list — turns the asset's `bg_remove` key into its real name. */
         operations?: Op[]
+        /** Slug/alias => name for every model on record, so a retired one still reads. */
+        modelNames?: Record<string, string>
         canVariations?: boolean
     }>(),
-    { models: () => [], allowModelChoice: false, operations: () => [], canVariations: false },
+    { models: () => [], allowModelChoice: false, operations: () => [], modelNames: () => ({}), canVariations: false },
 )
 
 const emit = defineEmits<{
@@ -35,7 +37,7 @@ const emit = defineEmits<{
     (e: 'action', type: PreviewActionType, asset: Asset): void
 }>()
 
-const model = computed(() => modelLabel(props.models, props.asset?.model))
+const model = computed(() => modelLabel(props.models, props.asset?.model, props.modelNames))
 
 /** The operation's real name, never its raw registry key. */
 const title = computed(() => operationLabel(props.operations, props.asset?.operation) ?? t('Preview'))

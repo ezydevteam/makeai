@@ -10,6 +10,9 @@ use Inertia\Inertia;
 
 class KbHomeController extends Controller
 {
+    /** How many popular articles the landing page shows — a 3-column grid, filled. */
+    private const FEATURED_LIMIT = 9;
+
     public function index(Request $request)
     {
         $categories = KbCategory::active()
@@ -33,12 +36,17 @@ class KbHomeController extends Controller
             }
         }
 
-        // Popular articles, paginated (Pagination component on the frontend).
+        // The nine most-read articles. Not paginated: this is a teaser row on the landing
+        // page and the full list lives at /articles, so a paginator here only added page
+        // links that scrolled the visitor through the whole library from the front door.
         $featuredArticles = KbArticle::published()
             ->orderByDesc('views')
             ->with('category')
-            ->paginate(8, ['id', 'ulid', 'title', 'slug', 'excerpt', 'views', 'helpful_count', 'published_at'])
-            ->withQueryString();
+            ->limit(self::FEATURED_LIMIT)
+            ->get(['id', 'ulid', 'title', 'slug', 'excerpt', 'views', 'helpful_count', 'published_at']);
+
+        // Drives the "View more" button — hidden when the nine above are the whole library.
+        $publishedCount = KbArticle::published()->count();
 
         $pageTitle = $activeCategory
             ? $activeCategory->name . ' - ' . addon_setting('ai-knowledge-base', 'page_title', 'Help Center')
@@ -50,6 +58,7 @@ class KbHomeController extends Controller
         return Inertia::render('Addons/ai-knowledge-base/Public/Home', [
             'categories' => $categories,
             'featuredArticles' => $featuredArticles,
+            'hasMoreArticles' => $publishedCount > self::FEATURED_LIMIT,
             'activeCategory' => $activeCategory,
             'categoryArticles' => $categoryArticles,
             // Site-free — Home.vue passes this to <Head :title>, which the global callback

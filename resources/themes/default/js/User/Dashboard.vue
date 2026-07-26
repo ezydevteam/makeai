@@ -34,12 +34,12 @@ interface TxItem {
     created_at: string
 }
 
-interface RecentConv {
-    id: number
+interface RecentGeneration {
     ulid: string
-    title: string
-    message_count: number
-    last_message_at: string | null
+    tool_slug: string | null
+    tool_name: string
+    output_preview: string | null
+    created_at: string | null
 }
 
 interface RecentDoc {
@@ -79,7 +79,7 @@ interface ReferralData {
 interface DashboardStats {
     credits: number
     credits_used_month: number
-    total_conversations: number
+    total_generations: number
     total_documents: number
     total_open_support_tickets: number
     lifetime_credits_used: number
@@ -100,7 +100,7 @@ interface PageProps {
     usageChart: { date: string; credits: number }[]
     recentTransactions: TxItem[]
     quickTools: ToolCard[]
-    recentConversations: RecentConv[]
+    recentGenerations: RecentGeneration[]
     recentDocuments: RecentDoc[]
     recentLoginHistory: RecentLoginItem[]
     plan: PlanData | null
@@ -151,7 +151,7 @@ const userFirstName = computed(() => {
 const stats = computed(() => pageProps.value.stats)
 const recentTransactions = computed(() => pageProps.value.recentTransactions)
 const quickTools = computed(() => pageProps.value.quickTools)
-const recentConversations = computed(() => pageProps.value.recentConversations)
+const recentGenerations = computed(() => pageProps.value.recentGenerations)
 const recentDocuments = computed(() => pageProps.value.recentDocuments)
 const recentLoginHistory = computed(() => pageProps.value.recentLoginHistory)
 const plan = computed(() => pageProps.value.plan)
@@ -162,6 +162,7 @@ const chartLoading = ref(false)
 
 watch(() => pageProps.value.usageChart, (value) => {
     usageChart.value = value
+    void drawChart()
 })
 
 watch(() => pageProps.value.chartPeriod, (value) => {
@@ -274,7 +275,7 @@ const statCards = computed<StatCard[]>(() => {
         {
             key: 'lifetime',
             label: t('Lifetime usage'),
-            value: formatCompact(stats.value.lifetime_credits_used),
+            value: formatCompact(stats.value.lifetime_credits_used, 2),
             hint: t('Believable production volume'),
             icon: 'ti ti-activity-heartbeat',
             iconClass: 'bg-amber-500/12 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
@@ -282,18 +283,18 @@ const statCards = computed<StatCard[]>(() => {
         },
         middleCard,
         {
-            key: 'conversations',
-            label: t('Conversations'),
-            value: formatNumber(stats.value.total_conversations),
-            hint: t('Live ideation sessions'),
-            icon: 'ti ti-message-2',
+            key: 'generations',
+            label: t('Total generations'),
+            value: formatNumber(stats.value.total_generations),
+            hint: t('Every AI run on this account'),
+            icon: 'ti ti-sparkles',
             iconClass: 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
             cardClass: 'border-emerald-100/80 bg-white/95 dark:border-emerald-900/60 dark:!bg-surface-900',
         },
     ]
 })
 
-const planFeatures = computed(() => plan.value?.features?.slice(0, 4) ?? [])
+const planFeatures = computed(() => plan.value?.features?.slice(0, 5) ?? [])
 
 const txTypeLabel = (type: string) => {
     const map: Record<string, string> = {
@@ -333,6 +334,10 @@ const copyReferralLink = () => {
 }
 
 const switchChartPeriod = async (period: string) => {
+    // The buttons are disabled while loading, but guard the handler too — a keyboard repeat
+    // or a double-tap would otherwise race two fetches and land whichever returns last.
+    if (chartLoading.value) return
+
     chartLoading.value = true
 
     try {
@@ -347,6 +352,10 @@ const switchChartPeriod = async (period: string) => {
             const data = await response.json() as { chart: { date: string; credits: number }[] }
             usageChart.value = data.chart
             chartPeriod.value = period
+            // Draw before releasing the overlay: drawChart awaits nextTick and a dynamic
+            // import, so handing off to the watcher would lift the overlay a frame or two
+            // before the new bars actually appear.
+            await drawChart()
         }
     } finally {
         chartLoading.value = false
@@ -364,11 +373,11 @@ const formatChartLabel = (date: string): string => {
 }
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-let chartInstance: ChartJs<'bar'> | null = null
+let chartInstance: ChartJs<'line'> | null = null
 
 const loadChartJs = async () => {
-    const { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Filler } = await import('chart.js')
-    Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Filler)
+    const { Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler } = await import('chart.js')
+    Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler)
 
     return Chart
 }
@@ -403,10 +412,10 @@ const drawChart = async () => {
     const maxValue = Math.max(...data, 1)
     const gridColor = isDark.value ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.18)'
     const tickColor = isDark.value ? '#94a3b8' : '#64748b'
-    const barBaseColor = isDark.value ? '#60a5fa' : '#bfdbfe'
-    const barPeakColor = isDark.value ? '#3b82f6' : '#1f75fe'
-    const borderPeakColor = isDark.value ? '#60a5fa' : '#1d4ed8'
-    const borderBaseColor = isDark.value ? '#93c5fd' : '#93c5fd'
+    const lineColor = isDark.value ? '#60a5fa' : '#1f75fe'
+    const peakColor = isDark.value ? '#93c5fd' : '#1d4ed8'
+    const fillTop = isDark.value ? 'rgba(96, 165, 250, 0.32)' : 'rgba(31, 117, 254, 0.22)'
+    const fillBottom = isDark.value ? 'rgba(96, 165, 250, 0)' : 'rgba(31, 117, 254, 0)'
 
     if (chartInstance) {
         chartInstance.destroy()
@@ -415,35 +424,63 @@ const drawChart = async () => {
     const Chart = await loadChartJs()
 
     chartInstance = new Chart(context, {
-        type: 'bar',
+        type: 'line',
         data: {
             labels,
             datasets: [
                 {
                     data,
-                    backgroundColor: (chartContext: ScriptableContext<'bar'>) => (
-                        data[chartContext.dataIndex] === maxValue ? barPeakColor : barBaseColor
+                    borderColor: lineColor,
+                    borderWidth: 2,
+                    tension: 0.35,
+                    fill: true,
+                    // Vertical gradient under the line. Built from the chart area rather than
+                    // the canvas so it stays correct on resize; chartArea is undefined on the
+                    // very first scriptable call, before layout has run.
+                    backgroundColor: (chartContext: ScriptableContext<'line'>) => {
+                        const { chart } = chartContext
+                        const { ctx: canvasContext, chartArea } = chart
+
+                        if (!chartArea) {
+                            return fillTop
+                        }
+
+                        const gradient = canvasContext.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+                        gradient.addColorStop(0, fillTop)
+                        gradient.addColorStop(1, fillBottom)
+
+                        return gradient
+                    },
+                    // Points stay hidden except on the peak day, so the "Peak day" tile above
+                    // the chart has something to point at.
+                    pointRadius: (chartContext: ScriptableContext<'line'>) => (
+                        data[chartContext.dataIndex] === maxValue ? 4 : 0
                     ),
-                    borderColor: (chartContext: ScriptableContext<'bar'>) => (
-                        data[chartContext.dataIndex] === maxValue ? borderPeakColor : borderBaseColor
-                    ),
-                    borderWidth: 1,
-                    borderRadius: 10,
-                    borderSkipped: false,
-                    maxBarThickness: 32,
+                    pointBackgroundColor: peakColor,
+                    pointBorderColor: peakColor,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: lineColor,
+                    pointHoverBorderColor: '#ffffff',
+                    pointHoverBorderWidth: 2,
                 },
             ],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // Points are hidden, so hovering anywhere in the column must still resolve to
+            // that day rather than requiring a hit on the line itself.
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
             plugins: {
                 legend: {
                     display: false,
                 },
                 tooltip: {
                     callbacks: {
-                        label: (tooltipContext: TooltipItem<'bar'>) => `${formatCredits(Number(tooltipContext.raw ?? 0))} ${t('credits')}`,
+                        label: (tooltipContext: TooltipItem<'line'>) => `${formatCredits(Number(tooltipContext.raw ?? 0))} ${t('credits')}`,
                     },
                 },
             },
@@ -482,10 +519,9 @@ onMounted(() => {
     void drawChart()
 })
 
-watch(usageChart, () => {
-    void drawChart()
-})
-
+// Redraws are explicit (period switch, Inertia prop update, theme toggle) rather than a
+// watcher on usageChart — otherwise switching period drew the chart twice, once from the
+// handler and once from the watcher.
 watch(isDark, () => {
     void drawChart()
 })
@@ -497,7 +533,7 @@ watch(isDark, () => {
     <UserDashboardLayout>
         <div class="space-y-6">
             <div class="min-w-0 space-y-2">
-                <h1 class="mb-1 break-words font-bold text-xl tracking-tight text-gray-950 dark:!text-white lg:text-2xl">
+                <h1 class="mb-1 break-words !font-semibold text-xl tracking-tight text-gray-950 dark:!text-white lg:text-2xl">
                     {{ t('Welcome back! :name', { name: userFirstName }) }} 👏
                 </h1>
                 <p class="max-w-2xl break-words text-sm text-gray-600 dark:text-gray-300 lg:text-base">
@@ -580,12 +616,21 @@ watch(isDark, () => {
                     </div>
 
                     <div class="p-6">
-                        <div v-if="!hasChartData" class="flex flex-col items-center justify-center h-[320px] border border-dashed border-gray-200 dark:border-surface-800 rounded-2xl bg-gray-50/30 dark:bg-surface-900/30">
-                            <i class="ti ti-chart-bar-off text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('No data found') }}</p>
-                        </div>
-                        <div v-else class="h-[320px]">
-                            <canvas ref="canvasRef"></canvas>
+                        <div class="relative h-[320px]">
+                            <div v-if="!hasChartData" class="flex h-full flex-col items-center justify-center border border-dashed border-gray-200 dark:border-surface-800 rounded-2xl bg-gray-50/30 dark:bg-surface-900/30">
+                                <i class="ti ti-chart-bar-off text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('No data found') }}</p>
+                            </div>
+                            <canvas v-else ref="canvasRef"></canvas>
+                            <!-- Loading overlay — covers the plot only, so the heading, the
+                                 summary tiles and the period switch stay legible while the new
+                                 range loads. -->
+                            <div v-if="chartLoading" class="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[2px] transition-all dark:bg-surface-900/70">
+                                <div class="flex flex-col items-center gap-2">
+                                    <i class="ti ti-loader animate-spin text-2xl text-primary-500"></i>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Updating...') }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -593,82 +638,82 @@ watch(isDark, () => {
 
             <section class="grid gap-6" :class="isProAvailable ? 'xl:grid-cols-2' : ''">
                 <section v-if="isProAvailable" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-                        <div class="px-6 pt-6 bg-white dark:bg-surface-900">
-                            <div class="flex items-start justify-between gap-4">
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Current plan') }}</p>
-                                    <h2 class="mt-2 break-words font-heading text-xl font-bold text-gray-950 dark:!text-white">{{ plan?.name ?? t('No active plan') }}</h2>
-                                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                                        <span :class="planStatusClass" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
-                                            {{ planStatusLabel }}
-                                        </span>
-                                        <span v-if="plan?.trial_ends_at" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Trial ends :date', { date: formatDate(plan.trial_ends_at) }) }}</span>
-                                        <span v-else-if="plan?.subscription_ends_at" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Access reserved through :date', { date: formatDate(plan.subscription_ends_at) }) }}</span>
-                                    </div>
-                                </div>
-                                <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-700 shadow-sm dark:bg-primary-500/15 dark:text-primary-500 shrink-0">
-                                    <i class="ti ti-rocket text-xl"></i>
+                    <div class="px-6 pt-6 bg-white dark:bg-surface-900">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Current plan') }}</p>
+                                <h2 class="mt-2 break-words font-heading text-xl font-bold text-gray-950 dark:!text-white">{{ plan?.name ?? t('No active plan') }}</h2>
+                                <div class="mt-2 flex flex-wrap items-center gap-2">
+                                    <span :class="planStatusClass" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                                        {{ planStatusLabel }}
+                                    </span>
+                                    <span v-if="plan?.trial_ends_at" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Trial ends :date', { date: formatDate(plan.trial_ends_at) }) }}</span>
+                                    <span v-else-if="plan?.subscription_ends_at" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Access reserved through :date', { date: formatDate(plan.subscription_ends_at) }) }}</span>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="space-y-5 px-6 pb-6 pt-4">
+                    <div class="space-y-5 px-6 pb-6 pt-4">
 
-                            <div v-if="planFeatures.length" class="space-y-3">
-                                <div v-for="feature in planFeatures" :key="feature" class="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-2 dark:border-surface-800 dark:bg-surface-950/60">
-                                    <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                                        <i class="ti ti-check text-sm"></i>
-                                    </div>
-                                    <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ feature }}</p>
+                        <div v-if="planFeatures.length" class="space-y-3">
+                            <div v-for="feature in planFeatures" :key="feature" class="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-2 dark:border-surface-800 dark:bg-surface-950/60">
+                                <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                                    <i class="ti ti-check text-sm"></i>
                                 </div>
+                                <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ feature }}</p>
                             </div>
-
-                            <Link
-                                v-if="!plan || plan.is_free || plan.subscription_status === 'none'"
-                                :href="route('pricing')"
-                                class="btn-primary"
-                            >
-                                <i class="ti ti-arrow-up"></i>
-                                {{ t('Upgrade plan') }}
-                            </Link>
-                            <Link
-                                v-else
-                                :href="route('user.dashboard.billing')"
-                                class="flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:!border-gray-200 hover:!bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900/20 dark:text-gray-200 dark:hover:!border-gray-800 dark:hover:!bg-surface-900/30 dark:hover:!text-gray-300"
-                            >
-                                <i class="ti ti-credit-card"></i>
-                                {{ t('Manage billing') }}
-                            </Link>
                         </div>
+
+                        <Link
+                            v-if="!plan || plan.is_free || plan.subscription_status === 'none'"
+                            :href="route('pricing')"
+                            class="btn-primary"
+                        >
+                            <i class="ti ti-arrow-up"></i>
+                            {{ t('Upgrade plan') }}
+                        </Link>
+                        <Link
+                            v-else
+                            :href="route('user.dashboard.billing')"
+                            class="flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:!border-gray-200 hover:!bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900/20 dark:text-gray-200 dark:hover:!border-gray-800 dark:hover:!bg-surface-900/30 dark:hover:!text-gray-300"
+                        >
+                            <i class="ti ti-credit-card"></i>
+                            {{ t('Manage billing') }}
+                        </Link>
+                    </div>
                 </section>
 
                 <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-                        <div class="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-surface-800 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="min-w-0">
-                                <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent login history') }}</h2>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('The last 10 login attempts for this account.') }}</p>
-                            </div>
-                            <Link :href="route('user.dashboard.privacy')" class="shrink-0 text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
-                                {{ t('View details') }}
-                            </Link>
+                    <div class="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-surface-800 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent login history') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('The last 5 login attempts for this account.') }}</p>
                         </div>
-                        <div class="divide-y divide-gray-100 dark:divide-surface-800">
-                            <div v-if="recentLoginHistory.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No login history yet.') }}</div>
-                            <div v-for="login in recentLoginHistory" :key="login.id" class="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span :class="login.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'" class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]">
-                                            {{ login.success ? t('Success') : t('Failed') }}
-                                        </span>
-                                        <p class="break-all text-sm font-semibold text-gray-950 dark:text-white">{{ login.ip || t('Unknown IP') }}</p>
-                                    </div>
-                                    <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ formatLoginLocation(login) }}</p>
+                        <!-- Anchored at the Login History section: the privacy page's own
+                             Session Management block lists LIVE sessions (usually just the
+                             current one), which is not what this panel is showing. -->
+                        <Link :href="route('user.dashboard.privacy') + '#login-history'" class="shrink-0 text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
+                            {{ t('View all') }}
+                        </Link>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-surface-800">
+                        <div v-if="recentLoginHistory.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No login history yet.') }}</div>
+                        <div v-for="login in recentLoginHistory" :key="login.id" class="flex flex-col gap-3 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span :class="login.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'" class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]">
+                                        {{ login.success ? t('Success') : t('Failed') }}
+                                    </span>
+                                    <p class="break-all text-sm font-semibold text-gray-950 dark:text-white">{{ login.ip || t('Unknown IP') }}</p>
                                 </div>
-                                <span class="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 dark:!bg-surface-800 dark:text-gray-300">
-                                    {{ login.created_at ? formatRelative(login.created_at) : t('Unknown time') }}
-                                </span>
+                                <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ formatLoginLocation(login) }}</p>
                             </div>
+                            <span class="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 dark:!bg-surface-800 dark:text-gray-300">
+                                {{ login.created_at ? formatRelative(login.created_at) : t('Unknown time') }}
+                            </span>
                         </div>
+                    </div>
                 </section>
             </section>
 
@@ -717,20 +762,26 @@ watch(isDark, () => {
                 <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                         <div class="min-w-0">
-                            <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent conversations') }}</h2>
-                            <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ t('Fresh idea sessions and client-facing discussions.') }}</p>
+                            <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent generations') }}</h2>
+                            <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ t('Your latest AI runs across every tool.') }}</p>
                         </div>
+                        <Link :href="route('user.dashboard.history.index')" class="shrink-0 text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
+                            {{ t('View all') }}
+                        </Link>
                     </div>
 
                     <div class="divide-y divide-gray-100 dark:divide-surface-800">
-                        <div v-if="recentConversations.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No conversations yet.') }}</div>
-                        <div v-for="conversation in recentConversations" :key="conversation.id" class="flex items-start justify-between gap-4 px-6 py-4">
+                        <div v-if="recentGenerations.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No generations yet.') }}</div>
+                        <div v-for="generation in recentGenerations" :key="generation.ulid" class="flex items-start justify-between gap-4 px-6 py-4">
                             <div class="min-w-0 flex-1">
-                                <p class="break-words font-semibold text-gray-950 dark:!text-gray-200">{{ conversation.title }}</p>
-                                <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ formatNumber(conversation.message_count) }} {{ t('messages') }}</p>
+                                <Link v-if="generation.tool_slug" :href="route('ai.tools.show', { slug: generation.tool_slug })" class="break-words font-semibold text-gray-950 transition hover:text-primary-700 dark:!text-gray-200 dark:hover:!text-primary-400">
+                                    {{ generation.tool_name }}
+                                </Link>
+                                <p v-else class="break-words font-semibold text-gray-950 dark:!text-gray-200">{{ generation.tool_name }}</p>
+                                <p class="mt-1 break-words text-sm text-gray-500 line-clamp-1 dark:text-gray-400">{{ generation.output_preview }}</p>
                             </div>
                             <span class="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 dark:!bg-surface-800 dark:text-gray-300">
-                                {{ conversation.last_message_at ? formatRelative(conversation.last_message_at) : t('Just now') }}
+                                {{ generation.created_at ? formatRelative(generation.created_at) : t('Just now') }}
                             </span>
                         </div>
                     </div>
@@ -742,6 +793,9 @@ watch(isDark, () => {
                             <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent documents') }}</h2>
                             <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ t('Saved deliverables that make the dashboard feel alive and valuable.') }}</p>
                         </div>
+                        <Link :href="route('user.dashboard.documents.index')" class="shrink-0 text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
+                            {{ t('View all') }}
+                        </Link>
                     </div>
 
                     <div class="divide-y divide-gray-100 dark:divide-surface-800">
@@ -765,8 +819,10 @@ watch(isDark, () => {
                         <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Wallet activity') }}</h2>
                         <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ t('Your latest credit purchases, usage, and balance updates.') }}</p>
                     </div>
-                    <Link :href="route('user.dashboard.usage.index')" class="text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
-                        {{ t('Usage details') }}
+                    <!-- Anchored at the wallet ledger: the Usage page's charts count
+                         generations, which is not what this panel is listing. -->
+                    <Link :href="route('user.dashboard.usage.index') + '#wallet-activity'" class="text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400">
+                        {{ t('View all') }}
                     </Link>
                 </div>
 

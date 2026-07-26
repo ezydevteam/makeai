@@ -83,7 +83,7 @@ const form = useForm({
     show_featured_image: props.page?.show_featured_image ?? true,
     show_sidebar: props.page?.show_sidebar ?? false,
     sidebar_position: props.page?.sidebar_position ?? 'right',
-    container_width: props.page?.container_width ?? '1280px',
+    container_width: props.page?.container_width ?? 'default',
     featured_image: null as File | null,
     og_image: null as File | null,
     remove_featured_image: false,
@@ -122,7 +122,7 @@ const parentOptions = computed(() => [
 ]);
 
 const containerWidthOptions = computed(() => [
-    { value: '1280px', label: t('Default') },
+    { value: 'default', label: t('Default') },
     { value: 'full', label: t('Full Width') },
     { value: '1080px', label: t('Boxed') },
     { value: '1536px', label: t('Stretched') },
@@ -204,6 +204,10 @@ const markSlugTouched = () => {
     slugTouched.value = true;
     form.slug = makeSlug(form.slug);
 };
+
+// The [faqs] shortcode works on any page, but the reference panel is only relevant on
+// the FAQ page — showing it under every new page's editor is just noise.
+const isFaqPage = computed(() => form.slug === 'faq' || props.page?.slug === 'faq');
 
 const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
 
@@ -499,6 +503,18 @@ onClickOutside(publishMenuRef, () => {
                             @ai-assist="runAiAssist"
                         />
                         <p v-if="form.errors.content" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.content }}</p>
+
+                        <div v-if="isFaqPage" class="mt-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3 dark:border-surface-800 dark:bg-surface-800/40">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('Shortcodes') }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ t('Type a shortcode on its own line to embed managed content in this page.') }}
+                            </p>
+                            <ul class="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                <li><code class="rounded bg-white px-1.5 py-0.5 font-mono text-gray-700 dark:bg-surface-900 dark:text-gray-200">[faqs]</code> — {{ t('all active FAQs from Content › FAQs') }}</li>
+                                <li><code class="rounded bg-white px-1.5 py-0.5 font-mono text-gray-700 dark:bg-surface-900 dark:text-gray-200">[faqs category="Billing" limit="8"]</code> — {{ t('limit to categories (id or name) and cap the count') }}</li>
+                                <li><code class="rounded bg-white px-1.5 py-0.5 font-mono text-gray-700 dark:bg-surface-900 dark:text-gray-200">[faqs tabs="sidebar" heading="FAQ"]</code> — {{ t('tabs: hidden, top or sidebar; optional heading') }}</li>
+                            </ul>
+                        </div>
                     </div>
 
                     <div>
@@ -576,10 +592,22 @@ onClickOutside(publishMenuRef, () => {
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Password Protection') }}</label>
                             <div class="relative">
+                                <!-- This is a per-page visitor password, not the admin's own credential.
+                                     `new-password` is what actually suppresses Chrome/Safari autofill
+                                     (they ignore autocomplete="off" on password inputs); the data-*
+                                     attributes opt out of 1Password / LastPass / Dashlane. -->
                                 <input
                                     v-model="form.password"
                                     :type="showPassword ? 'text' : 'password'"
-                                    :placeholder="page?.has_password ? t('Leave blank to keep current password') : t('Optional page password')"
+                                    :placeholder="page?.has_password ? t('Leave blank to remove the password') : t('Optional page password')"
+                                    name="page_password"
+                                    autocomplete="new-password"
+                                    autocorrect="off"
+                                    autocapitalize="off"
+                                    spellcheck="false"
+                                    data-1p-ignore="true"
+                                    data-lpignore="true"
+                                    data-form-type="other"
                                     class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                 />
                                 <button
@@ -593,7 +621,15 @@ onClickOutside(publishMenuRef, () => {
                                 </button>
                             </div>
                             <p v-if="form.errors.password" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.password }}</p>
-                            <p v-if="page?.has_password" class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">{{ t('Password enabled') }}</p>
+                            <!-- The stored hash is never sent to the browser, so the field always
+                                 starts empty. Spell out that saving it empty unprotects the page. -->
+                            <div v-if="page?.has_password && !form.password" class="mt-2 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50/60 p-2.5 dark:border-warning-900/40 dark:bg-warning-950/20">
+                                <i class="ti ti-lock-open mt-0.5 text-sm text-warning-600 dark:text-warning-400"></i>
+                                <span class="text-xs text-warning-700 dark:text-warning-300">
+                                    {{ t('This page is password protected. Retype the password to keep it — saving with this field empty removes the protection.') }}
+                                </span>
+                            </div>
+                            <p v-else-if="page?.has_password" class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">{{ t('Password enabled') }}</p>
                         </div>
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Container Width') }}</label>

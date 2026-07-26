@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import DOMPurify from 'dompurify'
@@ -8,6 +9,7 @@ import KbLayout from './KbLayout.vue'
 defineOptions({ layout: KbLayout })
 
 const { t } = useTranslate()
+const toast = useToastr()
 const page = usePage()
 const kbSettings = computed(() => (page.props as any).kbSettings || {})
 const kbSlug = computed(() => kbSettings.value.public_slug || 'help')
@@ -63,14 +65,33 @@ async function vote(val: number) {
   try {
     const res = await fetch(`/${kbSlug.value}/vote/${props.article.ulid}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content },
+      headers: {
+        'Content-Type': 'application/json',
+        // Without this the request does not read as JSON server-side, so anything that
+        // branches on expectsJson() — demo mode's block, the auth guard, validation —
+        // answered with a 302 to an HTML page instead of a JSON body. res.json() then
+        // threw and the empty catch below swallowed it: the buttons did nothing at all,
+        // silently. Asking for JSON is what makes those responses reportable.
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content,
+      },
       body: JSON.stringify({ vote: val }),
     })
-    const data = await res.json()
+
+    const data = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      // Demo mode answers 403 with its own wording; keep it rather than inventing one.
+      toast.error(data?.message || t('Could not record your feedback. Please try again.'))
+      return
+    }
+
     voted.value = data.your_vote
     helpfulCount.value = data.helpful_count
     notHelpfulCount.value = data.not_helpful_count
-  } catch {} finally {
+  } catch {
+    toast.error(t('Could not record your feedback. Please try again.'))
+  } finally {
     voting.value = false
   }
 }

@@ -52,6 +52,11 @@ interface BlogPost {
     categories: Category[]
     tags: ExistingTag[]
     revisions?: Revision[]
+    // Sidebar stats card (edit mode only; null on create).
+    views_count?: number
+    comments_count?: number
+    created_at?: string | null
+    updated_at?: string | null
 }
 
 interface RichEditorExpose {
@@ -196,6 +201,40 @@ const schemaTypeOptions = computed<SelectOption[]>(() => [
     { value: 'Article', label: 'Article' },
     { value: 'NewsArticle', label: 'News Article' },
 ])
+
+// ─── Sidebar stats card ───────────────────────────────────────────────
+const postStats = computed(() => [
+    { key: 'views', label: t('Views'), value: (props.post?.views_count ?? 0).toLocaleString(), icon: 'ti ti-eye' },
+    { key: 'comments', label: t('Comments'), value: (props.post?.comments_count ?? 0).toLocaleString(), icon: 'ti ti-message-circle' },
+])
+
+function formatStatDate(value: string | null | undefined): string {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function relativeStatDate(value: string | null | undefined): string {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+
+    const seconds = Math.round((Date.now() - date.getTime()) / 1000)
+    const units: [Intl.RelativeTimeFormatUnit, number][] = [
+        ['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60],
+    ]
+    const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+
+    for (const [unit, secondsPerUnit] of units) {
+        if (Math.abs(seconds) >= secondsPerUnit) {
+            return formatter.format(-Math.round(seconds / secondsPerUnit), unit)
+        }
+    }
+
+    return formatter.format(0, 'second')
+}
 
 const publishMenuOpen = ref(false)
 const publishMenuRef = ref<HTMLElement | null>(null)
@@ -462,7 +501,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                    <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-gray-200 bg-white py-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
                         <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
                             <span class="inline-flex items-center gap-2">
                                 <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
@@ -498,7 +537,7 @@ onBeforeUnmount(() => {
 
         <div class="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
             <main class="space-y-5">
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</label>
                     <input v-model="form.title" @input="syncSlug" :placeholder="t('Enter blog post title')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-lg font-semibold dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                     <p v-if="form.errors.title" class="mt-1 text-sm text-danger-600">{{ form.errors.title }}</p>
@@ -548,7 +587,7 @@ onBeforeUnmount(() => {
                     <p v-if="form.errors.excerpt" class="mt-1 text-sm text-danger-600">{{ form.errors.excerpt }}</p>
                 </section>
 
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('SEO') }}</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -588,7 +627,49 @@ onBeforeUnmount(() => {
             </main>
 
             <aside class="space-y-5">
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <!-- Stats. Edit mode only — a post that doesn't exist yet has nothing to report. -->
+                <section v-if="post" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Stats') }}</h2>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div
+                            v-for="stat in postStats"
+                            :key="stat.key"
+                            class="rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2.5 dark:border-surface-800 dark:bg-surface-800/40"
+                        >
+                            <div class="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <i :class="stat.icon" class="text-sm"></i>
+                                <span>{{ stat.label }}</span>
+                            </div>
+                            <p class="mt-1 text-xl font-bold leading-tight text-gray-900 dark:text-white">{{ stat.value }}</p>
+                        </div>
+                    </div>
+
+                    <dl class="mt-4 space-y-3 border-t border-gray-100 pt-4 dark:border-surface-800">
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <i class="ti ti-calendar-plus text-sm"></i>
+                                <span>{{ t('Created') }}</span>
+                            </dt>
+                            <dd class="text-right">
+                                <span class="block text-xs font-medium text-gray-900 dark:text-white">{{ formatStatDate(post.created_at) }}</span>
+                                <span class="block text-[11px] text-gray-400 dark:text-gray-500">{{ relativeStatDate(post.created_at) }}</span>
+                            </dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <i class="ti ti-history text-sm"></i>
+                                <span>{{ t('Last updated') }}</span>
+                            </dt>
+                            <dd class="text-right">
+                                <span class="block text-xs font-medium text-gray-900 dark:text-white">{{ formatStatDate(post.updated_at) }}</span>
+                                <span class="block text-[11px] text-gray-400 dark:text-gray-500">{{ relativeStatDate(post.updated_at) }}</span>
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Publishing') }}</h2>
                     <div class="space-y-4">
                         <div v-if="form.status === 'scheduled'">
@@ -601,7 +682,7 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Categories & Tags') }}</h2>
                     <AppSelect
                         v-if="categories.length"
@@ -622,14 +703,14 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h2>
                     <div class="relative group">
-                        <div class="aspect-video overflow-hidden rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center dark:border-surface-700 dark:bg-surface-800">
+                        <div class="aspect-video overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center dark:border-surface-700 dark:bg-surface-800">
                             <img v-if="featuredPreview" :src="featuredPreview" :alt="form.featured_image_alt || form.title" class="w-full h-full object-cover">
                             <svg v-else class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         </div>
-                        <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg cursor-pointer">
+                        <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
                             <input @change="setFeaturedImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden">
                             <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
                         </label>
@@ -645,7 +726,7 @@ onBeforeUnmount(() => {
                     <input v-model="form.reading_time" :placeholder="t('Estimated reading time in minutes')" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                 </section>
 
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h2>
                     <div class="space-y-4">
                         <div v-for="field in toggles" :key="field.key" class="flex items-center justify-between gap-3">
@@ -674,7 +755,7 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section v-if="post?.revisions?.length" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                <section v-if="post?.revisions?.length" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Revisions') }}</h2>
                     <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                         <div v-for="revision in post.revisions.slice(0, 6)" :key="revision.id" class="rounded-lg bg-gray-50 p-3 dark:bg-surface-800">

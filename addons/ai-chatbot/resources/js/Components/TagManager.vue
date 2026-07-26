@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import type { useChat, ConversationTag } from '../Composables/useChat'
 import { inject } from 'vue'
 
@@ -71,13 +72,36 @@ async function saveTag() {
     }
 }
 
-async function deleteTag(tag: ConversationTag) {
-    if (!confirm(t('Are you sure you want to delete this tag?'))) return
+// The browser's own confirm() blocks the page, ignores the site theme, cannot be styled or
+// translated beyond its message, and on a tag with conversations attached it gave no room to
+// say what deleting one actually does. ActionConfirmModal is what the rest of the chat
+// (conversation and project deletes) already uses.
+const deletingTag = ref<ConversationTag | null>(null)
+const deleteBusy = ref(false)
+
+function askDeleteTag(tag: ConversationTag) {
     saveError.value = ''
+    deletingTag.value = tag
+}
+
+function cancelDeleteTag() {
+    if (deleteBusy.value) return
+    deletingTag.value = null
+}
+
+async function deleteTag() {
+    if (!deletingTag.value) return
+
+    deleteBusy.value = true
+    saveError.value = ''
+
     try {
-        await chat.deleteTag(tag.id)
+        await chat.deleteTag(deletingTag.value.id)
+        deletingTag.value = null
     } catch (e) {
         saveError.value = e instanceof Error ? e.message : t('Failed to delete tag')
+    } finally {
+        deleteBusy.value = false
     }
 }
 </script>
@@ -169,7 +193,7 @@ async function deleteTag(tag: ConversationTag) {
                             </button>
                             <button
                                 class="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                @click="deleteTag(tag)"
+                                @click="askDeleteTag(tag)"
                             >
                                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -192,4 +216,19 @@ async function deleteTag(tag: ConversationTag) {
             </div>
         </div>
     </div>
+
+    <ActionConfirmModal
+        :open="deletingTag !== null"
+        :title="t('Delete tag?')"
+        :message="deletingTag
+            ? t('“:name” will be removed from every conversation it is on. The conversations themselves are not deleted.', { name: deletingTag.name })
+            : ''"
+        :confirm-label="t('Delete')"
+        :cancel-label="t('Cancel')"
+        :processing-label="t('Deleting...')"
+        :processing="deleteBusy"
+        variant="danger"
+        @confirm="deleteTag"
+        @cancel="cancelDeleteTag"
+    />
 </template>

@@ -7,6 +7,7 @@ namespace Addons\AiChatbot\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Addons\AiChatbot\Models\ChatbotMode;
 use Addons\AiChatbot\Models\Conversation;
+use Addons\AiChatbot\Support\ChatDefaults;
 use Addons\AiChatbot\Support\KnowledgeBase;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
@@ -617,8 +618,8 @@ class ChatController extends Controller
             }
         }
 
-        $globalDefaultModel = addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini');
-        $model = $validated['model'] ?? $conversation->model ?? $modeDefaultModel ?? $globalDefaultModel ?? 'gpt-4o-mini';
+        $globalDefaultModel = ChatDefaults::chatModel();
+        $model = $validated['model'] ?? $conversation->model ?? $modeDefaultModel ?? $globalDefaultModel;
 
         $systemPrompt = $mode?->system_prompt ?? null;
 
@@ -631,7 +632,7 @@ class ChatController extends Controller
                         if (!empty($customModel['system_prompt'])) {
                             $systemPrompt = (!empty($systemPrompt) ? $systemPrompt . "\n\n" : '') . $customModel['system_prompt'];
                         }
-                        $model = $customModel['model'] ?? 'gpt-4o-mini';
+                        $model = $customModel['model'] ?? $globalDefaultModel;
                         break;
                     }
                 }

@@ -57,7 +57,15 @@ interface SupportSettingsForm {
 }
 
 const props = defineProps<{
-    tickets: { data: Ticket[]; links: PaginationLink[] }
+    tickets: {
+        data: Ticket[]
+        links: PaginationLink[]
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
+    }
     departments: Option[]
     admins: Option[]
     filters: { search?: string; status?: string; priority?: string; department?: string; assigned_to?: string }
@@ -648,8 +656,18 @@ onBeforeUnmount(() => {
                 </table>
             </div>
 
-            <div v-if="tickets.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                <Pagination :links="tickets.links" />
+            <!-- last_page rather than links.length > 3: the link array also carries the
+                 Previous/Next entries, so the old check was an indirect way of asking the
+                 same thing. from/to/total drive the "showing X to Y of Z" row. -->
+            <div v-if="tickets.last_page > 1" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
+                <Pagination
+                    :links="tickets.links"
+                    :from="tickets.from"
+                    :to="tickets.to"
+                    :total="tickets.total"
+                    :current-page="tickets.current_page"
+                    :last-page="tickets.last_page"
+                />
             </div>
         </section>
 

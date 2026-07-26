@@ -96,9 +96,13 @@ onBeforeUnmount(() => {
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
+            <!-- z-[120], not z-50: the sticky top-announcement stack is z-[60] and the mobile
+                 menu z-[80], so a z-50 backdrop was painted UNDER them and the banner showed
+                 through the dim. A modal is aria-modal — nothing in the page chrome may sit
+                 above it. Still below the toast layer (z-[99999]), which must stay on top. -->
             <div
                 v-if="open"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+                class="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
                 role="dialog"
                 aria-modal="true"
                 @click.self="handleOutsideClick"
@@ -149,8 +153,7 @@ onBeforeUnmount(() => {
                                         <button
                                             v-if="cancelText !== null"
                                             type="button"
-                                            class="inline-flex items-center justify-center border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                            :class="confirmVariant === 'admin' ? 'rounded-xl' : 'rounded-full'"
+                                            class="inline-flex items-center justify-center border rounded-full border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                                             @click="handleClose"
                                         >
                                             {{ t(cancelText) }}
@@ -159,7 +162,7 @@ onBeforeUnmount(() => {
                                             v-if="confirmText"
                                             :type="hasForm ? 'submit' : 'button'"
                                             :disabled="confirmLoading || confirmDisabled"
-                                            class="inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                            class="inline-flex items-center justify-center gap-2 !rounded-full disabled:cursor-not-allowed disabled:opacity-60"
                                             :class="confirmVariant === 'submit' ? 'btn-primary' : confirmVariant === 'delete' ? 'btn-danger' : 'btn-primary-admin'"
                                             @click="!hasForm ? emit('confirm') : null"
                                         >

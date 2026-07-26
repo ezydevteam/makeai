@@ -499,7 +499,7 @@ class RagToolService
             );
 
             // 7. Pre-flight credit check
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = settings('default_ai_model', config('ai.fallback_model'));
             try {
                 TokenGuard::before($user, null, $modelName);
             } catch (\Throwable $e) {
@@ -608,7 +608,7 @@ class RagToolService
         $labels = ['A', 'B', 'C'];
         $topK = (int) settings('rag_top_k', 6);
         $provider = settings('default_ai_provider', 'openai');
-        $modelName = settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = settings('default_ai_model', config('ai.fallback_model'));
 
         try {
             TokenGuard::before($user, null, $modelName);
@@ -750,7 +750,7 @@ class RagToolService
         }
 
         $provider = settings('default_ai_provider', 'openai');
-        $modelName = settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = settings('default_ai_model', config('ai.fallback_model'));
 
         // Get all chunks, sorted by document+index
         $chunks = DB::table('knowledge_base_chunks')
@@ -947,7 +947,7 @@ class RagToolService
 
         $topK = (int) settings('rag_top_k', 6);
         $provider = settings('default_ai_provider', 'openai');
-        $modelName = settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = settings('default_ai_model', config('ai.fallback_model'));
         $embeddingModel = settings('rag_embedding_model', '') ?: null;
 
         try {

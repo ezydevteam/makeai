@@ -1062,8 +1062,14 @@ onBeforeUnmount(() => {
         <!-- Link tooltip -->
         <div v-if="linkTooltip.visible" class="pointer-events-none fixed z-50 max-w-xs truncate rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg" :style="{ left: `${linkTooltip.x + 12}px`, top: `${linkTooltip.y + 14}px` }">{{ linkTooltip.url }}</div>
 
+        <!-- The five editor sub-modals below sit at z-[125]: above the app modal layer
+             (z-[120]) so they still work when the editor is itself inside a modal, and above
+             the sticky announcement stack (z-[60]) / mobile menu (z-[80]) when it is not.
+             They render in place rather than teleporting, so nested inside a modal they stay
+             confined to its stacking context regardless — the value only matters standalone. -->
+
         <!-- Table picker modal -->
-        <div v-if="tablePickerOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="tablePickerOpen = false">
+        <div v-if="tablePickerOpen" class="fixed inset-0 z-[125] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="tablePickerOpen = false">
             <div data-rich-editor-table-picker class="rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">{{ tablePickerRows }} × {{ tablePickerCols }}</div>
                 <div class="grid grid-cols-8 gap-1">
@@ -1074,7 +1080,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Modals: Link, Image, Video, Attachment -->
-        <div v-if="linkModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeLinkModal">
+        <div v-if="linkModalOpen" class="fixed inset-0 z-[125] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeLinkModal">
             <div class="w-full max-w-[540px] overflow-visible rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ linkEditing ? t('Edit link') : t('Add link') }}</h3></div>
                 <div class="space-y-4 p-5">
@@ -1090,7 +1096,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div v-if="imageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeImageModal">
+        <div v-if="imageModalOpen" class="fixed inset-0 z-[125] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeImageModal">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add image') }}</h3></div>
                 <div class="space-y-4 p-5">
@@ -1131,7 +1137,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div v-if="videoModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="videoModalOpen = false">
+        <div v-if="videoModalOpen" class="fixed inset-0 z-[125] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="videoModalOpen = false">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Embed video') }}</h3></div>
                 <div class="space-y-4 p-5"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('YouTube or Vimeo URL') }}<input v-model="videoUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label><p v-if="videoError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ videoError }}</p></div>
@@ -1139,7 +1145,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div v-if="attachmentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="attachmentModalOpen = false">
+        <div v-if="attachmentModalOpen" class="fixed inset-0 z-[125] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="attachmentModalOpen = false">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Attach file') }}</h3></div>
                 <div class="space-y-4 p-5">

@@ -1,6 +1,7 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import Fuse from 'fuse.js'
+import { t } from '@/Composables/useTranslate'
 
 export interface PaletteItem {
     id: string
@@ -10,6 +11,37 @@ export interface PaletteItem {
     icon?: string
     color?: string
     action: () => void
+}
+
+export interface PaletteTab {
+    key: string
+    label: string
+    icon: string
+    /** How many of the currently matching items live in this tab. */
+    count: number
+}
+
+/**
+ * Tab definitions, in display order. `groups` is the set of item groups a tab
+ * owns; `null` means "everything" (the All tab). A tab whose groups have no
+ * loaded items at all is dropped from the bar — e.g. Admin for a normal user.
+ *
+ * Group names and `label` stay in English: they are lookup keys (and translation
+ * source strings). The view translates them at render time.
+ */
+const TAB_DEFS: { key: string; label: string; icon: string; groups: string[] | null }[] = [
+    { key: 'all', label: 'All', icon: 'ti ti-layout-grid-add', groups: null },
+    { key: 'actions', label: 'Actions', icon: 'ti ti-bolt', groups: ['Actions'] },
+    { key: 'navigation', label: 'Navigate', icon: 'ti ti-compass', groups: ['Navigation'] },
+    { key: 'tools', label: 'AI Tools', icon: 'ti ti-sparkles', groups: ['AI Tools'] },
+    { key: 'documents', label: 'Documents', icon: 'ti ti-file-text', groups: ['Recent Documents'] },
+    { key: 'chats', label: 'Chats', icon: 'ti ti-message-circle', groups: ['Recent Chats'] },
+    { key: 'admin', label: 'Admin', icon: 'ti ti-shield', groups: ['Admin'] },
+]
+
+/** Section headers are injected as pseudo-items; they are never selectable. */
+export function isSectionHeader(item: PaletteItem | undefined): boolean {
+    return !!item && item.id.startsWith('header-')
 }
 
 const RECENT_KEY = 'cmd_palette_recent'
@@ -34,6 +66,7 @@ export function useCommandPalette() {
     const query = ref('')
     const isOpen = ref(false)
     const selectedIndex = ref(0)
+    const activeTab = ref('all')
     const page = usePage()
 
     const user = computed(() => (page.props.auth as any)?.user ?? null)
@@ -55,27 +88,27 @@ export function useCommandPalette() {
     })
 
     const navItems: PaletteItem[] = [
-        { id: 'nav-dashboard', group: 'Navigation', label: 'Dashboard', icon: 'ti ti-dashboard', action: () => router.visit('/user/dashboard') },
-        { id: 'nav-tools', group: 'Navigation', label: 'AI Tools', icon: 'ti ti-tools', action: () => router.visit('/ai-tools') },
-        { id: 'nav-documents', group: 'Navigation', label: 'Documents', icon: 'ti ti-file-text', action: () => router.visit('/user/dashboard/documents') },
-        { id: 'nav-history', group: 'Navigation', label: 'History', icon: 'ti ti-history', action: () => router.visit('/user/dashboard/history') },
-        { id: 'nav-usage', group: 'Navigation', label: 'My Usage', icon: 'ti ti-chart-bar', action: () => router.visit('/user/dashboard/usage') },
-        { id: 'nav-playground', group: 'Navigation', label: 'Playground', icon: 'ti ti-building-factory', action: () => router.visit('/user/dashboard/playground') },
-        { id: 'nav-chains', group: 'Navigation', label: 'Tool Chains', icon: 'ti ti-link', action: () => router.visit('/user/dashboard/chains') },
-        { id: 'nav-favorites', group: 'Navigation', label: 'Favorites', icon: 'ti ti-star', action: () => router.visit('/user/dashboard/favorites') },
-        { id: 'nav-collections', group: 'Navigation', label: 'Collections', icon: 'ti ti-books', action: () => router.visit('/user/dashboard/collections') },
-        { id: 'nav-settings', group: 'Navigation', label: 'Settings', icon: 'ti ti-settings', action: () => router.visit('/user/dashboard/profile') },
-        { id: 'nav-chat', group: 'Navigation', label: 'Chat', icon: 'ti ti-message-circle', action: () => router.visit('/chat') },
+        { id: 'nav-dashboard', group: 'Navigation', label: t('Dashboard'), icon: 'ti ti-dashboard', action: () => router.visit('/user/dashboard') },
+        { id: 'nav-tools', group: 'Navigation', label: t('AI Tools'), icon: 'ti ti-tools', action: () => router.visit('/ai-tools') },
+        { id: 'nav-documents', group: 'Navigation', label: t('Documents'), icon: 'ti ti-file-text', action: () => router.visit('/user/dashboard/documents') },
+        { id: 'nav-history', group: 'Navigation', label: t('History'), icon: 'ti ti-history', action: () => router.visit('/user/dashboard/history') },
+        { id: 'nav-usage', group: 'Navigation', label: t('My Usage'), icon: 'ti ti-chart-bar', action: () => router.visit('/user/dashboard/usage') },
+        { id: 'nav-playground', group: 'Navigation', label: t('Playground'), icon: 'ti ti-building-factory', action: () => router.visit('/user/dashboard/playground') },
+        { id: 'nav-chains', group: 'Navigation', label: t('Tool Chains'), icon: 'ti ti-link', action: () => router.visit('/user/dashboard/chains') },
+        { id: 'nav-favorites', group: 'Navigation', label: t('Favorites'), icon: 'ti ti-star', action: () => router.visit('/user/dashboard/favorites') },
+        { id: 'nav-collections', group: 'Navigation', label: t('Collections'), icon: 'ti ti-books', action: () => router.visit('/user/dashboard/collections') },
+        { id: 'nav-settings', group: 'Navigation', label: t('Settings'), icon: 'ti ti-settings', action: () => router.visit('/user/dashboard/profile') },
+        { id: 'nav-chat', group: 'Navigation', label: t('Chat'), icon: 'ti ti-message-circle', action: () => router.visit('/chat') },
     ]
 
     const quickActions: PaletteItem[] = [
-        { id: 'action-copy-last', group: 'Actions', label: 'Copy last output', icon: 'ti ti-copy', action: () => {
+        { id: 'action-copy-last', group: 'Actions', label: t('Copy last output'), icon: 'ti ti-copy', action: () => {
             const outputs = document.querySelectorAll('[data-last-output]')
             if (outputs.length > 0) {
                 navigator.clipboard.writeText((outputs[0] as HTMLElement).innerText).catch(() => {})
             }
         }},
-        { id: 'action-dark-mode', group: 'Actions', label: 'Toggle dark mode', icon: 'ti ti-moon', action: () => {
+        { id: 'action-dark-mode', group: 'Actions', label: t('Toggle dark mode'), icon: 'ti ti-moon', action: () => {
             const html = document.documentElement
             html.classList.toggle('dark')
             fetch('/profile/theme', {
@@ -88,16 +121,16 @@ export function useCommandPalette() {
                 body: JSON.stringify({ theme: html.classList.contains('dark') ? 'dark' : 'light' }),
             }).catch(() => {})
         }},
-        { id: 'action-new-doc', group: 'Actions', label: 'New document', icon: 'ti ti-file-plus', action: () => router.visit('/ai-tools') },
-        { id: 'action-new-chat', group: 'Actions', label: 'New chat', icon: 'ti ti-message-plus', action: () => router.visit('/chat') },
-        { id: 'action-shortcuts', group: 'Actions', label: 'View all shortcuts', icon: 'ti ti-keyboard', action: () => window.dispatchEvent(new CustomEvent('shortcuts:show')) },
+        { id: 'action-new-doc', group: 'Actions', label: t('New document'), icon: 'ti ti-file-plus', action: () => router.visit('/ai-tools') },
+        { id: 'action-new-chat', group: 'Actions', label: t('New chat'), icon: 'ti ti-message-plus', action: () => router.visit('/chat') },
+        { id: 'action-shortcuts', group: 'Actions', label: t('View all shortcuts'), icon: 'ti ti-keyboard', action: () => window.dispatchEvent(new CustomEvent('shortcuts:show')) },
     ]
 
     const adminItems: PaletteItem[] = isAdmin.value ? [
-        { id: 'admin-dashboard', group: 'Admin', label: 'Admin Dashboard', icon: 'ti ti-shield', action: () => router.visit('/admin/dashboard') },
-        { id: 'admin-users', group: 'Admin', label: 'Manage Users', icon: 'ti ti-users', action: () => router.visit('/admin/users') },
-        { id: 'admin-tools', group: 'Admin', label: 'AI Tools', icon: 'ti ti-tools', action: () => router.visit('/admin/ai/tools') },
-        { id: 'admin-settings', group: 'Admin', label: 'Admin Settings', icon: 'ti ti-settings-cog', action: () => router.visit('/admin/settings/general') },
+        { id: 'admin-dashboard', group: 'Admin', label: t('Admin Dashboard'), icon: 'ti ti-shield', action: () => router.visit('/admin/dashboard') },
+        { id: 'admin-users', group: 'Admin', label: t('Manage Users'), icon: 'ti ti-users', action: () => router.visit('/admin/users') },
+        { id: 'admin-tools', group: 'Admin', label: t('AI Tools'), icon: 'ti ti-tools', action: () => router.visit('/admin/ai/tools') },
+        { id: 'admin-settings', group: 'Admin', label: t('Admin Settings'), icon: 'ti ti-settings-cog', action: () => router.visit('/admin/settings/general') },
     ] : []
 
     function buildItems(): PaletteItem[] {
@@ -136,7 +169,7 @@ export function useCommandPalette() {
             items.push({
                 id: `chat-${c.id}`,
                 group: 'Recent Chats',
-                label: c.title || 'Untitled',
+                label: c.title || t('Untitled'),
                 sublabel: c.ulid,
                 icon: 'ti ti-message-circle',
                 action: () => {
@@ -170,47 +203,115 @@ export function useCommandPalette() {
         distance: 100,
     }))
 
-    const results = computed<PaletteItem[]>(() => {
+    /** Everything matching the current query, still ungrouped and untabbed. */
+    const matchedItems = computed<PaletteItem[]>(() => {
         const q = query.value.trim()
-        if (!q) {
-            const grouped = new Map<string, PaletteItem[]>()
-            for (const item of allItems.value) {
-                if (!grouped.has(item.group)) grouped.set(item.group, [])
-                grouped.get(item.group)!.push(item)
-            }
-            const out: PaletteItem[] = []
-            for (const [group, items] of grouped) {
-                out.push({ id: `header-${group}`, group, label: group, icon: '', action: () => {}, sublabel: `${items.length} items` } as any)
-                out.push(...items.slice(0, 12))
-            }
-            return out
-        }
-        return fuse.value.search(q).map(r => r.item)
+        return q ? fuse.value.search(q).map(r => r.item) : allItems.value
     })
 
-    const flatItems = computed(() => results.value)
+    function itemsForTab(items: PaletteItem[], key: string): PaletteItem[] {
+        const def = TAB_DEFS.find(t => t.key === key)
+        if (!def || !def.groups) return items
+        return items.filter(item => def.groups!.includes(item.group))
+    }
+
+    /**
+     * Counts track the *query matches*, but a tab stays in the bar as long as it
+     * has any loaded item — otherwise the bar would reshuffle on every keystroke.
+     */
+    const tabs = computed<PaletteTab[]>(() =>
+        TAB_DEFS
+            .filter(def => !def.groups || itemsForTab(allItems.value, def.key).length > 0)
+            .map(def => ({
+                key: def.key,
+                label: def.label,
+                icon: def.icon,
+                count: itemsForTab(matchedItems.value, def.key).length,
+            })),
+    )
+
+    const results = computed<PaletteItem[]>(() => {
+        const items = itemsForTab(matchedItems.value, activeTab.value)
+
+        // Only the unfiltered All tab needs group headers — every other view is a
+        // single group already, and search results are ranked, not grouped.
+        if (activeTab.value !== 'all' || query.value.trim()) return items
+
+        const grouped = new Map<string, PaletteItem[]>()
+        for (const item of items) {
+            if (!grouped.has(item.group)) grouped.set(item.group, [])
+            grouped.get(item.group)!.push(item)
+        }
+
+        const out: PaletteItem[] = []
+        for (const [group, groupItems] of grouped) {
+            out.push({
+                id: `header-${group}`,
+                group,
+                label: group,
+                icon: '',
+                action: () => {},
+                sublabel: t('One item|:count items', { count: groupItems.length }),
+            } as any)
+            out.push(...groupItems.slice(0, 6))
+        }
+        return out
+    })
+
+    const flatItems = computed(() => results.value.filter(item => !isSectionHeader(item)))
+
+    /** Total matches across every tab — drives the "try another tab" hint. */
+    const totalMatches = computed(() => matchedItems.value.length)
+
+    function firstSelectable(): number {
+        return results.value.findIndex(item => !isSectionHeader(item))
+    }
+
+    // Any change to what is on screen re-anchors the cursor to the first real row.
+    watch([query, activeTab], () => {
+        selectedIndex.value = firstSelectable()
+    })
 
     function open() {
         isOpen.value = true
         query.value = ''
-        selectedIndex.value = 0
+        activeTab.value = 'all'
+        selectedIndex.value = firstSelectable()
     }
 
     function close() {
         isOpen.value = false
     }
 
+    function setTab(key: string) {
+        if (tabs.value.some(tab => tab.key === key)) activeTab.value = key
+    }
+
+    function cycleTab(step: number) {
+        const list = tabs.value
+        if (list.length < 2) return
+        const current = list.findIndex(tab => tab.key === activeTab.value)
+        const next = (current + step + list.length) % list.length
+        activeTab.value = list[next].key
+    }
+
     function selectNext() {
-        if (selectedIndex.value < flatItems.value.length - 1) selectedIndex.value++
+        const list = results.value
+        for (let i = selectedIndex.value + 1; i < list.length; i++) {
+            if (!isSectionHeader(list[i])) { selectedIndex.value = i; return }
+        }
     }
 
     function selectPrev() {
-        if (selectedIndex.value > 0) selectedIndex.value--
+        const list = results.value
+        for (let i = selectedIndex.value - 1; i >= 0; i--) {
+            if (!isSectionHeader(list[i])) { selectedIndex.value = i; return }
+        }
     }
 
     function execute() {
-        const item = flatItems.value[selectedIndex.value]
-        if (item && item.action) {
+        const item = results.value[selectedIndex.value]
+        if (item && item.action && !isSectionHeader(item)) {
             saveRecent(item.id)
             item.action()
             close()
@@ -223,7 +324,16 @@ export function useCommandPalette() {
         if (e.key === 'ArrowDown') { e.preventDefault(); selectNext(); return }
         if (e.key === 'ArrowUp') { e.preventDefault(); selectPrev(); return }
         if (e.key === 'Enter') { e.preventDefault(); execute(); return }
-        if (e.key === '?') {
+        // Tab walks the tab bar; arrows only do so while the query is empty, so
+        // they stay available for editing the search text.
+        if (e.key === 'Tab') { e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1); return }
+        if (!query.value && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+            e.preventDefault()
+            cycleTab(e.key === 'ArrowRight' ? 1 : -1)
+            return
+        }
+        // Only a shortcut while nothing is typed — otherwise "?" belongs in the query.
+        if (e.key === '?' && !query.value) {
             e.preventDefault()
             close()
             window.dispatchEvent(new CustomEvent('shortcuts:show'))
@@ -245,5 +355,8 @@ export function useCommandPalette() {
         window.removeEventListener('palette:open', onPaletteOpen)
     })
 
-    return { query, isOpen, selectedIndex, results, flatItems, open, close, selectNext, selectPrev, execute }
+    return {
+        query, isOpen, selectedIndex, activeTab, tabs, results, flatItems, totalMatches,
+        open, close, setTab, cycleTab, selectNext, selectPrev, execute,
+    }
 }

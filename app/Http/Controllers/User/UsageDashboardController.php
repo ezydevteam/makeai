@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 
 use App\Models\AiTool;
 use App\Models\AiUsageLog;
+use App\Models\CreditTransaction;
 use App\Models\GenerationHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -53,7 +54,7 @@ class UsageDashboardController extends Controller
             $totalCreditsUsed = AiUsageLog::where('user_id', $user->id)->sum('credits_used');
 
             $peakHour = AiUsageLog::where('user_id', $user->id)
-                ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
+                ->selectRaw(self::sqlHour('created_at').' as hour, COUNT(*) as count')
                 ->groupBy('hour')
                 ->orderByDesc('count')
                 ->first();
@@ -63,10 +64,12 @@ class UsageDashboardController extends Controller
 
             $totalGenerations = AiUsageLog::where('user_id', $user->id)->count();
 
-            $mostActiveDay = AiUsageLog::where('user_id', $user->id)
+            // Grouped by weekday NUMBER and named in PHP: DAYNAME() is MySQL-only, and it also
+            // returns an untranslatable English name straight from the database.
+            $mostActiveWeekday = AiUsageLog::where('user_id', $user->id)
                 ->where('created_at', '>=', $thirtyDaysAgo)
-                ->selectRaw('DAYNAME(created_at) as day_name, COUNT(*) as count')
-                ->groupBy('day_name')
+                ->selectRaw(self::sqlWeekday('created_at').' as weekday, COUNT(*) as count')
+                ->groupBy('weekday')
                 ->orderByDesc('count')
                 ->first();
 
@@ -93,7 +96,9 @@ class UsageDashboardController extends Controller
                 'daily_usage' => $dailyUsage,
                 'top_tools' => $topTools,
                 'peak_hour' => $peakHour ? (int) $peakHour->hour : null,
-                'most_active_day' => $mostActiveDay?->day_name,
+                'most_active_day' => $mostActiveWeekday
+                    ? self::weekdayName((int) $mostActiveWeekday->weekday)
+                    : null,
                 'avg_tokens_per_gen' => $totalGenerations > 0 ? round($totalTokens / $totalGenerations) : 0,
                 'recent_history' => $recentHistory,
             ];
@@ -114,7 +119,32 @@ class UsageDashboardController extends Controller
             'plan_credit_limit' => (float) $planCreditLimit,
         ]);
 
-        return Inertia::render('User/Usage', ['stats' => $stats]);
+        // Deliberately OUTSIDE the 5-minute stats cache: it is paginated (the cache key does
+        // not vary by page) and a wallet ledger that lags five minutes behind a purchase
+        // reads as a bug. The dashboard's "Wallet activity" panel links here for the full
+        // list, so this page has to actually carry it.
+        $transactions = tap(
+            $user->creditTransactions()
+                ->latest()
+                ->paginate(15, ['*'], 'wallet_page')
+                ->withQueryString()
+                ->fragment('wallet-activity'),
+            function ($paginator) {
+                $paginator->getCollection()->transform(fn (CreditTransaction $tx) => [
+                    'id' => $tx->id,
+                    'amount' => (float) $tx->amount,
+                    'balance_after' => (float) $tx->balance_after,
+                    'type' => $tx->type,
+                    'description' => $tx->description,
+                    'created_at' => $tx->created_at?->toIso8601String(),
+                ]);
+            }
+        );
+
+        return Inertia::render('User/Usage', [
+            'stats' => $stats,
+            'transactions' => $transactions,
+        ]);
     }
 
     public function export(): \Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -310,7 +340,7 @@ class UsageDashboardController extends Controller
                 $twentyFourHoursAgo = now()->subHours(24);
                 $rows = AiUsageLog::where('user_id', $userId)
                     ->where('created_at', '>=', $twentyFourHoursAgo)
-                    ->selectRaw('DATE(created_at) as label_date, HOUR(created_at) as label_hour, SUM(credits_used) as credits')
+                    ->selectRaw('DATE(created_at) as label_date, '.self::sqlHour('created_at').' as label_hour, SUM(credits_used) as credits')
                     ->groupBy('label_date', 'label_hour')
                     ->orderBy('label_date', 'asc')
                     ->orderBy('label_hour', 'asc')
@@ -341,7 +371,7 @@ class UsageDashboardController extends Controller
                 $oneYearAgo = now()->subMonths(12)->startOfMonth();
                 $rows = AiUsageLog::where('user_id', $userId)
                     ->where('created_at', '>=', $oneYearAgo)
-                    ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(credits_used) as credits')
+                    ->selectRaw(self::sqlYear('created_at').' as year, '.self::sqlMonth('created_at').' as month, SUM(credits_used) as credits')
                     ->groupBy('year', 'month')
                     ->orderBy('year', 'asc')
                     ->orderBy('month', 'asc')
@@ -374,5 +404,61 @@ class UsageDashboardController extends Controller
     private static function colLetter(int $i): string
     {
         return chr(65 + $i);
+    }
+
+    /**
+     * Date-part expressions that work on both MySQL and SQLite.
+     *
+     * HOUR()/YEAR()/MONTH()/DAYNAME() are MySQL-only, so this page threw a 500 on any SQLite
+     * install (and could not be covered by a feature test at all, since the suite runs on
+     * sqlite :memory:). SQLite's strftime returns a zero-padded string, hence the cast.
+     */
+    private static function isSqlite(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlite';
+    }
+
+    private static function sqlHour(string $column): string
+    {
+        return self::isSqlite()
+            ? "CAST(strftime('%H', {$column}) AS INTEGER)"
+            : "HOUR({$column})";
+    }
+
+    private static function sqlYear(string $column): string
+    {
+        return self::isSqlite()
+            ? "CAST(strftime('%Y', {$column}) AS INTEGER)"
+            : "YEAR({$column})";
+    }
+
+    private static function sqlMonth(string $column): string
+    {
+        return self::isSqlite()
+            ? "CAST(strftime('%m', {$column}) AS INTEGER)"
+            : "MONTH({$column})";
+    }
+
+    /**
+     * Weekday as an integer, 0 = Sunday on both engines: SQLite's strftime('%w') is already
+     * 0-based from Sunday, MySQL's DAYOFWEEK() is 1-based from Sunday.
+     */
+    private static function sqlWeekday(string $column): string
+    {
+        return self::isSqlite()
+            ? "CAST(strftime('%w', {$column}) AS INTEGER)"
+            : "(DAYOFWEEK({$column}) - 1)";
+    }
+
+    /**
+     * Weekday number to a translatable name. Previously DAYNAME() returned an English name
+     * straight from the database, which no locale could translate.
+     */
+    private static function weekdayName(int $weekday): string
+    {
+        return [
+            translate('Sunday'), translate('Monday'), translate('Tuesday'), translate('Wednesday'),
+            translate('Thursday'), translate('Friday'), translate('Saturday'),
+        ][$weekday] ?? '';
     }
 }

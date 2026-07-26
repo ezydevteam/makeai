@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, nextTick, onUnmounted } from 'vue'
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
@@ -8,6 +8,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import QRCode from 'qrcode'
 
 interface Program {
@@ -41,16 +42,36 @@ const props = defineProps<{
     referral: { code: string; custom_slug: string | null; link: string; alias_link: string | null }
     chart: ChartPoint[]
     marketing: { banners: MarketingBanner[]; emails: MarketingEmail[]; posts: MarketingPost[] }
-    referrals: Array<{ email: string; joined_at: string | null; status: string; commission: number }>
-    commissions: { data: Array<{ id: number; amount: string | number; status: string; created_at: string; payment?: { amount: string | number; currency: string } | null }> }
+    referrals: {
+        data: Array<{ email: string; joined_at: string | null; status: string; commission: number }>
+        links: Array<{ url: string | null; label: string; active: boolean }>
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
+    }
+    commissions: {
+        data: Array<{ id: number; amount: string | number; status: string; created_at: string; payment?: { amount: string | number; currency: string } | null }>
+        links: Array<{ url: string | null; label: string; active: boolean }>
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
+    }
     payouts: { data: Array<{ id: number; amount: string | number; method: string; status: string; created_at: string }> }
+    filters: { status?: string | null }
 }>()
 
 const { t } = useTranslate()
 const { isDark } = useTheme()
 const { formatCurrency, formatNumber } = useNumberFormat()
 const selectedMethod = ref(props.program.payout_methods[0] ?? 'paypal')
-const commissionStatusFilter = ref('')
+// Mirrors the server-side filter rather than owning it: the list is paginated, so a local
+// filter only ever searched the 10 newest rows — "paid" and "cancelled" commissions live
+// further down the list and appeared to not exist at all.
+const commissionStatusFilter = computed(() => props.filters.status ?? '')
 const isPayoutModalOpen = ref(false)
 const isEditingAlias = ref(props.program.allow_custom_alias && !props.referral.custom_slug)
 const referralCopied = ref(false)
@@ -133,7 +154,11 @@ const buildChart = async () => {
                     backgroundColor: 'rgba(59, 130, 246, 0.65)',
                     borderColor: '#3b82f6',
                     borderWidth: 1.5,
-                    borderRadius: 4,
+                    // Pill-topped bars, matching the Usage chart: the radius is clamped to
+                    // half the bar width, and skipping the bottom edge keeps it square where
+                    // it meets the axis.
+                    borderRadius: 20,
+                    borderSkipped: 'bottom',
                     maxBarThickness: 20
                 },
                 {
@@ -276,11 +301,7 @@ const visibleStats = computed(() => [
     }
 ])
 
-const visibleCommissions = computed(() => (
-    commissionStatusFilter.value
-        ? props.commissions.data.filter((commission) => commission.status === commissionStatusFilter.value)
-        : props.commissions.data
-))
+const visibleCommissions = computed(() => props.commissions.data)
 
 const formatDateTime = (value: string | null | undefined) => {
     if (!value) return t('—')
@@ -366,7 +387,13 @@ const cancelAliasEdit = () => {
     isEditingAlias.value = false
 }
 const filterCommissions = (status: string) => {
-    commissionStatusFilter.value = status
+    if (commissionStatusFilter.value === status) return
+
+    router.get(
+        route('user.dashboard.affiliate'),
+        status ? { status } : {},
+        { preserveScroll: true, preserveState: true, only: ['commissions', 'filters'] },
+    )
 }
 </script>
 
@@ -390,7 +417,7 @@ const filterCommissions = (status: string) => {
                     @click="openPayoutModal"
                 >
                     <i class="ti ti-send mr-1"></i>
-                    {{ t('Request payout') }}
+                    {{ t('Request Payout') }}
                 </button>
             </div>
 
@@ -417,7 +444,7 @@ const filterCommissions = (status: string) => {
             <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
                 <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
                     <label class="min-w-0 flex-1">
-                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-700 dark:text-gray-400">{{ t('Your Referral link') }}</span>
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-gray-900 dark:text-gray-400">{{ t('Your Referral link') }}</span>
                         <div class="relative">
                             <input
                                 :value="referralUrl"
@@ -475,7 +502,7 @@ const filterCommissions = (status: string) => {
                     </div>
                 </form>
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <a v-for="s in [{label:'Facebook',u:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralUrl)}`},{label:'X',u:`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(referralUrl)}`},{label:'WhatsApp',u:`https://wa.me/?text=${shareText}%20${encodeURIComponent(referralUrl)}`},{label:'LinkedIn',u:`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralUrl)}`},{label:'Telegram',u:`https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${shareText}`}]" :key="s.label" :href="s.u" target="_blank" class="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:text-primary-300">{{ s.label }}</a>
+                    <a v-for="s in [{label:'Facebook',u:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralUrl)}`},{label:'Twitter X',u:`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(referralUrl)}`},{label:'WhatsApp',u:`https://wa.me/?text=${shareText}%20${encodeURIComponent(referralUrl)}`},{label:'LinkedIn',u:`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralUrl)}`},{label:'Telegram',u:`https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${shareText}`}]" :key="s.label" :href="s.u" target="_blank" class="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:text-primary-300">{{ s.label }}</a>
                 </div>
             </section>
 
@@ -517,7 +544,7 @@ const filterCommissions = (status: string) => {
                         <div class="border-b border-gray-100/80 p-5 dark:border-gray-800"><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Referrals') }}</h2></div>
                         <div class="min-w-0 overflow-x-auto">
                             <table class="w-full table-fixed text-left text-sm">
-                                <thead class="bg-gray-50/80 text-xs uppercase text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+                                <thead class="bg-gray-50/80 text-xs uppercase text-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
                                     <tr>
                                         <th class="px-4 py-3">{{ t('User') }}</th>
                                         <th class="px-4 py-3 text-center">{{ t('Joined') }}</th>
@@ -526,25 +553,35 @@ const filterCommissions = (status: string) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="ref in referrals" :key="`${ref.email}-${ref.joined_at}`" class="border-t border-gray-100/80 transition hover:bg-sky-50/60 dark:border-gray-800 dark:hover:bg-gray-800/50">
+                                    <tr v-for="(ref, index) in referrals.data" :key="`${ref.email}-${ref.joined_at}-${index}`" class="border-t border-gray-100/80 transition hover:bg-sky-50/60 dark:border-gray-800 dark:hover:bg-gray-800/50">
                                         <td class="px-4 py-3 break-all text-gray-700 dark:text-gray-200">{{ ref.email }}</td>
                                         <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{{ formatDateTime(ref.joined_at) }}</td>
                                         <td class="px-4 py-3 text-center">
-                                            <span class="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-bold text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">{{ t(ref.status) }}</span>
+                                            <span :class="ref.status === 'clicked' ? 'bg-gray-200/60 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300' : 'bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300'" class="rounded-full px-2.5 py-1 text-xs font-bold">{{ t(ref.status) }}</span>
                                         </td>
                                         <td class="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100">{{ formatMoney(ref.commission) }}</td>
                                     </tr>
-                                    <tr v-if="referrals.length === 0">
+                                    <tr v-if="referrals.data.length === 0">
                                         <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">{{ t('No referrals yet. Share your link to get started.') }}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                        <div v-if="referrals.last_page > 1" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <Pagination
+                                :links="referrals.links"
+                                :from="referrals.from"
+                                :to="referrals.to"
+                                :total="referrals.total"
+                                :current-page="referrals.current_page"
+                                :last-page="referrals.last_page"
+                            />
+                        </div>
                     </section>
 
                     <!-- Commissions Table with Filter -->
                     <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
-                        <div class="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex flex-col gap-3 border-b border-gray-100/80 p-5 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Commissions') }}</h2>
                             <div class="flex flex-wrap gap-1">
                                 <button v-for="s in ['', 'pending', 'approved', 'paid', 'rejected', 'cancelled']" :key="s" type="button" :class="commissionStatusFilter === s ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40' : 'text-gray-500 hover:bg-gray-100 dark:hover:!text-white dark:hover:bg-surface-950/60'" class="rounded-full px-2.5 py-1 text-xs font-medium" @click="filterCommissions(s)">{{ s ? formatChoiceLabel(s) : t('All') }}</button>
@@ -552,7 +589,7 @@ const filterCommissions = (status: string) => {
                         </div>
                         <div class="min-w-0 overflow-x-auto">
                             <table class="w-full table-fixed text-left text-sm">
-                                <thead class="bg-gray-50/80 text-xs uppercase text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+                                <thead class="bg-gray-50/80 text-xs uppercase text-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
                                     <tr>
                                         <th class="px-4 py-3">{{ t('Date') }}</th>
                                         <th class="px-4 py-3 text-center">{{ t('Purchased') }}</th>
@@ -566,16 +603,29 @@ const filterCommissions = (status: string) => {
                                         <td class="px-4 py-3 text-center text-gray-700 dark:text-gray-200">{{ c.payment ? c.payment.amount : '—' }}</td>
                                         <td class="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100">{{ formatMoney(c.amount) }}</td>
                                         <td class="px-4 py-3 text-center">
-                                            <span :class="c.status === 'approved' || c.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300' : c.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : c.status === 'cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'" class="rounded-full px-2.5 py-1 text-xs font-bold">
+                                            <span :class="c.status === 'approved' || c.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300' : c.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : c.status === 'cancelled' ? 'bg-gray-200/60 text-gray-600 dark:bg-gray-500/15 dark:text-gray-300' : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'" class="rounded-full px-2.5 py-1 text-xs font-bold">
                                                 {{ t(c.status) }}
                                             </span>
                                         </td>
                                     </tr>
                                     <tr v-if="visibleCommissions.length === 0">
-                                        <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">{{ t('No commissions yet.') }}</td>
+                                        <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                                            <span v-if="commissionStatusFilter">{{ t('No :status commissions.', { status: formatChoiceLabel(commissionStatusFilter).toLowerCase() }) }}</span>
+                                            <span v-else>{{ t('No commissions yet.') }}</span>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div v-if="commissions.last_page > 1" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <Pagination
+                                :links="commissions.links"
+                                :from="commissions.from"
+                                :to="commissions.to"
+                                :total="commissions.total"
+                                :current-page="commissions.current_page"
+                                :last-page="commissions.last_page"
+                            />
                         </div>
                     </section>
                 </div>
@@ -590,7 +640,7 @@ const filterCommissions = (status: string) => {
                     <div class="border-b border-gray-100/80 p-5 dark:border-gray-800"><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Payout history') }}</h2></div>
                     <div class="min-w-0 overflow-x-auto">
                         <table class="w-full table-fixed text-left text-sm">
-                            <thead class="bg-gray-50/80 text-xs uppercase text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+                            <thead class="bg-gray-50/80 text-xs uppercase text-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
                                 <tr>
                                     <th class="px-4 py-3">{{ t('Date') }}</th>
                                     <th class="px-4 py-3 text-center">{{ t('Amount') }}</th>

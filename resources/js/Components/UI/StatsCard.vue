@@ -8,6 +8,15 @@ const props = defineProps<{
     comparison?: string
     comparisonDetail?: string
     comparisonType?: 'up' | 'down' | 'warning' | 'neutral'
+    /**
+     * Which way the arrow points, when that differs from the sentiment colour.
+     *
+     * On most metrics the two agree — more is better — so this stays unset and the arrow
+     * follows `comparisonType`. It exists for "lower is better" metrics (a failure or churn
+     * rate), where a fall is good news and must read green while the arrow still points down
+     * to match the negative figure beside it.
+     */
+    comparisonDirection?: 'up' | 'down' | null
     icon?: string
     color?: 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'pink'
     sparkline?: number[]
@@ -70,6 +79,17 @@ const sparklinePath = computed(() => {
 })
 
 const { t } = useTranslate()
+
+// Falls back to the sentiment, so every existing caller keeps the arrow it had.
+const arrowDirection = computed(() => {
+    if (props.comparisonDirection) {
+        return props.comparisonDirection
+    }
+
+    return props.comparisonType === 'up' || props.comparisonType === 'down'
+        ? props.comparisonType
+        : null
+})
 </script>
 
 <template>
@@ -101,8 +121,8 @@ const { t } = useTranslate()
             </svg>
         </div>
         <p v-if="comparison" :class="[comparisonType === 'up' ? 'text-success-500' : comparisonType === 'down' ? 'text-danger-500' : comparisonType === 'warning' ? 'text-warning-500' : 'text-gray-500 dark:text-gray-400']" class="mt-2 flex items-center gap-1 text-xs font-medium">
-            <svg v-if="comparisonType === 'up'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
-            <svg v-else-if="comparisonType === 'down'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25" /></svg>
+            <svg v-if="arrowDirection === 'up'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
+            <svg v-else-if="arrowDirection === 'down'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25" /></svg>
             <span>{{ comparison }}</span>
             <span v-if="comparisonDetail" class="text-gray-400 dark:text-gray-500">{{ comparisonDetail }}</span>
         </p>

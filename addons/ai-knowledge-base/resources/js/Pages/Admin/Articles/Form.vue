@@ -94,7 +94,7 @@ function save(status: 'draft' | 'published') {
     <Head :title="pageTitle" />
 
     <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -112,14 +112,14 @@ function save(status: 'draft' | 'published') {
             <div class="flex flex-wrap gap-3">
                 <Link
                     :href="route('addon.kb.admin.articles.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                     :disabled="form.processing"
                     @click="save('draft')"
                 >
@@ -128,7 +128,7 @@ function save(status: 'draft' | 'published') {
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin disabled:opacity-60"
+                    class="inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60"
                     :disabled="form.processing"
                     @click="save('published')"
                 >
@@ -213,7 +213,7 @@ function save(status: 'draft' | 'published') {
 
             <div class="space-y-6">
                 <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Organization') }}</h2>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Attributes') }}</h2>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Assign a category and sort order for article lists.') }}
                     </p>

@@ -22,6 +22,16 @@ return [
     */
 
     'default' => env('AI_DEFAULT_PROVIDER', 'openai'),
+
+    /*
+    | Last-resort chat model, used only when the admin's `default_ai_model` setting is
+    | missing entirely. Every caller used to spell its own literal, and all of them spelled
+    | 'gpt-4o-mini' — a slug AiModelSeeder retired, so the fallback resolved to a model that
+    | does not exist and the generation failed at the provider. Keep this pointing at a slug
+    | the catalog actually ships whenever that catalog is refreshed.
+    */
+    'fallback_model' => env('AI_FALLBACK_MODEL', 'gpt-5.4-mini'),
+
     'default_for_images' => env('AI_DEFAULT_IMAGE_PROVIDER', 'openai'),
     'default_for_audio' => env('AI_DEFAULT_AUDIO_PROVIDER', 'openai'),
     'default_for_transcription' => env('AI_DEFAULT_TRANSCRIPTION_PROVIDER', 'openai'),

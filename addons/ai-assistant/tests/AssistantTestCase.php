@@ -170,11 +170,22 @@ abstract class AssistantTestCase extends TestCase
 
     // ─── AI plumbing ─────────────────────────────────────────
 
+    /**
+     * The one chat model the assistant tests run against.
+     *
+     * Its slug must be whatever the assistant will actually resolve when no model is
+     * configured — the site default, which falls back to config('ai.fallback_model'). Pinning
+     * a literal here silently decoupled the fixture from that default the moment the model
+     * catalog moved on, and the tests that depend on pricing (global budget, credit spend)
+     * then measured a model TokenGuard could not find.
+     */
     protected function seedChatModel(): AiModel
     {
+        $slug = settings('default_ai_model', config('ai.fallback_model'));
+
         return AiModel::create([
-            'slug' => 'gpt-4o-mini',
-            'name' => 'GPT-4o Mini',
+            'slug' => $slug,
+            'name' => $slug,
             'provider' => 'openai',
             'type' => 'chat',
             'is_active' => true,

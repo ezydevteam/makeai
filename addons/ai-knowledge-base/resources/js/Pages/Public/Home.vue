@@ -4,22 +4,11 @@ import { Head, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted } from 'vue'
 import DOMPurify from 'dompurify'
 import KbLayout from './KbLayout.vue'
-import Pagination from '@/Components/UI/Pagination.vue'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation as SwiperNavigation, Pagination as SwiperPagination } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
-
-interface Paginator<T> {
-  data: T[]
-  links: { url: string | null; label: string; active: boolean }[]
-  current_page: number
-  last_page: number
-  from: number | null
-  to: number | null
-  total: number
-}
 
 defineOptions({ layout: KbLayout })
 
@@ -50,7 +39,8 @@ interface Article {
 
 const props = defineProps<{
   categories: Category[]
-  featuredArticles: Paginator<Article>
+  featuredArticles: Article[]
+  hasMoreArticles: boolean
   meta: { title: string; description: string }
   activeCategory: Category | null
   categoryArticles: Article[]
@@ -306,10 +296,10 @@ onMounted(() => {
             </div>
 
             <!-- Suggested Quick Links -->
-            <div v-if="props.featuredArticles.data.length && !hasSearchResults && !streaming" class="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
+            <div v-if="props.featuredArticles.length && !hasSearchResults && !streaming" class="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
               <span class="text-gray-400 dark:text-gray-500 font-medium">{{ t('Popular searches') }}:</span>
               <a
-                v-for="article in props.featuredArticles.data.slice(0, 3)"
+                v-for="article in props.featuredArticles.slice(0, 3)"
                 :key="article.ulid"
                 :href="`/${kbSlug}/article/${article.slug}`"
                 class="px-3 py-1.5 rounded-full border border-gray-200 dark:border-surface-700 hover:border-primary-400 dark:hover:border-primary-500/50 bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all font-medium"
@@ -376,7 +366,7 @@ onMounted(() => {
       </section>
 
       <!-- Popular Articles -->
-      <section v-if="props.featuredArticles.data.length" class="space-y-6">
+      <section v-if="props.featuredArticles.length" class="space-y-6">
         <div class="flex items-center gap-4">
           <h2 class="text-2xl font-bold text-gray-900 dark:text-white shrink-0">{{ t('Popular Articles') }}</h2>
           <div class="flex-grow h-px bg-gray-200 dark:bg-surface-800"></div>
@@ -385,7 +375,7 @@ onMounted(() => {
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <a
-            v-for="a in props.featuredArticles.data"
+            v-for="a in props.featuredArticles"
             :key="a.ulid"
             :href="`/${kbSlug}/article/${a.slug}`"
             class="group block p-6 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-850 hover:border-primary-300 dark:hover:border-primary-500/40 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
@@ -418,15 +408,17 @@ onMounted(() => {
           </a>
         </div>
 
-        <Pagination
-          v-if="props.featuredArticles.last_page > 1"
-          :links="props.featuredArticles.links"
-          :from="props.featuredArticles.from"
-          :to="props.featuredArticles.to"
-          :total="props.featuredArticles.total"
-          :current-page="props.featuredArticles.current_page"
-          :last-page="props.featuredArticles.last_page"
-        />
+        <!-- Only when there is genuinely more to see — with nine or fewer articles in the
+             library, this row already IS the library. -->
+        <div v-if="props.hasMoreArticles" class="flex justify-center pt-2">
+          <a
+            :href="`/${kbSlug}/articles`"
+            class="group inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-300 hover:text-primary-600 hover:shadow-md dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-500/40 dark:hover:text-primary-400"
+          >
+            <span>{{ t('View more articles') }}</span>
+            <i class="ti ti-arrow-right text-base transition-transform duration-300 group-hover:translate-x-0.5"></i>
+          </a>
+        </div>
       </section>
     </div>
   </div>

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $tool->name }} — {{ $appName }}</title>
     @php
+    // Guarded because a compiled Blade view is plain PHP included into the current process:
+    // rendering this view twice in one process (a long-lived worker, or two embeds in one
+    // test) hit "Cannot redeclare hex2rgb()" and killed the process.
+    if (! function_exists('hex2rgb')) {
     function hex2rgb($hex) {
         $hex = str_replace("#", "", $hex);
         if(strlen($hex) == 3) {
@@ -18,9 +22,11 @@
         }
         return "$r, $g, $b";
     }
+    }
     $primaryColor = $embed->primary_color ?? '#1F75FE';
     $primaryRgb = hex2rgb($primaryColor);
 
+    if (! function_exists('getNormalizedOptions')) {
     function getNormalizedOptions($field, $languages, $models) {
         $type = $field['type'] ?? 'text';
         if ($type === 'tone_select') {
@@ -61,6 +67,7 @@
             }
         }
         return $options;
+    }
     }
     @endphp
     <style>

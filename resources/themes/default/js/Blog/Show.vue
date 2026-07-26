@@ -257,6 +257,9 @@ onClickOutside(shareDropdownRef, () => {
                         </div>
                     </div>
 
+                    <!-- Directly after the article body, before related posts and comments. -->
+                    <AdSection zone="blog_after_content" bare class="mx-auto mt-6 w-full max-w-[728px]" />
+
                     <section v-if="relatedPosts.length && blogSettings.show_related_posts_post" class="mt-10">
                         <h2 class="text-xl font-bold text-gray-900 dark:text-white" :class="[blogSettings.post_layout_centered ? 'text-center' : '']">{{ t('Related Posts') }}</h2>
                         <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -280,9 +283,9 @@ onClickOutside(shareDropdownRef, () => {
 
                 <!-- Sidebar Column -->
                 <aside v-if="blogSettings.sidebar_post_position !== 'none'" :class="[blogSettings.sidebar_post_position === 'left' ? 'lg:order-first' : 'lg:order-last', 'space-y-5 h-fit']">
-                    <AdSection zone="sidebar_top" class="mb-3" />
+                    <AdSection zone="sidebar_top" bare class="mb-3" />
                     <AppSidebar area="blog" />
-                    <AdSection zone="sidebar_bottom" class="mt-3" />
+                    <AdSection zone="sidebar_bottom" bare class="mt-3" />
                 </aside>
             </div>
         </div>

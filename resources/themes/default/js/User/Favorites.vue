@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import FavoriteButton from '@themes/default/js/Components/FavoriteButton.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserDashboardLayout })
@@ -49,12 +50,15 @@ const props = defineProps<{
         current_page: number
         last_page: number
         total: number
+        from: number | null
+        to: number | null
         links: PaginationLink[]
     }
 }>()
 
 const { t } = useTranslate()
 const activeType = ref('all')
+const searchQuery = ref('')
 const viewMode = ref<'grid' | 'list'>('grid')
 const openDropdown = ref<number | null>(null)
 const addingToCollection = ref<string | null>(null)
@@ -62,9 +66,19 @@ const addingToCollection = ref<string | null>(null)
 const allItems = computed(() => props.groups.flatMap((group) => group.items))
 
 const visibleItems = computed(() => {
-    if (activeType.value === 'all') return allItems.value
+    const items = activeType.value === 'all'
+        ? allItems.value
+        : props.groups.find((group) => group.type === activeType.value)?.items ?? []
 
-    return props.groups.find((group) => group.type === activeType.value)?.items ?? []
+    const query = searchQuery.value.trim().toLowerCase()
+
+    if (query === '') {
+        return items
+    }
+
+    return items.filter((item) =>
+        item.title.toLowerCase().includes(query)
+        || (item.description || '').toLowerCase().includes(query))
 })
 
 const tabs = computed(() => [
@@ -80,13 +94,6 @@ const formatDate = (value: string | null) => {
     if (!value) return ''
 
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
-}
-
-const paginationLabel = (label: string) => {
-    if (label.includes('Previous')) return t('Previous')
-    if (label.includes('Next')) return t('Next')
-
-    return label.replace('&laquo;', '').replace('&raquo;', '').trim()
 }
 
 function toggleDropdown(itemId: number) {
@@ -136,7 +143,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                     :title="t('Grid view')"
                     @click="viewMode = 'grid'"
                 >
-                    <i class="ti ti-grid-dots"></i>
+                    <i class="ti ti-layout-grid"></i>
                 </button>
                 <button
                     type="button"
@@ -151,18 +158,44 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
             </div>
         </div>
 
-        <div class="flex gap-2 overflow-x-auto pb-1">
-            <button
-                v-for="tab in tabs"
-                :key="tab.type"
-                type="button"
-                :class="activeType === tab.type ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-200'"
-                class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition"
-                @click="activeType = tab.type"
-            >
-                <span>{{ tab.label }}</span>
-                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10 dark:text-gray-300">{{ tab.count }}</span>
-            </button>
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex gap-2 overflow-x-auto pb-1">
+                <button
+                    v-for="tab in tabs"
+                    :key="tab.type"
+                    type="button"
+                    :class="activeType === tab.type ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-200'"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold shadow-sm transition"
+                    @click="activeType = tab.type"
+                >
+                    <span>{{ tab.label }}</span>
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10 dark:text-gray-300">{{ tab.count }}</span>
+                </button>
+            </div>
+
+            <!-- Filters the rows already loaded, like the History page's search. -->
+            <div class="relative w-full shrink-0 lg:w-64">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                    <i class="ti ti-search text-gray-400"></i>
+                </span>
+                <input
+                    v-model="searchQuery"
+                    type="search"
+                    :placeholder="t('Search favorites...')"
+                    :aria-label="t('Search favorites')"
+                    class="w-full !rounded-full border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm outline-none transition focus:border-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-primary-500"
+                />
+                <span v-if="searchQuery" class="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <button
+                        type="button"
+                        :aria-label="t('Clear search')"
+                        class="text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
+                        @click="searchQuery = ''"
+                    >
+                        <i class="ti ti-x text-xs"></i>
+                    </button>
+                </span>
+            </div>
         </div>
 
         <div v-if="visibleItems.length" :class="viewMode === 'grid' ? 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3' : 'space-y-3'">
@@ -238,34 +271,52 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
             </article>
         </div>
 
-        <div v-if="pagination.last_page > 1" class="flex flex-wrap items-center justify-center gap-2">
-            <Link
-                v-for="link in pagination.links"
-                :key="link.label"
-                :href="link.url || '#'"
-                :class="[
-                    link.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/15 dark:text-primary-200' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300',
-                    !link.url ? 'pointer-events-none opacity-50' : '',
-                ]"
-                class="rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition"
-                preserve-scroll
-            >
-                {{ paginationLabel(link.label) }}
-            </Link>
-        </div>
+        <!-- All tab only, and not while searching: both the type tabs and the search filter
+             client-side over the page already loaded, so a pager beside either would describe
+             a different set than the one on screen. -->
+        <Pagination
+            v-if="activeType === 'all' && !searchQuery.trim()"
+            :links="pagination.links"
+            :from="pagination.from"
+            :to="pagination.to"
+            :total="pagination.total"
+            :current-page="pagination.current_page"
+            :last-page="pagination.last_page"
+        />
 
         <div v-if="!visibleItems.length" class="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-300">
-                <i class="ti-heart text-2xl"></i>
-            </div>
-            <h2 class="mt-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('No favorites yet') }}</h2>
-            <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-                {{ t('Save useful tools, articles, and documents so you can return to them quickly.') }}
-            </p>
-            <Link :href="route('ai.tools.index')" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700">
-                <i class="ti-wand"></i>
-                <span>{{ t('Browse AI Tools') }}</span>
-            </Link>
+            <!-- A search that matched nothing is not an empty account: keep the two apart so
+                 "No favorites yet" never appears next to a list the user has just filtered. -->
+            <template v-if="searchQuery.trim()">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-400 dark:bg-white/5 dark:text-gray-500">
+                    <i class="ti ti-search-off text-2xl"></i>
+                </div>
+                <h2 class="mt-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('No matching favorites') }}</h2>
+                <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Nothing on this page matches your search. Try a different term or clear the search.') }}
+                </p>
+                <button
+                    type="button"
+                    class="mt-5 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:text-gray-200"
+                    @click="searchQuery = ''"
+                >
+                    <i class="ti ti-x"></i>
+                    <span>{{ t('Clear search') }}</span>
+                </button>
+            </template>
+            <template v-else>
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-300">
+                    <i class="ti-heart text-2xl"></i>
+                </div>
+                <h2 class="mt-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('No favorites yet') }}</h2>
+                <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Save useful tools, articles, and documents so you can return to them quickly.') }}
+                </p>
+                <Link :href="route('ai.tools.index')" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700">
+                    <i class="ti-wand"></i>
+                    <span>{{ t('Browse AI Tools') }}</span>
+                </Link>
+            </template>
         </div>
     </section>
 </template>

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import type { PageProps } from '@inertiajs/core'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import { toastAssistantError } from '../../Composables/useAssistantErrors'
 import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
@@ -97,7 +98,7 @@ const SETTING_ORDER: string[] = [
     // persona
     'assistant_name', 'designation', 'avatar_url', 'greeting_message',
     // channels
-    'social_whatsapp', 'social_telegram', 'social_facebook', 'social_instagram', 'social_website',
+    'social_whatsapp', 'social_telegram', 'social_facebook', 'social_instagram', 'social_x', 'social_website',
     // legal
     'show_legal_note', 'privacy_url', 'terms_url',
     // ai
@@ -390,15 +391,22 @@ async function saveRule() {
             : route('addon.ai-assistant.admin.rules.store')
 
         const response = await fetch(url, {
-            method: isEditingRule.value ? 'PUT' : 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+            method: isEditingRule.value ? "PUT" : "POST",
+            // Without Accept, demo mode (and anything else that branches on expectsJson)
+            // answers with a redirect to HTML and the `response.ok` check below silently
+            // does nothing — the modal just sat there.
+            headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-TOKEN": csrf() },
             body: JSON.stringify(ruleForm.value),
         })
 
-        if (response.ok) {
-            showRuleModal.value = false
-            router.reload({ only: ['rules'] })
+        if (!response.ok) {
+            await toastAssistantError(response, t("This rule could not be saved."))
+
+            return
         }
+
+        showRuleModal.value = false
+        router.reload({ only: ["rules"] })
     } finally {
         processingRule.value = false
     }
@@ -411,24 +419,28 @@ async function confirmDeleteRule() {
     deletingRule.value = true
 
     try {
-        const response = await fetch(route('addon.ai-assistant.admin.rules.delete', { rule: rule.id }), {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': csrf() },
+        const response = await fetch(route("addon.ai-assistant.admin.rules.delete", { rule: rule.id }), {
+            method: "DELETE",
+            headers: { Accept: "application/json", "X-CSRF-TOKEN": csrf() },
         })
 
-        if (response.ok) {
-            pendingDeleteRule.value = null
-            router.reload({ only: ['rules'] })
+        if (!response.ok) {
+            await toastAssistantError(response, t("This rule could not be deleted."))
+
+            return
         }
+
+        pendingDeleteRule.value = null
+        router.reload({ only: ["rules"] })
     } finally {
         deletingRule.value = false
     }
 }
 
 async function toggleRuleActive(rule: AutomationRule) {
-    await fetch(route('addon.ai-assistant.admin.rules.update', { rule: rule.id }), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+    const response = await fetch(route("addon.ai-assistant.admin.rules.update", { rule: rule.id }), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-TOKEN": csrf() },
         body: JSON.stringify({
             trigger: rule.trigger,
             response: rule.response,
@@ -437,7 +449,12 @@ async function toggleRuleActive(rule: AutomationRule) {
         }),
     })
 
-    router.reload({ only: ['rules'] })
+    // The reload below would silently snap the switch back with no explanation.
+    if (!response.ok) {
+        await toastAssistantError(response, t("This rule could not be updated."))
+    }
+
+    router.reload({ only: ["rules"] })
 }
 
 const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
@@ -447,7 +464,12 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
     <div class="mx-auto w-full max-w-5xl px-4 sm:px-6">
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Assistant') }}</h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Assistant') }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Configure the assistant widget shown on your site and in the admin panel.') }}
                 </p>
@@ -474,7 +496,7 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
                         v-for="tab in tabs"
                         :key="tab.id"
                         type="button"
-                        class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        class="rounded-full px-3 py-2 text-sm font-medium transition-colors"
                         :class="activeTab === tab.id
                             ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'"
@@ -535,14 +557,11 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
                                     />
                                 </div>
 
-                                <!-- Everything else: label, then description, then the field -->
+                                <!-- Everything else: label, then the field, then its hint -->
                                 <div v-else :class="isWideField(setting) ? 'md:col-span-2' : ''">
                                     <label class="block text-sm font-medium text-gray-900 dark:text-white">
                                         {{ t(setting.label) }}
                                     </label>
-                                    <p v-if="setting.description" class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                                        {{ t(setting.description) }}
-                                    </p>
 
                                     <div class="mt-2">
                                         <AppSelect
@@ -560,7 +579,7 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
 
                                         <textarea
                                             v-else-if="setting.type === 'textarea'"
-                                            rows="5"
+                                            rows="6"
                                             :class="inputClass"
                                             :value="String(setting.value ?? '')"
                                             :placeholder="setting.default === null ? '' : String(setting.default)"
@@ -615,6 +634,10 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
                                             @change="setValue(setting.key, ($event.target as HTMLInputElement).value)"
                                         />
                                     </div>
+
+                                    <p v-if="setting.description" class="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                                        {{ t(setting.description) }}
+                                    </p>
                                 </div>
                             </template>
                         </div>
@@ -717,15 +740,15 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
                                         <td class="whitespace-nowrap px-4 py-3 text-right">
                                             <button
                                                 type="button"
-                                                class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
+                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
                                                 :aria-label="t('Edit')"
                                                 @click="openEditRule(rule)"
                                             >
-                                                <i class="ti ti-pencil text-base"></i>
+                                                <i class="ti ti-edit text-base"></i>
                                             </button>
                                             <button
                                                 type="button"
-                                                class="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
                                                 :aria-label="t('Delete')"
                                                 @click="pendingDeleteRule = rule"
                                             >
@@ -779,7 +802,7 @@ const inputClass = 'block w-full rounded-lg border border-gray-200 bg-gray-50 px
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ t('Supports {site_name}, {user_name}, {user_email} and {current_page}.') }}
                     </p>
-                    <textarea v-model="ruleForm.response" rows="4" :class="[inputClass, 'mt-2']" :placeholder="t('e.g. Our refund policy is 30 days.')"></textarea>
+                    <textarea v-model="ruleForm.response" rows="5" :class="[inputClass, 'mt-2']" :placeholder="t('e.g. Our refund policy is 30 days.')"></textarea>
                 </div>
 
                 <div class="flex items-center justify-between rounded-xl border border-gray-100 p-4 dark:border-gray-800">

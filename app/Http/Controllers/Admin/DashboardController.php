@@ -461,13 +461,17 @@ class DashboardController extends Controller
             ->limit(9)
             ->get();
 
-        $topToolNames = AiTool::whereIn('slug', $topToolsByUsageRows->pluck('tool_slug')->filter()->unique())
-            ->pluck('name', 'slug');
+        // Fetch id alongside the name so the dashboard can deep-link each tool to its
+        // admin edit page (AiTool binds by id).
+        $topTools = AiTool::whereIn('slug', $topToolsByUsageRows->pluck('tool_slug')->filter()->unique())
+            ->get(['id', 'slug', 'name'])
+            ->keyBy('slug');
 
         $topToolsByUsage = $topToolsByUsageRows
             ->map(fn ($row) => [
+                'tool_id' => $topTools[$row->tool_slug]->id ?? null,
                 'tool_slug' => $row->tool_slug,
-                'tool_name' => $topToolNames[$row->tool_slug] ?? $row->tool_slug,
+                'tool_name' => $topTools[$row->tool_slug]->name ?? $row->tool_slug,
                 'count' => (int) $row->count,
             ])
             ->values()
@@ -598,7 +602,7 @@ class DashboardController extends Controller
         // ─── 20. Addon stats ───
         $addonStats = $this->getAddonStats();
 
-        return [
+        $payload = [
             'dashboardCharts' => [
                 'signupsChart' => $signupsChart,
                 'revenueChart' => $revenueChart,
@@ -641,6 +645,222 @@ class DashboardController extends Controller
             'activity' => $activity,
             'addonStats' => $addonStats,
         ];
+
+        // Demo-only: guarantee every period and list renders — see applyDemoDashboardFloor().
+        if (config('demo.enabled')) {
+            $payload = $this->applyDemoDashboardFloor($payload, $now);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Demo-only dashboard "data floor".
+     *
+     * DemoSeeder anchors rows to now() and demo:reset re-runs every 6 hours, but between
+     * midnight and the next reset the "today" buckets (and any genuinely quiet period)
+     * fall to all-zero — which the dashboard renders as "No data found". A demo must
+     * never look empty regardless of the wall-clock date, so this fills every all-zero
+     * period series and every empty list/donut with plausible, deterministic fixed
+     * values. Guarded by config('demo.enabled'); a real install never reaches it. Runs
+     * inside the cached build and BEFORE the premium strip, so a non-pro demo still hides
+     * revenue/subscription series (stripPremiumData zeroes them afterwards).
+     */
+    private function applyDemoDashboardFloor(array $data, $now): array
+    {
+        foreach (($data['dashboardCharts'] ?? []) as $key => $series) {
+            if ($key === 'cardComparisons' || ! is_array($series)) {
+                continue;
+            }
+            foreach ($series as $period => $points) {
+                if (is_array($points) && $points !== [] && $this->demoSeriesIsAllZero($points)) {
+                    $data['dashboardCharts'][$key][$period] = $this->demoFillSeries($points, $key . $period);
+                }
+            }
+        }
+
+        // KPI cards: a zeroed current/previous pair reads as a dead business — give it life.
+        foreach (($data['dashboardCharts']['cardComparisons'] ?? []) as $period => $comparison) {
+            foreach ($comparison as $metric => $pair) {
+                if (is_array($pair) && (float) ($pair['current'] ?? 0) === 0.0 && (float) ($pair['previous'] ?? 0) === 0.0) {
+                    $seed = crc32($period . $metric);
+                    $current = 4 + ($seed % 40);
+                    $data['dashboardCharts']['cardComparisons'][$period][$metric] = [
+                        'current' => $current,
+                        'previous' => max(0, $current - (1 + ($seed % 9))),
+                    ];
+                }
+            }
+        }
+
+        // Real tool/model names keep labels and links authentic; the metrics are synthetic.
+        // Falls back to fixed rows so the floor holds even if the catalog is somehow empty.
+        $tools = AiTool::query()->orderBy('id')->limit(9)->get(['id', 'slug', 'name'])
+            ->map(fn ($t) => ['id' => $t->id, 'slug' => $t->slug, 'name' => $t->name ?? $t->slug])->all();
+        if ($tools === []) {
+            $tools = array_map(fn ($s) => ['id' => null, 'slug' => $s, 'name' => Str::headline($s)], [
+                'blog-article-generator', 'seo-meta-description-generator', 'email-subject-line-generator',
+                'product-description-writer', 'social-media-caption', 'ad-copy-generator',
+                'code-explainer', 'paragraph-rewriter', 'youtube-script-writer',
+            ]);
+        }
+
+        $models = AiModel::query()->orderBy('id')->limit(9)->get(['slug', 'name'])
+            ->map(fn ($m) => ['slug' => $m->slug, 'name' => $m->name ?? $m->slug])->all();
+        if ($models === []) {
+            $models = [
+                ['slug' => 'gpt-5.6-terra', 'name' => 'GPT-5.6 Terra'],
+                ['slug' => 'gpt-5.4-mini', 'name' => 'GPT-5.4 Mini'],
+                ['slug' => 'claude-sonnet-4-6', 'name' => 'Claude Sonnet 4.6'],
+                ['slug' => 'claude-haiku-4-5', 'name' => 'Claude Haiku 4.5'],
+                ['slug' => 'gemini-3.5-flash', 'name' => 'Gemini 3.5 Flash'],
+                ['slug' => 'deepseek-v4-pro', 'name' => 'DeepSeek V4 Pro'],
+                ['slug' => 'llama-3.3-70b-versatile', 'name' => 'Llama 3.3 70B Versatile'],
+            ];
+        }
+
+        if (empty($data['aiByTool'])) {
+            $data['aiByTool'] = collect($tools)->take(6)->values()
+                ->map(fn ($t, $i) => ['label' => $t['name'], 'credits' => (float) (900 - $i * 120)])
+                ->toArray();
+        }
+        if (empty($data['topToolsByUsage'])) {
+            $data['topToolsByUsage'] = collect($tools)->values()
+                ->map(fn ($t, $i) => ['tool_id' => $t['id'] ?? null, 'tool_slug' => $t['slug'], 'tool_name' => $t['name'], 'count' => 240 - $i * 22])
+                ->toArray();
+        }
+        if (empty($data['topToolsByCost'])) {
+            $data['topToolsByCost'] = collect($tools)->take(6)->values()
+                ->map(fn ($t, $i) => ['tool_slug' => $t['slug'], 'cost' => round(18.5 - $i * 2.3, 2)])
+                ->toArray();
+        }
+        if (empty($data['topToolsByTokens'])) {
+            $data['topToolsByTokens'] = collect($tools)->take(6)->values()
+                ->map(fn ($t, $i) => ['tool_slug' => $t['slug'], 'tokens' => 120000 - $i * 14000])
+                ->toArray();
+        }
+        if (empty($data['topModelsByUsage'])) {
+            $data['topModelsByUsage'] = collect($models)->values()
+                ->map(fn ($m, $i) => ['model' => $m['slug'], 'model_name' => $m['name'], 'count' => 300 - $i * 26])
+                ->toArray();
+        }
+        if (empty($data['topModelsByCost'])) {
+            $data['topModelsByCost'] = collect($models)->take(6)->values()
+                ->map(fn ($m, $i) => ['model' => $m['slug'], 'model_name' => $m['name'], 'cost' => round(24.0 - $i * 3.1, 2)])
+                ->toArray();
+        }
+        if (empty($data['topModelsByTokens'])) {
+            $data['topModelsByTokens'] = collect($models)->take(6)->values()
+                ->map(fn ($m, $i) => ['model' => $m['slug'], 'model_name' => $m['name'], 'tokens' => 210000 - $i * 24000])
+                ->toArray();
+        }
+        if (empty($data['costByProvider'])) {
+            $data['costByProvider'] = [
+                ['label' => 'OpenAI', 'cost' => 18.42],
+                ['label' => 'Anthropic', 'cost' => 12.90],
+                ['label' => 'Google', 'cost' => 7.35],
+                ['label' => 'DeepSeek', 'cost' => 3.10],
+            ];
+        }
+        if (empty($data['providerUsageByCount'])) {
+            $data['providerUsageByCount'] = [
+                ['label' => 'OpenAI', 'count' => 320],
+                ['label' => 'Anthropic', 'count' => 210],
+                ['label' => 'Google', 'count' => 140],
+                ['label' => 'Meta', 'count' => 90],
+            ];
+        }
+        if (empty($data['geoUsage'])) {
+            $data['geoUsage'] = [
+                ['country' => 'United States', 'logins' => 142],
+                ['country' => 'United Kingdom', 'logins' => 86],
+                ['country' => 'India', 'logins' => 73],
+                ['country' => 'Germany', 'logins' => 54],
+                ['country' => 'Singapore', 'logins' => 38],
+            ];
+        }
+        if (empty($data['trafficSources'])) {
+            $data['trafficSources'] = [
+                ['label' => translate('Direct'), 'count' => 128],
+                ['label' => 'Google', 'count' => 74],
+                ['label' => translate('Referral'), 'count' => 39],
+                ['label' => 'Github', 'count' => 21],
+            ];
+        }
+        if (empty($data['recentUsers'])) {
+            $data['recentUsers'] = User::excludingInternal()
+                ->latest()->limit(6)->get(['ulid', 'name', 'email', 'created_at'])->toArray();
+        }
+        if (empty($data['popularBlogPosts'])) {
+            $data['popularBlogPosts'] = BlogPost::published()
+                ->orderByDesc('views_count')->limit(5)
+                ->get(['ulid', 'title', 'views_count', 'published_at'])
+                ->map(fn ($p) => [
+                    'ulid' => $p->ulid,
+                    'title' => $p->title,
+                    'views_count' => (int) $p->views_count,
+                    'published_at' => optional($p->published_at)?->toISOString(),
+                ])->toArray();
+        }
+        if (empty($data['activity'])) {
+            $data['activity'] = $this->getRecentActivity(5);
+        }
+
+        return $data;
+    }
+
+    /**
+     * True when every point in a period series is zero (the same "empty" the Vue's
+     * isEmptySeries() detects and renders as "No data").
+     */
+    private function demoSeriesIsAllZero(array $points): bool
+    {
+        foreach ($points as $p) {
+            if (array_key_exists('value', $p)) {
+                if ((float) $p['value'] !== 0.0) {
+                    return false;
+                }
+            } elseif ((float) ($p['revenue'] ?? 0) !== 0.0 || (float) ($p['cost'] ?? 0) !== 0.0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Overwrite a period's points with a deterministic non-zero wave, preserving the
+     * date labels already computed for the current wall-clock. Cumulative charts rise
+     * monotonically; the rest gently wave. Same seed key → identical output (cache-safe).
+     */
+    private function demoFillSeries(array $points, string $seedKey): array
+    {
+        $seed = crc32($seedKey);
+        $cumulative = str_contains($seedKey, 'proSubs')
+            || str_contains($seedKey, 'openTickets')
+            || str_contains($seedKey, 'pendingComments');
+        $n = max(1, count($points));
+        $running = 4 + ($seed % 6);
+
+        foreach ($points as $i => $p) {
+            $wave = max(1, (int) round(7 + 5 * sin(($i / $n) * 6.2832 + ($seed % 7))));
+
+            if ($cumulative) {
+                $running += (int) max(1, round($wave / 2));
+                $value = $running;
+            } else {
+                $value = $wave + ($seed % 3);
+            }
+
+            if (array_key_exists('value', $p)) {
+                $points[$i]['value'] = $value;
+            } else {
+                $points[$i]['revenue'] = $value * (6 + ($seed % 5));
+                $points[$i]['cost'] = round($value * (1.2 + ($seed % 3) * 0.3), 2);
+            }
+        }
+
+        return $points;
     }
 
     private function buildSeriesFromQuery(
@@ -659,51 +879,57 @@ class DashboardController extends Controller
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
 
+        // Sum aggregations over fractional columns (cost_usd, credits_used, amount) must NOT
+        // be truncated to int — a daily cost bucket is cents, so (int) collapsed the whole
+        // day/hour series to zero (lifetime's monthly buckets were >= $1 so they survived,
+        // which is why cost cards read $0 at 90d but non-zero All-Time). Counts stay integers.
+        $castValue = fn ($v) => $aggregation === 'sum' ? round((float) ($v ?? 0), 2) : (int) ($v ?? 0);
+
         $result = [];
         foreach ($ranges as $key => $cfg) {
             $query = clone $baseQuery;
             $query->whereBetween($dateColumn, [$cfg['start'], $cfg['end']]);
 
             if ($cfg['interval'] === 'hour') {
-                $query->selectRaw('HOUR(' . $dateColumn . ') as period, ' . 
+                $query->selectRaw('HOUR(' . $dateColumn . ') as period, ' .
                     ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
                 $query->groupByRaw('HOUR(' . $dateColumn . ')');
                 $data = $query->pluck('total', 'period');
-                
-                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($data, $now) {
+
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($data, $now, $castValue) {
                     $slot = $now->copy()->startOfDay()->addHours($hour);
                     return [
                         'date' => $slot->format('H:00'),
-                        'value' => (int) ($data[$hour] ?? 0),
+                        'value' => $castValue($data[$hour] ?? 0),
                     ];
                 })->values()->toArray();
             } elseif ($cfg['interval'] === 'day') {
-                $query->selectRaw('DATE(' . $dateColumn . ') as period, ' . 
+                $query->selectRaw('DATE(' . $dateColumn . ') as period, ' .
                     ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
                 $query->groupByRaw('DATE(' . $dateColumn . ')');
                 $data = $query->pluck('total', 'period');
-                
+
                 $days = $cfg['start']->diffInDays($cfg['end']);
-                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($data, $cfg) {
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($data, $cfg, $castValue) {
                     $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
                     return [
                         'date' => $date,
-                        'value' => (int) ($data[$date] ?? 0),
+                        'value' => $castValue($data[$date] ?? 0),
                     ];
                 })->values()->toArray();
             } else { // month
-                $query->selectRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m") as period, ' . 
+                $query->selectRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m") as period, ' .
                     ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
                 $query->groupByRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m")');
                 $data = $query->pluck('total', 'period');
-                
+
                 $cursor = now()->parse($startDate)->copy()->startOfMonth();
                 $result[$key] = [];
                 while ($cursor->lte($now)) {
                     $monthKey = $cursor->format('Y-m');
                     $result[$key][] = [
                         'date' => $cursor->format('M Y'),
-                        'value' => (int) ($data[$monthKey] ?? 0),
+                        'value' => $castValue($data[$monthKey] ?? 0),
                     ];
                     $cursor->addMonth();
                 }

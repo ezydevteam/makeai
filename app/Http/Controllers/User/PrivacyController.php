@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ExportUserDataJob;
 use App\Jobs\PermanentlyDeleteUserJob;
 use App\Models\DataExportRequest;
+use App\Models\LoginHistory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -52,6 +53,32 @@ class PrivacyController extends Controller
                 'is_current' => $s->id === $currentSessionId,
             ]);
 
+        // The audit trail, which is a different thing to the live sessions above: a session
+        // ends when it is revoked or expires, whereas login_history keeps every sign-in
+        // attempt including failed ones. The dashboard's "Recent sign-ins" panel links here
+        // for the full list, so it has to exist on this page.
+        $loginHistory = tap(
+            $user->loginHistory()
+                ->latest()
+                // Its own page parameter, so a second paginated list on this page later cannot
+                // drag this one along. fragment() keeps the reader at the section they were
+                // paging instead of bouncing to the top of the page on every click.
+                ->paginate(10, ['*'], 'login_page')
+                ->withQueryString()
+                ->fragment('login-history'),
+            function ($paginator) {
+                $paginator->getCollection()->transform(fn (LoginHistory $login) => [
+                    'id' => $login->id,
+                    'ip' => $login->ip,
+                    'country' => $login->country,
+                    'city' => $login->city,
+                    'user_agent' => $login->user_agent,
+                    'success' => (bool) $login->success,
+                    'created_at' => optional($login->created_at)->toIso8601String(),
+                ]);
+            }
+        );
+
         $pendingExport = DataExportRequest::forUser($user->id)
             ->pending()
             ->count();
@@ -65,6 +92,7 @@ class PrivacyController extends Controller
         return Inertia::render('User/Privacy', [
             'exportHistory' => $exportHistory,
             'sessions' => $sessions,
+            'loginHistory' => $loginHistory,
             'pendingExport' => $pendingExport > 0,
             'recentExport' => $recentExport,
             'scheduledDeletion' => $scheduledDeletion,

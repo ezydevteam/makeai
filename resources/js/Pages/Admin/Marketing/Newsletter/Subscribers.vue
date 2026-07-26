@@ -267,8 +267,8 @@ onBeforeUnmount(() => {
                         <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                             <tr>
                                 <th class="px-6 py-3 text-left">{{ t('Email') }}</th>
-                                <th class="px-6 py-3 text-left">{{ t('Status') }}</th>
-                                <th class="px-6 py-3 text-left">{{ t('Date') }}</th>
+                                <th class="px-6 py-3 text-center">{{ t('Status') }}</th>
+                                <th class="px-6 py-3 text-center">{{ t('Joined Date') }}</th>
                                 <th class="px-6 py-3 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ subscriber.email }}</div>
                                     <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ subscriber.name || t('Anonymous') }}</div>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 text-center">
                                     <span
                                         class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
                                         :class="subscriber.status === 'subscribed'
@@ -288,7 +288,7 @@ onBeforeUnmount(() => {
                                         {{ t(subscriber.status) }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                <td class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                     {{ formatDate(subscriber.created_at) }}
                                 </td>
                                 <td class="px-6 py-4 text-right">

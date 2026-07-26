@@ -743,7 +743,7 @@ class AiAssistantController extends Controller
     private function resolveModel(): array
     {
         $provider = addon_setting('ai-assistant', 'provider') ?: settings('default_ai_provider', 'openai');
-        $model = addon_setting('ai-assistant', 'model') ?: settings('default_ai_model', 'gpt-4o-mini');
+        $model = addon_setting('ai-assistant', 'model') ?: settings('default_ai_model', config('ai.fallback_model'));
 
         return [$provider, $model];
     }

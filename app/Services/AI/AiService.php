@@ -110,7 +110,7 @@ class AiService
         string $toolSlug = 'direct'
     ): CompletionResponse {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
 
         try {
             // Pre-flight failures are credit/account problems — a different
@@ -279,7 +279,7 @@ class AiService
         ?string $model = null
     ): AiChatMessage {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? $chat->model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? $chat->model ?? settings('default_ai_model', config('ai.fallback_model'));
 
         try {
             TokenGuard::before($user, null, $modelName);
@@ -420,7 +420,7 @@ class AiService
         ?string $model = null,
     ): \Generator {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {
@@ -847,7 +847,7 @@ class AiService
         }
 
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
 
         return app(KnowledgeBaseSearchService::class)->answer(
             query: $query,
@@ -920,7 +920,7 @@ class AiService
         $systemPrompt = 'You are an expert document summarizer. Provide clear, accurate summaries that capture the key points without losing important context.';
 
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {
@@ -971,7 +971,7 @@ class AiService
         $systemPrompt = 'You are a data extraction AI. Always respond with valid, parseable JSON only. Do not include any explanatory text outside the JSON.';
 
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {

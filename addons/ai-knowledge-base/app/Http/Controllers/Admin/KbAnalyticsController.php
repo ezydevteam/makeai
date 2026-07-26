@@ -16,22 +16,18 @@ class KbAnalyticsController extends Controller
         $sevenDaysAgo = $now->copy()->subDays(7);
         $fourteenDaysAgo = $now->copy()->subDays(14);
 
-        // 1. Searches Today
-        $searchesTodayCurrent = KbSearch::whereDate('created_at', today())->count();
-        $searchesTodayPrevious = KbSearch::whereDate('created_at', today()->subDays(7))->count();
-
-        // 2. Searches 7 Days
+        // Searches over 7 days
         $searches7dCurrent = KbSearch::where('created_at', '>=', $sevenDaysAgo)->count();
         $searches7dPrevious = KbSearch::where('created_at', '>=', $fourteenDaysAgo)->where('created_at', '<', $sevenDaysAgo)->count();
 
-        // 3. Answer Rate
+        // Answer rate
         $answered7dCurrent = KbSearch::where('created_at', '>=', $sevenDaysAgo)->where('was_answered', true)->count();
         $answerRateCurrent = $searches7dCurrent > 0 ? (int) round(($answered7dCurrent / $searches7dCurrent) * 100) : 0;
 
         $answered7dPrevious = KbSearch::where('created_at', '>=', $fourteenDaysAgo)->where('created_at', '<', $sevenDaysAgo)->where('was_answered', true)->count();
         $answerRatePrevious = $searches7dPrevious > 0 ? (int) round(($answered7dPrevious / $searches7dPrevious) * 100) : 0;
 
-        // 4. Published Articles — value is the all-time total; the comparison is a true
+        // Published articles — value is the all-time total; the comparison is a true
         // week-over-week on newly-published articles (by published_at), not the old
         // "total vs total-created-before-7d" ratio which was a cumulative growth rate
         // mislabeled as a period delta.
@@ -63,10 +59,6 @@ class KbAnalyticsController extends Controller
             ->toArray();
 
         return Inertia::render('Addons/ai-knowledge-base/Admin/Analytics', [
-            'searches_today' => [
-                'value' => $searchesTodayCurrent,
-                'comparison' => $this->calculateComparison($searchesTodayCurrent, $searchesTodayPrevious),
-            ],
             'searches_7d' => [
                 'value' => $searches7dCurrent,
                 'comparison' => $this->calculateComparison($searches7dCurrent, $searches7dPrevious),

@@ -3,6 +3,7 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import AssistantMessages from '../AssistantMessages.vue'
 import AssistantInput from '../AssistantInput.vue'
 import { csrfHeaders } from '../../../Composables/useAssistantApi'
+import { toastAssistantError } from '../../../Composables/useAssistantErrors'
 import { useTranslate } from '@/Composables/useTranslate'
 import type {
     AssistantAttachment,
@@ -287,20 +288,11 @@ function dropPlaceholder(index: number) {
     }
 }
 
+// Kept as a thin wrapper so the inline error line still gets the text, while the shared
+// helper raises the toast — the widget can be scrolled out of view or collapsed, and a
+// refusal only written into the panel goes unseen.
 async function httpErrorMessage(response: Response): Promise<string> {
-    let body: { message?: string; error?: string } | null = null
-    try {
-        body = await response.json() as { message?: string; error?: string }
-    } catch {
-        body = null
-    }
-
-    if (body?.message) return body.message
-    if (body?.error) return body.error
-    if (response.status === 429) return t('Too many requests. Please slow down.')
-    if (response.status === 419) return t('Your session expired. Please reload the page.')
-
-    return t('Something went wrong. Please try again.')
+    return toastAssistantError(response)
 }
 
 function stopStreaming() {
@@ -410,7 +402,14 @@ defineExpose({ sendMessage })
 
         <!-- Legal note. Sits under the input (it's about sending a message, so this is where
              it belongs), and the server sends `legal: null` — so this renders nothing at all —
-             when it's disabled, on the admin surface, or when neither link is configured. -->
+             when it's disabled, on the admin surface, or when neither link is configured.
+
+             The empty HTML comments below join the links tightly, keeping a stray space out
+             from before the closing full stop. The separator's spaces then have to live INSIDE
+             its interpolation: Vue's whitespace: 'condense' strips leading and trailing
+             whitespace within an element, so writing the spaces as plain text around the
+             mustache compiles them away and the line reads "Privacy PolicyandTerms of Use".
+             Interpolated text is never condensed. Do not move them back out. -->
         <p
             v-if="settings.legal"
             class="shrink-0 px-4 pb-2.5 text-center text-[11px] leading-snug text-gray-400 dark:text-gray-500"
@@ -423,7 +422,7 @@ defineExpose({ sendMessage })
                 rel="noopener noreferrer"
                 class="underline hover:text-gray-600 dark:hover:text-gray-300"
             >{{ t('Privacy Policy') }}</a><!--
-            --><span v-if="settings.legal.privacy_url && settings.legal.terms_url"> {{ t('and') }} </span><!--
+            --><span v-if="settings.legal.privacy_url && settings.legal.terms_url">{{ ` ${t('and')} ` }}</span><!--
             --><a
                 v-if="settings.legal.terms_url"
                 :href="settings.legal.terms_url"

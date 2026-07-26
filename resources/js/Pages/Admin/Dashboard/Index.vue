@@ -40,6 +40,7 @@ interface DualSeriesPoint { date: string; revenue: number; cost: number }
 interface LabelValue { label: string; credits?: number; cost?: number; tokens?: number; logins?: number; count?: number; country?: string }
 interface DashboardMetricItem {
     label: string
+    tool_id?: number
     tool_slug?: string
     tool_name?: string
     model?: string
@@ -715,7 +716,7 @@ async function drawAllCharts() {
     const xAxis = chartXAxisOptions(period)
 
     await drawChart('signups', chartRefs.signups, () => ({
-        type: 'bar', data: { labels: timeLabels(getPeriodSeries(dashboardCharts.value.signupsChart, period)), datasets: [{ data: getPeriodSeries(dashboardCharts.value.signupsChart, period).map(d => d.value), backgroundColor: 'rgba(31, 117, 254, 0.62)', borderColor: 'rgba(31, 117, 254, 0.92)', borderWidth: 1, borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.72, maxBarThickness: 18 }] },
+        type: 'bar', data: { labels: timeLabels(getPeriodSeries(dashboardCharts.value.signupsChart, period)), datasets: [{ data: getPeriodSeries(dashboardCharts.value.signupsChart, period).map(d => d.value), backgroundColor: 'rgba(31, 117, 254, 0.62)', borderColor: 'rgba(31, 117, 254, 0.92)', borderWidth: 1, borderRadius: 9999, barPercentage: 0.6, categoryPercentage: 0.72, maxBarThickness: 18 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor }, border: { display: false }, ticks: { callback: (value: string | number) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true } } },
     }))
 
@@ -935,7 +936,7 @@ async function drawAllCharts() {
                     },
                 },
                 scales: {
-                    x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
+                    x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: false },
                     y: {
                         beginAtZero: true,
                         grid: { color: chartGridColor }, border: { display: false },
@@ -1009,7 +1010,12 @@ async function drawAllCharts() {
                         backgroundColor: 'rgba(59, 130, 246, 0.65)',
                         borderColor: 'rgba(59, 130, 246, 0.95)',
                         borderWidth: 1,
-                        borderRadius: 4,
+                        borderRadius: 9999,
+                        // Cap the width so sparse periods (7d, lifetime) don't render
+                        // full-category-width slabs — matches the other dashboard bars.
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.7,
+                        maxBarThickness: 18,
                         yAxisID: 'y',
                     },
                     {
@@ -1049,7 +1055,21 @@ async function drawAllCharts() {
                     },
                 },
                 scales: {
-                    x: { border: { display: false }, grid: { display: false }, ...xAxis },
+                    // Chart.js `offset` is only boolean (false = flush, true = half-category
+                    // gap that balloons on sparse periods). For a small CONSTANT gap instead,
+                    // keep the axis flush and inset the bars a fixed number of px at each end.
+                    // Tune EDGE_GAP_PX to taste (0 = fully flush/touching).
+                    x: {
+                        border: { display: false },
+                        grid: { display: false },
+                        ...xAxis,
+                        offset: true,
+                        afterFit: (scale: { paddingLeft: number; paddingRight: number }) => {
+                            const EDGE_GAP_PX = 8
+                            scale.paddingLeft = EDGE_GAP_PX
+                            scale.paddingRight = EDGE_GAP_PX
+                        },
+                    },
                     y: {
                         beginAtZero: true,
                         grid: { color: chartGridColor }, border: { display: false },
@@ -1092,7 +1112,7 @@ async function drawAllCharts() {
                             maxBarThickness: 18,
                         },
                         {
-                            label: t('Pro'),
+                            label: t('Premium'),
                             data: proValues,
                             backgroundColor: 'rgba(99, 102, 241, 0.72)',
                             borderColor: 'rgba(99, 102, 241, 0.96)',
@@ -1249,7 +1269,7 @@ async function drawAllCharts() {
                     backgroundColor: providerColors,
                     borderColor: providerColors,
                     borderWidth: 1,
-                    borderRadius: 4,
+                    borderRadius: 9999,
                     // Cap thickness so a handful of providers render as slim bars
                     // instead of stretching to fill the whole chart height.
                     maxBarThickness: 28,
@@ -1383,7 +1403,7 @@ const activityTypeLabels: Record<string, string> = {
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <h1 class="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+                <h1 class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white">
                     <span>{{ t('Welcome back!') }}{{ adminFirstName ? ` ${adminFirstName}` : '' }} 👏</span>
                 </h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Overview of your platform') }} · <span class="font-medium text-gray-600 dark:text-gray-300">{{ t('Showing') }}: {{ t(periodLabels[chartPeriod]) }}</span></p>
@@ -1441,7 +1461,7 @@ const activityTypeLabels: Record<string, string> = {
                 </svg>
                 <div class="flex-1">
                     <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ t('Demo Mode Active') }}</p>
-                    <p class="mt-1 text-sm text-amber-700 dark:text-amber-400">{{ t('Destructive write operations are blocked. AI generation, login/logout, and preferences remain functional. To change demo settings, edit the .env file.') }}</p>
+                    <p class="mt-1 text-sm text-amber-700 dark:text-amber-400">{{ t('Destructive write operations are blocked. AI generation, login/logout, and preferences remain functional.') }}</p>
                 </div>
             </div>
         </div>
@@ -1561,7 +1581,10 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Section: Growth & Revenue -->
-        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Growth & Revenue') }}</h2>
+        <div class="flex items-center gap-3 pt-2">
+            <h2 class="shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Growth & Revenue') }}</h2>
+            <div class="h-px flex-1 bg-gray-200/80 dark:bg-surface-700/60"></div>
+        </div>
 
         <!-- Row 2: User Registrations + Cost vs Revenue — pro-only (non-pro shows signups as the hero above) -->
         <div v-if="isProAvailable" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1600,7 +1623,10 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Section: AI Usage & Cost -->
-        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('AI Usage & Cost') }}</h2>
+        <div class="flex items-center gap-3 pt-2">
+            <h2 class="shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('AI Usage & Cost') }}</h2>
+            <div class="h-px flex-1 bg-gray-200/80 dark:bg-surface-700/60"></div>
+        </div>
 
         <!-- Row 4: AI Credits by Tool + Cost by Provider -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1639,7 +1665,10 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Section: Acquisition -->
-        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Acquisition') }}</h2>
+        <div class="flex items-center gap-3 pt-2">
+            <h2 class="shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Acquisition') }}</h2>
+            <div class="h-px flex-1 bg-gray-200/80 dark:bg-surface-700/60"></div>
+        </div>
 
         <!-- Row 6: Acquisition -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -1656,11 +1685,18 @@ const activityTypeLabels: Record<string, string> = {
                 </div>
             </ChartCard>
             <ChartCard :title="t('Top AI Tools')">
-                <div v-if="topToolsByUsage.length" class="space-y-2">
-                    <div v-for="tool in topToolsByUsage.slice(0, 9)" :key="tool.tool_slug" class="flex items-center justify-between text-sm">
-                        <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ tool.tool_name ?? tool.tool_slug }}</span>
+                <div v-if="topToolsByUsage.length" class="space-y-1">
+                    <component
+                        :is="tool.tool_id ? Link : 'div'"
+                        v-for="tool in topToolsByUsage.slice(0, 9)"
+                        :key="tool.tool_slug"
+                        :href="tool.tool_id ? route('admin.ai.tools.edit', tool.tool_id) : undefined"
+                        class="group flex items-center justify-between text-sm rounded-lg -mx-2 px-2 py-1 transition-colors"
+                        :class="tool.tool_id ? 'hover:bg-gray-50 dark:hover:bg-surface-800/60' : ''"
+                    >
+                        <span class="text-gray-600 dark:text-gray-400 truncate mr-2" :class="tool.tool_id ? 'group-hover:text-primary-600 dark:group-hover:text-primary-400' : ''">{{ tool.tool_name ?? tool.tool_slug }}</span>
                         <span class="font-medium text-gray-900 dark:text-white shrink-0">{{ tool.count?.toLocaleString() || 0 }}</span>
-                    </div>
+                    </component>
                 </div>
                 <div v-else class="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-500">
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -1680,11 +1716,19 @@ const activityTypeLabels: Record<string, string> = {
                 </div>
             </ChartCard>
             <ChartCard :title="t('Recent Users')">
-                <div v-if="recentUsers.length" class="space-y-2">
-                    <div v-for="user in recentUsers" :key="user.ulid" class="text-sm">
-                        <p class="font-medium text-gray-900 dark:text-white truncate">{{ user.name }}</p>
+                <div v-if="recentUsers.length" class="space-y-1">
+                    <Link
+                        v-for="user in recentUsers"
+                        :key="user.ulid"
+                        :href="route('admin.users.show', user.ulid)"
+                        class="group block text-sm rounded-lg -mx-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-surface-800/60 transition-colors"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400">{{ user.name }}</p>
+                            <span class="text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ timeAgo(user.created_at) }}</span>
+                        </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
-                    </div>
+                    </Link>
                 </div>
                 <div v-else class="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-500">
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
@@ -1694,7 +1738,10 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Section: Engagement & Activity -->
-        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Engagement & Activity') }}</h2>
+        <div class="flex items-center gap-3 pt-2">
+            <h2 class="shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Engagement & Activity') }}</h2>
+            <div class="h-px flex-1 bg-gray-200/80 dark:bg-surface-700/60"></div>
+        </div>
 
         <!-- Row 7: Referral + Conversion -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1735,7 +1782,7 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <div v-if="isProAvailable" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <ChartCard :title="t('Free vs Pro Conversion')" class="lg:col-span-8 flex h-full flex-col">
+            <ChartCard :title="t('Free vs Premium Conversion')" class="lg:col-span-8 flex h-full flex-col">
                 <div v-if="!isEmptySeries(dashboardCharts.signupsChart[chartPeriod]) || !isEmptySeries(dashboardCharts.subscriptionConversionsChart[chartPeriod])" class="relative min-h-[20rem] flex-1"><canvas ref="conversionCanvas" /></div>
                 <div v-else class="flex min-h-[20rem] flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>

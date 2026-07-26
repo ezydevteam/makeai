@@ -54,6 +54,18 @@ class PageSeeder extends Seeder
                 'is_system' => true,
             ],
             [
+                'title' => 'Usage Policy',
+                'slug' => 'usage-policy',
+                'content' => '<h2>1. Acceptable Use</h2><p>Our AI tools are provided to help you create original, lawful content. You are responsible for the prompts you submit and the output you publish.</p>'
+                    . '<h2>2. Prohibited Content</h2><p>You may not use the platform to generate content that is unlawful, hateful, harassing, deceptive, or that infringes the intellectual property or privacy rights of others. Automated abuse, scraping, and attempts to bypass credit or rate limits are also prohibited.</p>'
+                    . '<h2>3. Credits &amp; Fair Use</h2><p>Each generation consumes credits according to the model and length of the request. Accounts that repeatedly exceed fair-use thresholds or share access across multiple users may be rate limited.</p>'
+                    . '<h2>4. Ownership of Output</h2><p>Subject to these terms and your plan, you retain rights to the content you generate. AI output may not be unique, so we recommend reviewing it before commercial use.</p>'
+                    . '<h2>5. Enforcement</h2><p>We may suspend or terminate accounts that violate this policy. Where possible we will provide notice and an opportunity to correct the issue.</p>',
+                'excerpt' => 'The rules for acceptable use of our AI tools, credits, and generated content.',
+                'status' => 'published',
+                'is_system' => true,
+            ],
+            [
                 'title' => 'Cookie Policy',
                 'slug' => 'cookie-policy',
                 'content' => '<h2>What are Cookies?</h2><p>Cookies are small text files that are stored on your device when you visit a website.</p><h2>How We Use Cookies</h2><p>We use cookies to understand how you use our site and to improve your experience.</p>',

@@ -190,9 +190,12 @@ const formatDate = (dateStr: string) => {
         <!-- Header -->
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('Chatbot Analytics') }}
-                </h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Chatbot Analytics') }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Monitor conversation engagement, model usage patterns, credit consumption, and customer satisfaction.') }}
                 </p>
@@ -479,7 +482,7 @@ const formatDate = (dateStr: string) => {
                         </div>
                         <div class="h-2 w-full bg-gray-100 rounded-full dark:bg-surface-800 overflow-hidden">
                             <div
-                                class="h-full bg-secondary-600 rounded-full transition-all duration-500"
+                                class="h-full bg-violet-600 rounded-full transition-all duration-500"
                                 :style="{ width: `${(item.conversations_count / totalPopularityConversations) * 100}%` }"
                             ></div>
                         </div>

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -241,7 +242,7 @@ const cancelScheduledChange = () => {
                     class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/30 dark:bg-surface-900 dark:text-sky-200 dark:hover:bg-sky-500/15"
                 >
                     <i class="ti ti-refresh"></i>
-                    {{ t('Renew') }}
+                    {{ t('Renew Now') }}
                 </Link>
             </div>
         </div>
@@ -250,26 +251,16 @@ const cancelScheduledChange = () => {
             <!-- Left Column: Current Plan, Features, Actions, History (span 2) -->
             <div class="lg:col-span-2 space-y-6">
                 <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-                    <div class="px-6 py-4 border-b border-gray-100 dark:border-surface-800 bg-white dark:bg-surface-900">
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Current plan') }}</p>
-                                <h2 class="mt-1 break-words font-heading text-2xl font-extrabold text-gray-950 dark:!text-white">
-                                    {{ plan?.name ?? t('No active plan') }}
-                                </h2>
-                                <p class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">
-                                    {{ t('Your active plan details and fully unlocked features.') }}
-                                </p>
-                            </div>
-                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 text-primary-700 shadow-sm dark:bg-surface-800 dark:text-primary-500 shrink-0">
-                                <i class="ti ti-crown text-3xl"></i>
-                            </div>
-                        </div>
+                    <div class="px-6 py-3 border-b border-gray-100 dark:border-surface-800 bg-white dark:bg-surface-900">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Your Current plan') }}</p>
+                        <h2 class="mt-1 break-words font-heading text-2xl font-extrabold text-gray-950 dark:!text-white">
+                            {{ plan?.name ?? t('No active plan') }}
+                        </h2>
                     </div>
 
                     <div class="px-6 py-4 space-y-6">
                         <div>
-                            <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-4">{{ t('Included Features') }}</h3>
+                            <h3 class="text-xs font-medium uppercase tracking-wider !text-gray-500 mb-4">{{ t('Included Features') }}</h3>
 
                             <div v-if="planFeatures.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div v-for="feature in planFeatures" :key="feature" class="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-2 dark:border-surface-800 dark:bg-surface-950/40">
@@ -286,39 +277,6 @@ const cancelScheduledChange = () => {
                         </div>
                     </div>
                 </section>
-
-                <!-- Payment History Card (Main Side) -->
-                <div class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-                    <div class="px-6 py-4 border-b border-gray-100 dark:border-surface-800">
-                        <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Payment History') }}</h3>
-                    </div>
-
-                    <div class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <div v-if="payments.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                            {{ t('No payments yet.') }}
-                        </div>
-                        <div v-for="payment in payments" :key="payment.id" class="flex items-center justify-between px-6 py-4">
-                            <div class="min-w-0 flex-1 pr-4">
-                                <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                    {{ payment.plan_name || t('Payment') }}
-                                </p>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <span :class="statusClass(payment.status)" class="inline-flex items-center rounded-full px-2 py-px text-[10px] font-semibold uppercase">
-                                        {{ statusLabel(payment.status) }}
-                                    </span>
-                                    <span class="text-xs text-gray-400">{{ formatDate(payment.created_at) }}</span>
-                                    <span class="text-xs text-gray-400">· {{ payment.gateway }}</span>
-                                </div>
-                            </div>
-                            <div class="text-right shrink-0 ml-3">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">
-                                    {{ formatCurrency(payment.amount, payment.currency) }}
-                                </div>
-                                <div class="text-[10px] text-gray-400">{{ paymentTypeLabel(payment.type) }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Right Column: Sidebar / Status & Limits (span 1) -->
@@ -353,7 +311,7 @@ const cancelScheduledChange = () => {
                     <!-- Billing Actions inside Plan Card -->
                     <div class="pt-4 mt-6 border-t border-gray-100 dark:border-surface-800 bg-gray-50/40 dark:bg-surface-950/20">
                         <div class="flex flex-wrap items-center gap-3">
-                            <Link :href="route('pricing')" class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:!text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300">
+                            <Link :href="route('pricing')" class="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:!text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300">
                                 <i class="ti ti-arrow-up text-base"></i>
                                 {{ t('Manage Plan') }}
                             </Link>
@@ -361,7 +319,7 @@ const cancelScheduledChange = () => {
                             <a
                                 v-if="subscription.has_billing_portal"
                                 :href="route('billing.portal')"
-                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:!text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
+                                class="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:!text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
                             >
                                 <i class="ti ti-credit-card text-base"></i>
                                 {{ t('Billing Portal') }}
@@ -370,7 +328,7 @@ const cancelScheduledChange = () => {
                             <button
                                 v-if="subscription.can_cancel"
                                 type="button"
-                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-red-200 hover:!bg-red-50 hover:!text-red-700 dark:hover:!border-red-900/30 dark:hover:!bg-red-900/30 dark:hover:!text-red-300"
+                                class="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-red-200 hover:!bg-red-50 hover:!text-red-700 dark:hover:!border-red-900/30 dark:hover:!bg-red-900/30 dark:hover:!text-red-300"
                                 @click="cancelModalOpen = true"
                             >
                                 <i class="ti ti-circle-x text-base"></i>
@@ -381,7 +339,7 @@ const cancelScheduledChange = () => {
                                 v-if="subscription.can_resume"
                                 type="button"
                                 :disabled="resumeProcessing"
-                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:!bg-emerald-100 disabled:opacity-60 dark:!border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"
+                                class="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:!bg-emerald-100 disabled:opacity-60 dark:!border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"
                                 @click="resumeSubscription"
                             >
                                 <i class="ti ti-refresh text-base"></i>
@@ -392,6 +350,84 @@ const cancelScheduledChange = () => {
                 </div>
             </div>
         </div>
+
+        <!-- Payment History — full width below the two-column grid, so the columns have room
+             to breathe rather than being squeezed into the 2/3 left column. -->
+        <section class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <div class="border-b border-gray-100/80 px-6 py-4 dark:border-surface-800">
+                <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Payment History') }}</h3>
+            </div>
+
+            <div v-if="payments.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                {{ t('No payments yet.') }}
+            </div>
+
+            <!-- Horizontally scrollable rather than wrapping: six columns do not fit a phone,
+                 and a wrapped table row is harder to read than a scrolled one. -->
+            <div v-else class="min-w-0 overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50/80 text-xs uppercase tracking-wide text-gray-700 dark:bg-surface-800/60 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-3 font-semibold">{{ t('Title') }}</th>
+                            <th class="px-4 py-3 font-semibold">{{ t('Gateway') }}</th>
+                            <th class="px-4 py-3 text-center font-semibold">{{ t('Amount') }}</th>
+                            <th class="px-4 py-3 text-center font-semibold">{{ t('Status') }}</th>
+                            <th class="px-4 py-3 text-center font-semibold">{{ t('Date') }}</th>
+                            <th class="px-6 py-3 text-center font-semibold">{{ t('Action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                        <tr
+                            v-for="payment in payments"
+                            :key="payment.id"
+                            class="transition hover:bg-gray-50/60 dark:hover:bg-surface-800/40"
+                        >
+                            <td class="px-6 py-4">
+                                <p class="font-semibold text-gray-900 dark:text-white">
+                                    {{ payment.plan_name || t('Payment') }}
+                                </p>
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                    {{ paymentTypeLabel(payment.type) }}
+                                </p>
+                            </td>
+                            <td class="px-4 py-4 capitalize text-gray-600 dark:text-gray-300">
+                                {{ payment.gateway?.replace('_', ' ') || '—' }}
+                            </td>
+                            <td class="px-4 py-4 text-center font-bold text-gray-900 dark:text-white">
+                                {{ formatCurrency(payment.amount, payment.currency) }}
+                            </td>
+                            <td class="px-4 py-4 text-center">
+                                <span :class="statusClass(payment.status)" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase">
+                                    {{ statusLabel(payment.status) }}
+                                </span>
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-4 text-center text-gray-500 dark:text-gray-400">
+                                {{ formatDate(payment.created_at) }}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <!-- Only settled payments get an invoice: a failed charge
+                                     collected nothing, and a pending one has not cleared yet,
+                                     so neither has an amount to invoice for. -->
+                                <Tooltip
+                                    v-if="!['failed', 'pending'].includes(payment.status)"
+                                    :content="t('Download invoice')"
+                                    placement="top"
+                                >
+                                    <a
+                                        :href="route('user.dashboard.billing.invoice', payment.ulid)"
+                                        :aria-label="t('Download invoice')"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-surface-800 dark:hover:text-primary-400"
+                                    >
+                                        <i class="ti ti-file-download text-base"></i>
+                                    </a>
+                                </Tooltip>
+                                <span v-else class="text-xs text-gray-300 dark:text-gray-600">—</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
         </template>
 
         <ActionConfirmModal

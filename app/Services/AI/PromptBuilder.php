@@ -220,11 +220,11 @@ class PromptBuilder
      * Resolve the default model slug, ensuring it matches the admin's default_ai_provider.
      *
      * Handles the case where admin changed default_ai_provider (e.g. to 'google')
-     * but default_ai_model still points to a different provider's model (e.g. 'gpt-4o-mini').
+     * but default_ai_model still points to a different provider's model (e.g. 'gpt-5.4-mini').
      */
     private function resolveDefaultModel(): string
     {
-        $defaultModel = settings('default_ai_model', 'gpt-4o-mini');
+        $defaultModel = settings('default_ai_model', config('ai.fallback_model'));
         $defaultProvider = settings('default_ai_provider', 'openai');
 
         // Check if the stored default model actually belongs to the default provider

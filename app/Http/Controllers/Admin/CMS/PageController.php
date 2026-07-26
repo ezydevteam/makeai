@@ -80,7 +80,7 @@ class PageController extends Controller
 
     public function update(PageRequest $request, Page $page)
     {
-        $validated = $this->normalizePageData($request->validated(), $page);
+        $validated = $this->normalizePageData($request->validated());
 
         // System pages have fixed slugs referenced by hardcoded links (footer,
         // GDPR cookie banner, menus, legal pages). Keep the slug immutable so a
@@ -275,7 +275,7 @@ class PageController extends Controller
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function normalizePageData(array $data, ?Page $page = null): array
+    private function normalizePageData(array $data): array
     {
         $data['slug'] = Str::slug($data['slug'] ?: $data['title']);
         $data['content'] = $this->sanitizeHtml($data['content']);
@@ -290,13 +290,12 @@ class PageController extends Controller
             $data['published_at'] = null;
         }
 
-        if (filled($data['password'] ?? null)) {
-            $data['password'] = Hash::make($data['password']);
-        } elseif ($page) {
-            unset($data['password']);
-        } else {
-            $data['password'] = null;
-        }
+        // The field is the single source of truth for protection: a value sets it,
+        // blank removes it. Previously a blank value was unset on update to "keep the
+        // current password", which left no way at all to unprotect a page again.
+        $data['password'] = filled($data['password'] ?? null)
+            ? Hash::make($data['password'])
+            : null;
 
         return $data;
     }

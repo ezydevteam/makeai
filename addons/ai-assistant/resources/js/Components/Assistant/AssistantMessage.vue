@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { renderMarkdown, handleMarkdownCopy, copyText } from '../../Composables/useAssistantMarkdown'
 import { relativeTime } from '../../Composables/useAssistantFormat'
 import { csrfHeaders } from '../../Composables/useAssistantApi'
+import { toastAssistantError, toastAssistantFailure } from '../../Composables/useAssistantErrors'
 import { useTranslate } from '@/Composables/useTranslate'
 import type { AssistantMessageItem } from '../../types'
 
@@ -66,12 +67,22 @@ async function rate(value: 1 | -1) {
             }),
         })
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    } catch {
+        if (!response.ok) {
+            // The server says why — demo mode, an expired session, a rate limit. Toast it
+            // rather than reducing every refusal to the same silent thumb reset.
+            await toastAssistantError(response, t('Your feedback could not be saved.'))
+            throw new Error(`HTTP ${response.status}`)
+        }
+    } catch (e: unknown) {
         // The admin widget used to POST to the frontend route, 401, and swallow it — the
         // thumb stayed lit and nothing was ever recorded. Surface the failure instead.
         rating.value = previous
         feedbackFailed.value = true
+
+        // A network failure never reached the toast above, so raise one here.
+        if (!(e instanceof Error) || !e.message.startsWith('HTTP ')) {
+            toastAssistantFailure(t('Your feedback could not be saved.'))
+        }
     } finally {
         sending.value = false
     }

@@ -39,11 +39,15 @@ if (! function_exists('is_regular_license')) {
 if (! function_exists('isProAvailable')) {
     /**
      * Check if subscription/billing features should be available.
-     * Requires: Extended License AND subscriptions enabled by admin.
+     * Requires: Extended License AND subscriptions enabled by admin (default on).
+     *
+     * The toggle defaults ON so a fresh Extended-license install surfaces Premium
+     * Subscriptions out of the box (mirrors coupons_enabled); an admin can still
+     * turn it off. On a Regular license the extended-license gate keeps it hidden.
      */
     function isProAvailable(): bool
     {
-        return is_extended_license() && (bool) settings('subscriptions_enabled', false);
+        return is_extended_license() && (bool) settings('subscriptions_enabled', true);
     }
 }
 

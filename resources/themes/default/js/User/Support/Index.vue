@@ -26,7 +26,15 @@ interface Ticket {
 }
 
 const props = defineProps<{
-    tickets: { data: Ticket[]; links: { url: string | null; label: string; active: boolean }[] }
+    tickets: {
+        data: Ticket[]
+        links: { url: string | null; label: string; active: boolean }[]
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
+    }
     departments: Department[]
     filters: { status?: string; search?: string }
     settings: { max_attachments_per_reply: number; max_attachment_size_mb: number; allowed_attachment_types: string }
@@ -130,7 +138,7 @@ const submit = () => {
                 :class="showCreate ? 'btn-danger' : 'btn-primary'"
                 class="shrink-0"
             >
-                <i :class="showCreate ? 'ti ti-x mr-2' : 'ti ti-plus mr-2'" ></i>
+                <i :class="showCreate ? 'ti ti-x' : 'ti ti-plus'" class="text-base"></i>
                 {{ showCreate ? t('Close') : t('New Ticket') }}
             </button>
         </div>
@@ -177,7 +185,7 @@ const submit = () => {
 
         <section class="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <div class="relative z-20 flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-end sm:justify-between dark:border-surface-800">
-                <div class="relative flex-1 min-w-[220px] md:max-w-sm">
+                <div class="relative flex-1 min-w-[220px] md:max-w-xs">
                     <i class="ti ti-search pointer-events-none absolute inset-y-0 left-4 flex items-center text-gray-400"></i>
                     <input
                         v-model="search"
@@ -224,7 +232,7 @@ const submit = () => {
                             <td class="px-4 py-4 text-right">
                                 <Link
                                     :href="route('user.dashboard.support.tickets.show', ticket.ticket_number)"
-                                    class="inline-flex items-center justify-center rounded-full border border-primary-500 px-4 py-1 text-xs font-semibold !text-primary-600 transition hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-500/10"
+                                    class="inline-flex items-center justify-center rounded-full border border-primary-500 px-4 py-1 text-xs font-semibold text-primary-600 transition hover:bg-primary-50 dark:text-primary-400 dark:border-primary-900/60 dark:hover:bg-primary-500/10"
                                 >
                                     {{ t('View') }}
                                 </Link>
@@ -242,6 +250,17 @@ const submit = () => {
             </div>
         </section>
 
-        <Pagination :links="tickets.links" class="mt-6" />
+        <!-- from/to/total drive the component's "showing X to Y of Z" row; with only :links
+             it rendered the page buttons above an empty count line. -->
+        <Pagination
+            v-if="tickets.last_page > 1"
+            :links="tickets.links"
+            :from="tickets.from"
+            :to="tickets.to"
+            :total="tickets.total"
+            :current-page="tickets.current_page"
+            :last-page="tickets.last_page"
+            class="mt-6"
+        />
     </div>
 </template>

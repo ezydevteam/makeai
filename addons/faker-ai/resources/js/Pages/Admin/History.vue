@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { asZonedDisplayDate, siteTimeZone } from '@/lib/timezone'
 
@@ -31,7 +32,17 @@ interface PageLink {
 }
 
 defineProps<{
-    batches: { data: Batch[]; links: PageLink[] }
+    batches: {
+        data: Batch[]
+        links: PageLink[]
+        // The paginator's own counters, so the control can show "Showing 1 to 20 of 47"
+        // rather than page numbers with no sense of scale.
+        from?: number | null
+        to?: number | null
+        total?: number | null
+        current_page?: number
+        last_page?: number
+    }
 }>()
 
 const deletingId = ref<number | null>(null)
@@ -88,9 +99,12 @@ const formatBatchDate = (dateStr: string | null) => {
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex-1">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('FakerAI History') }}
-                </h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('FakerAI History') }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Every generation run. Deleting a batch removes exactly the data it created.') }}
                 </p>
@@ -159,23 +173,15 @@ const formatBatchDate = (dateStr: string | null) => {
             </table>
         </div>
 
-        <div v-if="batches.links.length > 3" class="flex flex-wrap gap-1">
-            <template v-for="(link, i) in batches.links" :key="i">
-                <Link
-                    v-if="link.url"
-                    :href="link.url"
-                    class="rounded-lg px-3 py-1.5 text-sm"
-                    :class="link.active
-                        ? 'bg-primary-600 text-white'
-                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'"
-                    v-html="link.label"
-                />
-                <span
-                    v-else
-                    class="rounded-lg px-3 py-1.5 text-sm text-gray-300 dark:text-gray-600"
-                    v-html="link.label"
-                />
-            </template>
+        <div v-if="batches.links.length > 3">
+            <Pagination
+                :links="batches.links"
+                :from="batches.from"
+                :to="batches.to"
+                :total="batches.total"
+                :current-page="batches.current_page"
+                :last-page="batches.last_page"
+            />
         </div>
 
         <ActionConfirmModal

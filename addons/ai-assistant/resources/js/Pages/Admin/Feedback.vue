@@ -26,7 +26,7 @@ interface Paginated<T> {
 
 const props = defineProps<{
     feedback: Paginated<FeedbackRow>
-    stats: { total: number; positive: number; negative: number }
+    stats: { total: number; positive: number; negative: number; csat_count: number; csat_average: number }
 }>()
 
 const { t } = useTranslate()
@@ -43,6 +43,11 @@ const satisfactionColor = computed(() => {
     if (satisfaction.value >= 50) return 'warning'
     return 'down'
 })
+
+// Session-level experience score (1–5), distinct from the per-message thumbs above. The
+// controller sends 0 for the average when nothing has been rated, so gate on the count —
+// a "0.0 / 5" would read as unanimously terrible rather than unrated.
+const csatAverage = computed(() => (props.stats.csat_count > 0 ? props.stats.csat_average.toFixed(1) : '—'))
 
 function formatFeedbackDate(dateStr: string | null): string {
     if (!dateStr) return '—'
@@ -71,9 +76,12 @@ function go(url: string | null) {
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex-1">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('Assistant Feedback') }}
-                </h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Assistant Feedback') }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('What users thought of the assistant’s answers, joined to the message they rated.') }}
                 </p>
@@ -81,7 +89,7 @@ function go(url: string | null) {
         </div>
 
         <!-- Stat cards -->
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatsCard
                 :title="t('Total Feedback')"
                 :value="stats.total"
@@ -112,6 +120,17 @@ function go(url: string | null) {
             >
                 <template #icon>
                     <i class="ti ti-thumb-down text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Experience Rating')"
+                :value="csatAverage"
+                :label="stats.csat_count > 0 ? t('out of 5') : undefined"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-star text-lg"></i>
                 </template>
             </StatsCard>
         </div>

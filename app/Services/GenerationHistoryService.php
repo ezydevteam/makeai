@@ -34,13 +34,20 @@ class GenerationHistoryService
         return $history;
     }
 
-    public function getHistory(User $user, ?string $toolSlug = null, int $perPage = 20): LengthAwarePaginator
+    public function getHistory(User $user, ?string $toolSlug = null, int $perPage = 20, bool $starredOnly = false): LengthAwarePaginator
     {
         $query = GenerationHistory::where('user_id', $user->id)
             ->orderBy('created_at', 'desc');
 
         if ($toolSlug) {
             $query->where('tool_slug', $toolSlug);
+        }
+
+        // Starred is a real query filter, not a client-side filter over the current page:
+        // otherwise the paginator counts every generation while the list shows only the
+        // starred ones from page 1, and page 2 quietly drops the filter.
+        if ($starredOnly) {
+            $query->where('is_favorited', true);
         }
 
         // Model & provider are internal/admin details — never expose them in the

@@ -36,6 +36,9 @@ class FavoriteController extends Controller
                 'current_page' => $favorites->currentPage(),
                 'last_page' => $favorites->lastPage(),
                 'total' => $favorites->total(),
+                // from/to drive the shared Pagination component's "showing X to Y of Z".
+                'from' => $favorites->firstItem(),
+                'to' => $favorites->lastItem(),
                 'links' => $favorites->linkCollection(),
             ],
         ]);

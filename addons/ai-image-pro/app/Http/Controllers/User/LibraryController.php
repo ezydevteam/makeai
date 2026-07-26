@@ -100,6 +100,11 @@ class LibraryController extends Controller
             // turns that into the display name and provider the admin configured; without
             // it the preview would show `gemini-3.1-flash-image-preview` at the user.
             'modelCatalog' => $this->catalog->forFrontend(),
+            // Names for models that are NOT in the catalogue above — ones the admin has since
+            // disabled or dropped from the offered set. Their assets still exist and still
+            // have to read as a name; without this the Library fell back to printing the
+            // alias. Same resolver the admin reporting uses, so both agree.
+            'modelNames' => $this->catalog->displayNameMap(),
             // An asset stores the registry key of the operation that made it (`bg_remove`).
             // The registry turns that into the name the admin sees, so the preview header
             // never shows a bare key.

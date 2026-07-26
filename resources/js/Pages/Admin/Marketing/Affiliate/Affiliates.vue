@@ -244,13 +244,13 @@ onBeforeUnmount(() => {
                     <table class="min-w-full divide-y divide-gray-100 text-left dark:divide-gray-800">
                         <thead class="bg-gray-50 dark:bg-gray-900/60">
                             <tr>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Affiliate') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Code') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referrals') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Commissions') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Earnings') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Joined') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Action') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Affiliate') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Code') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Referrals') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Commissions') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Earnings') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Joined') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Action') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -269,11 +269,11 @@ onBeforeUnmount(() => {
                                 <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">{{ a.created_at ? formatDateTime(a.created_at) : '—' }}</td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="inline-flex items-center gap-2">
-                                        <Link :href="route('admin.affiliate.affiliates.show', a.ulid)" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+                                        <Link :href="route('admin.affiliate.affiliates.show', a.ulid)" class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
                                             <i class="ti ti-eye text-xs"></i>
                                             <span>{{ t('View') }}</span>
                                         </Link>
-                                        <button type="button" :disabled="banning[a.id]" class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50" :class="a.affiliate_banned ? 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700' : 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50'" @click="openConfirmModal(a)">
+                                        <button type="button" :disabled="banning[a.id]" class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50" :class="a.affiliate_banned ? 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700' : 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50'" @click="openConfirmModal(a)">
                                             <span v-if="banning[a.id]"><i class="ti ti-loader-2 animate-spin text-xs"></i></span>
                                             <template v-else>
                                                 <i :class="a.affiliate_banned ? 'ti ti-rotate-2 text-xs' : 'ti ti-ban text-xs'"></i>
@@ -297,7 +297,6 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </div>
-    
 
         <ActionConfirmModal
             :open="confirmModal.open"

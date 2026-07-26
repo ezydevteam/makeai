@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 
@@ -28,9 +29,28 @@ interface SessionItem {
     is_current?: boolean
 }
 
+interface LoginHistoryItem {
+    id: number
+    ip: string | null
+    country: string | null
+    city: string | null
+    user_agent: string | null
+    success: boolean
+    created_at: string | null
+}
+
 const props = defineProps<{
     exportHistory: ExportItem[]
     sessions: SessionItem[]
+    loginHistory: {
+        data: LoginHistoryItem[]
+        links: Array<{ url: string | null; label: string; active: boolean }>
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
+    }
     pendingExport: boolean
     recentExport: boolean
     scheduledDeletion: string | null
@@ -270,6 +290,56 @@ const exportedCookieConsent = computed(() => {
                     </div>
                 </div>
             </div>
+        </section>
+
+        <!-- Login History — the audit trail the dashboard's "Recent sign-ins" panel links to.
+             Distinct from Session Management above: a session disappears when it is revoked
+             or expires, whereas this keeps every sign-in, including failed attempts. -->
+        <section id="login-history" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Login History') }}</h2>
+            <p class="mt-1 text-sm text-gray-500">{{ t('Every recorded sign-in to your account, including failed attempts.') }}</p>
+
+            <div v-if="loginHistory.data.length === 0" class="mt-5 rounded-lg bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:bg-surface-800 dark:text-gray-400">
+                {{ t('No login history yet.') }}
+            </div>
+
+            <div v-else class="mt-5 space-y-2">
+                <div
+                    v-for="login in loginHistory.data"
+                    :key="login.id"
+                    class="flex flex-col gap-3 rounded-lg bg-gray-50 px-4 py-3 text-sm dark:bg-surface-800 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div class="min-w-0 flex flex-col gap-0.5">
+                        <span class="break-all text-gray-700 dark:text-gray-300">
+                            {{ login.ip || t('Unknown IP') }}
+                            <span v-if="login.city || login.country" class="text-gray-400">
+                                · {{ [login.city, login.country].filter(Boolean).join(', ') }}
+                            </span>
+                        </span>
+                        <span v-if="login.user_agent" class="break-words text-[11px] text-gray-400 sm:max-w-[300px]">{{ login.user_agent }}</span>
+                        <span v-if="login.created_at" class="text-[11px] text-gray-400">{{ new Date(login.created_at).toLocaleString() }}</span>
+                    </div>
+                    <span
+                        :class="login.success
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'"
+                        class="self-start rounded-full px-2 py-0.5 text-[11px] font-semibold sm:self-auto"
+                    >
+                        {{ login.success ? t('Success') : t('Failed') }}
+                    </span>
+                </div>
+            </div>
+
+            <Pagination
+                v-if="loginHistory.last_page > 1"
+                :links="loginHistory.links"
+                :from="loginHistory.from"
+                :to="loginHistory.to"
+                :total="loginHistory.total"
+                :current-page="loginHistory.current_page"
+                :last-page="loginHistory.last_page"
+                class="mt-5"
+            />
         </section>
     </div>
 

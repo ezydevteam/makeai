@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Addons\AiChatbot;
 
 use Addons\AiChatbot\Jobs\CleanupGuestAttachments;
+use Addons\AiChatbot\Support\ChatDefaults;
 use Addons\AiChatbot\Support\ChatSeo;
 use Addons\AiChatbot\Support\KnowledgeBase;
 use App\Services\HomepageProviderRegistry;
@@ -37,7 +38,7 @@ class AddonServiceProvider extends ServiceProvider
                 // Chat renders full-screen (consistent with the dedicated /chat route).
                 'hide_header' => true,
                 'hide_footer' => true,
-                'default_chat_model' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
+                'default_chat_model' => ChatDefaults::chatModel(),
                 'allow_model_select' => (bool) addon_setting('ai-chatbot', 'allow_model_select', true),
                 'show_provider_models' => (bool) addon_setting('ai-chatbot', 'show_provider_models', true),
                 'show_custom_models' => (bool) addon_setting('ai-chatbot', 'show_custom_models', false),
@@ -76,7 +77,7 @@ class AddonServiceProvider extends ServiceProvider
                 'showProviderModels' => (bool) addon_setting('ai-chatbot', 'show_provider_models', true),
                 'showCustomModels' => (bool) addon_setting('ai-chatbot', 'show_custom_models', false),
                 'customModels' => addon_setting('ai-chatbot', 'custom_models', []),
-                'defaultChatModel' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
+                'defaultChatModel' => ChatDefaults::chatModel(),
                 'allowGuestMessages' => (bool) addon_setting('ai-chatbot', 'allow_guest_messages', false),
                 'showTokenUsage' => (bool) addon_setting('ai-chatbot', 'show_token_usage', false),
                 'showCreditsCharged' => (bool) addon_setting('ai-chatbot', 'show_credits_charged', true),

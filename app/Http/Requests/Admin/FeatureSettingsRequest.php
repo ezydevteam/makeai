@@ -32,6 +32,7 @@ class FeatureSettingsRequest extends FormRequest
             'playground_enabled' => ['required', 'boolean'],
             'chains_enabled' => ['required', 'boolean'],
             'tool_embeds_enabled' => ['required', 'boolean'],
+            'global_tools_brand_voice_enabled' => ['required', 'boolean'],
             'optin_preferences_enabled' => ['required', 'boolean'],
             'cookie_preferences_enabled' => ['required', 'boolean'],
             'phone_required' => ['required', 'boolean'],

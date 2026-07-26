@@ -69,15 +69,14 @@ useFlashToasts()
         <!-- Newsletter Popup -->
         <NewsletterPopup />
 
-        <!-- Global Header Component -->
+        <!-- Global Header Component. The banner sits ABOVE the header so it is the first
+             thing on the page. -->
+        <AdSection v-if="showHeader" zone="header_banner" class="mx-auto mb-4 w-full max-w-7xl px-6" />
         <AppHeader v-if="showHeader" />
-        <AdSection v-if="showHeader" zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
 
         <!-- Content -->
         <main class="flex-1 flex flex-col md:pb-0" :style="mobileBottomInsetStyle">
-            <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
             <slot />
-            <AdSection zone="content_bottom" class="mx-auto mb-4 w-full max-w-7xl px-6" />
         </main>
 
         <!-- Global Footer Component -->

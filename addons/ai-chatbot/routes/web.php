@@ -15,7 +15,7 @@ Route::middleware(['web'])->group(function () {
             ...\Addons\AiChatbot\Support\ChatSeo::props($ulid),
             'hide_header' => true,
             'hide_footer' => true,
-            'default_chat_model' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
+            'default_chat_model' => \Addons\AiChatbot\Support\ChatDefaults::chatModel(),
             'allow_model_select' => (bool) addon_setting('ai-chatbot', 'allow_model_select', true),
             'show_provider_models' => (bool) addon_setting('ai-chatbot', 'show_provider_models', true),
             'show_custom_models' => (bool) addon_setting('ai-chatbot', 'show_custom_models', false),

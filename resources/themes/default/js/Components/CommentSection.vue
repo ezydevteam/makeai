@@ -4,6 +4,7 @@ import { Link, router, useForm, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { mediaUrl } from '@/lib/media'
 
 interface CommentUser {
     name: string
@@ -64,7 +65,9 @@ let pollTimer: number | undefined
 const canComment = computed(() => props.enabled && (authUser.value || props.allowGuests))
 
 const authorName = (comment: CommentItem) => comment.user?.name || comment.guest_name || t('Guest')
-const avatarUrl = (comment: CommentItem) => comment.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName(comment))}&background=10b981&color=fff`
+// Resolve stored avatar keys through the media helper (a raw key would render as a broken
+// relative path). Falls back to an initials avatar for guests / users without one.
+const avatarUrl = (comment: CommentItem) => mediaUrl(comment.user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName(comment))}&background=10b981&color=fff`
 
 const formatDate = (value: string | null) => {
     if (!value) return ''

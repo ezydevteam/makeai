@@ -245,7 +245,7 @@ function copyOutput(text: string) {
     </section>
 
     <!-- Run chain -->
-    <div v-if="runTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="runTarget = null">
+    <div v-if="runTarget" class="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" @click.self="runTarget = null">
       <div class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-surface-800 dark:bg-gray-900">
         <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Run :name', { name: runTarget.name }) }}</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('This text is passed to the steps that map the chain input.') }}</p>

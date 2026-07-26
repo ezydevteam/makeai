@@ -43,7 +43,7 @@ class PlaygroundController extends Controller
         return Inertia::render('User/Playground/Index', [
             'providers' => $providers,
             'defaultProvider' => settings('default_ai_provider', 'openai'),
-            'defaultModel' => settings('default_ai_model', 'gpt-4o-mini'),
+            'defaultModel' => settings('default_ai_model', config('ai.fallback_model')),
         ]);
     }
 

@@ -7,7 +7,6 @@ import StatsCard from '@/Components/UI/StatsCard.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
 import AppFilterDropdown from '@/Components/Admin/AppFilterDropdown.vue'
 import Pagination from '@/Components/UI/Pagination.vue'
-import Tooltip from '@/Components/UI/Tooltip.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
@@ -335,6 +334,22 @@ const gatewayLabel = (gateway: string | null) => {
     return gateway.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+// Read-only details view. Every field is already on the row, so opening this needs no
+// extra request — synthetic rows (a user holding a plan with no billing record) simply
+// have nulls, which render as an explicit "Not available" rather than a blank cell.
+const detailsSubscription = ref<SubscriptionItem | null>(null)
+
+const openDetailsModal = (subscription: SubscriptionItem) => {
+    detailsSubscription.value = subscription
+}
+
+const closeDetailsModal = () => {
+    detailsSubscription.value = null
+}
+
+const isSyntheticRow = (subscription: SubscriptionItem) => typeof subscription.id === 'string'
+    && String(subscription.id).startsWith('user-')
+
 const openDeactivateModal = (subscription: SubscriptionItem) => {
     confirmDeactivate.value = {
         open: true,
@@ -626,9 +641,17 @@ onBeforeUnmount(() => {
                                     <td class="px-6 py-4 align-top text-end">
                                         <TableActionMenu v-if="subscription.user?.ulid">
                                             <template #default="{ close }">
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
+                                                    @click="openDetailsModal(subscription); close()"
+                                                >
+                                                    <i class="ti ti-eye text-base"></i>
+                                                    {{ t('View Details') }}
+                                                </button>
                                                 <Link
                                                     :href="route('admin.users.show', subscription.user.ulid)"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                     @click="close"
                                                 >
                                                     <i class="ti ti-user text-base"></i>
@@ -686,6 +709,132 @@ onBeforeUnmount(() => {
         </div>
 
         <AppModal
+            :open="detailsSubscription !== null"
+            :title="t('Subscription details')"
+            :subtitle="detailsSubscription?.user?.email ?? ''"
+            cancel-text="Close"
+            @close="closeDetailsModal"
+        >
+            <div v-if="detailsSubscription" class="space-y-5">
+                <!-- Customer -->
+                <div class="flex items-start justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/40">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                            {{ detailsSubscription.user?.name ?? t('Unknown user') }}
+                        </p>
+                        <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+                            {{ detailsSubscription.user?.email ?? '—' }}
+                        </p>
+                    </div>
+                    <Link
+                        v-if="detailsSubscription.user?.ulid"
+                        :href="route('admin.users.show', detailsSubscription.user.ulid)"
+                        class="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                    >
+                        <i class="ti ti-user text-sm"></i>
+                        {{ t('View User') }}
+                    </Link>
+                </div>
+
+                <!-- A synthetic row has no billing record behind it; say so explicitly rather
+                     than showing a screen of "Not available" with no explanation. -->
+                <div
+                    v-if="isSyntheticRow(detailsSubscription)"
+                    class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+                >
+                    <i class="ti ti-alert-triangle mt-0.5 text-sm"></i>
+                    <span>{{ t('This user holds a plan without a gateway billing record — typically an admin grant or a legacy import. Billing fields below are unavailable.') }}</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Plan') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {{ detailsSubscription.plan?.name ?? t('Deleted Plan') }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Billing Cycle') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {{ billingCycleLabel(detailsSubscription.billing_cycle) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Amount') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {{ detailsSubscription.amount !== null && detailsSubscription.amount !== undefined && detailsSubscription.amount !== ''
+                                ? formatCurrency(Number(detailsSubscription.amount), detailsSubscription.currency ?? undefined)
+                                : t('Not available') }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Status') }}</p>
+                        <span
+                            class="mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                            :class="statusBadgeClass(detailsSubscription.status)"
+                        >
+                            {{ statusLabel(detailsSubscription.status) }}
+                        </span>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Gateway') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {{ gatewayLabel(detailsSubscription.gateway) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Gateway Subscription ID') }}</p>
+                        <p class="mt-1 break-all font-mono text-xs text-gray-900 dark:text-white">
+                            {{ detailsSubscription.gateway_subscription_id ?? t('Not available') }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="border-t border-gray-100 pt-4 dark:border-surface-800">
+                    <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Timeline') }}</p>
+                    <dl class="space-y-2.5">
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Started') }}</dt>
+                            <dd class="text-right text-xs font-medium text-gray-900 dark:text-white">
+                                {{ detailsSubscription.created_at ? formatDateTime(detailsSubscription.created_at) : t('Not set') }}
+                            </dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Current Period Start') }}</dt>
+                            <dd class="text-right text-xs font-medium text-gray-900 dark:text-white">
+                                {{ detailsSubscription.current_period_start ? formatDateTime(detailsSubscription.current_period_start) : t('Not set') }}
+                            </dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Renews / Expires') }}</dt>
+                            <dd class="text-right">
+                                <span class="block text-xs font-medium text-gray-900 dark:text-white">
+                                    {{ detailsSubscription.current_period_end ? formatDateTime(detailsSubscription.current_period_end) : t('Not set') }}
+                                </span>
+                                <span v-if="detailsSubscription.current_period_end" class="block text-[11px] text-gray-400 dark:text-gray-500">
+                                    {{ formatRelative(detailsSubscription.current_period_end) }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div v-if="detailsSubscription.trial_ends_at" class="flex items-start justify-between gap-3">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Trial Ends') }}</dt>
+                            <dd class="text-right text-xs font-medium text-gray-900 dark:text-white">
+                                {{ formatDateTime(detailsSubscription.trial_ends_at) }}
+                            </dd>
+                        </div>
+                        <div v-if="detailsSubscription.cancelled_at" class="flex items-start justify-between gap-3">
+                            <dt class="text-xs font-medium text-red-500 dark:text-red-400">{{ t('Cancelled') }}</dt>
+                            <dd class="text-right text-xs font-medium text-red-600 dark:text-red-300">
+                                {{ formatDateTime(detailsSubscription.cancelled_at) }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </AppModal>
+
+        <AppModal
             :open="confirmDeactivate.open"
             :title="t('Cancel subscription')"
             :subtitle="t('Choose how this subscription should be cancelled.')"
@@ -738,6 +887,7 @@ onBeforeUnmount(() => {
             has-form
             @close="closeGrantModal"
             @submit="submitGrant"
+            maxWidth="max-w-lg"
         >
             <div class="space-y-4">
                 <div class="space-y-1.5">

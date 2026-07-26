@@ -54,7 +54,7 @@ class AiManagementController extends Controller
             'providerModels' => $providerModels,
             'globalSettings' => [
                 'default_provider' => settings('default_ai_provider', config('ai.default', 'openai')),
-                'default_model' => settings('default_ai_model', 'gpt-4o-mini'),
+                'default_model' => settings('default_ai_model', config('ai.fallback_model')),
                 'fallback_provider' => settings('fallback_ai_provider', ''),
                 'fallback_model' => settings('fallback_ai_model', ''),
                 'max_tokens' => settings('max_tokens_per_request', config('ai.limits.max_tokens_per_request')),

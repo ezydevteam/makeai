@@ -42,7 +42,7 @@ class AiCaptionService
 
         $modelName = addon_setting('social-scheduler', 'ai_model');
         if (empty($modelName)) {
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = settings('default_ai_model', config('ai.fallback_model'));
         }
 
         $adapter = ProviderRegistry::resolve($providerName);
@@ -72,7 +72,7 @@ class AiCaptionService
 
         $modelName = addon_setting('social-scheduler', 'ai_model');
         if (empty($modelName)) {
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = settings('default_ai_model', config('ai.fallback_model'));
         }
 
         $adapter = ProviderRegistry::resolve($providerName);

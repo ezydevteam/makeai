@@ -46,7 +46,9 @@ function selectDemo(key: string) {
 
         <!-- Selector modal -->
         <Teleport to="body">
-            <div v-if="modalOpen" class="fixed inset-0 z-[130] flex items-center justify-center p-4" @click.self="modalOpen = false">
+            <!-- z-[120], the shared app-modal layer: at z-[130] this demo-only modal painted
+                 above every real modal in the app. -->
+            <div v-if="modalOpen" class="fixed inset-0 z-[120] flex items-center justify-center p-4" @click.self="modalOpen = false">
                 <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="modalOpen = false" />
                 <div class="frontend-theme-vars relative z-10 max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-2xl dark:border-white/10 dark:bg-gray-900">
                     <!-- Inset the scroll area so the scrollbar clears the rounded corners -->

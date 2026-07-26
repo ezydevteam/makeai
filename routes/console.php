@@ -252,3 +252,10 @@ Schedule::call(function (): void {
     Cache::put('last_scheduler_run', $timestamp, now()->addMinutes(10));
     settings_set('last_scheduler_run', $timestamp, 'string', 'system');
 })->everyMinute();
+
+// Demo-only: keep the Horizon dashboard active. The command self-gates on demo mode and a
+// Redis queue, so on a real install (or without Redis) it simply no-ops. Every five minutes
+// stays ahead of Horizon's recent-job trimming so the dashboard never goes quiet.
+Schedule::command('demo:horizon-activity')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();

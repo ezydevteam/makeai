@@ -23,6 +23,20 @@ class ThrottleAiRequests
         $maxAttempts = isset($args[1]) && is_numeric($args[1]) ? (int) $args[1] : null;
         $windowSeconds = isset($args[2]) && is_numeric($args[2]) ? (int) $args[2] : null;
 
+        // On a demo site every visitor is signed in as the SAME shared account, so the
+        // route's own per-user ceiling is one bucket the whole internet draws from — the
+        // first scripted visitor exhausts it for everybody. Generation gets a much tighter
+        // limit there, and buildKey() counts it per IP instead of per user. No effect on a
+        // real install: demo.enabled is false.
+        if ($category === 'text_gen' && config('demo.enabled')) {
+            $demoMax = (int) settings('demo_generation_rate_limit_per_min', 5);
+
+            if ($demoMax > 0 && ($maxAttempts === null || $maxAttempts > $demoMax)) {
+                $maxAttempts = $demoMax;
+                $windowSeconds = 60;
+            }
+        }
+
         // Check per-model rate limit if a model slug is in the request
         $modelLimitSlug = null;
         if ($category === 'text_gen' && ! $maxAttempts) {
@@ -114,8 +128,10 @@ class ThrottleAiRequests
         $ip = $request->ip();
 
         return match ($category) {
-            // User-wide key: the limit covers all tools combined, not N requests per tool
-            'text_gen' => $request->user()?->ulid ?? 'ip:'.$ip,
+            // User-wide key: the limit covers all tools combined, not N requests per tool.
+            // Except on a demo, where the account is shared by every visitor and keying on
+            // it would let one of them spend everyone else's allowance.
+            'text_gen' => config('demo.enabled') ? 'ip:'.$ip : ($request->user()?->ulid ?? 'ip:'.$ip),
             'auth' => strtolower((string) ($request->input('email') ?? '')).'|'.$ip,
             'otp' => ($request->session()->get('admin_2fa_id')
                 ?? $request->session()->get('user_2fa_id')

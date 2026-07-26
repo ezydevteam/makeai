@@ -107,11 +107,26 @@ export function useNumberFormat() {
         }
     }
 
-    const formatCompact = (value: number): string => {
-        const raw = new Intl.NumberFormat(localeCode.value, {
+    /**
+     * @param fractionDigits Pad the compacted value to a fixed number of decimals, so a
+     *   stat tile reads a steady "8.30K" rather than jumping between "8.3K" and "8.35K".
+     *   Opt-in: the default keeps Intl's own behaviour for existing callers.
+     */
+    const formatCompact = (value: number, fractionDigits = 0): string => {
+        const options: Intl.NumberFormatOptions = {
             notation: 'compact',
             compactDisplay: 'short',
-        }).format(value)
+        }
+
+        // Only pad once the value actually carries a suffix — below 1,000 Intl returns the
+        // plain number, and padding there would render a lifetime total of 45 as "45.00".
+        if (fractionDigits > 0 && Math.abs(value) >= 1000) {
+            options.minimumFractionDigits = fractionDigits
+            options.maximumFractionDigits = fractionDigits
+        }
+
+        const raw = new Intl.NumberFormat(localeCode.value, options).format(value)
+
         return convertDigits(raw, numberFormat.value.system)
     }
 

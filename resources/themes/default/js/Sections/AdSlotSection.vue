@@ -16,7 +16,8 @@ const effectiveCardWrapperClass = computed(() => {
 })
 import AdSection from '@themes/default/js/Components/AdSection.vue'
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
-type AdZone = 'header_banner' | 'sidebar_top' | 'sidebar_bottom' | 'content_top' | 'content_bottom' | 'content-injection' | 'between_posts' | 'between_ai_tools' | 'tool_page_top' | 'tool_page_bottom' | 'template_page' | 'chat_banner' | 'dashboard_top' | 'footer_banner' | 'custom_zone_1' | 'custom_zone_2'
+// Must mirror the keys in config/ads.php.
+type AdZone = 'header_banner' | 'footer_banner' | 'sidebar_top' | 'sidebar_bottom' | 'between_posts' | 'blog_after_content' | 'between_ai_tools' | 'tool_page_top' | 'tool_page_bottom' | 'chat_banner' | 'dashboard_top' | 'custom_zone_1' | 'custom_zone_2'
 interface HomepageSection { id: string; type: string; enabled: boolean; core: boolean; config: Record<string, SectionConfigValue> }
 const props = defineProps<{ section: HomepageSection }>()
 const { t } = useTranslate()
@@ -55,7 +56,9 @@ const asString = (v: SectionConfigValue | undefined, fallback = ''): string => t
                         <p v-if="asString(section.config.subtitle)" :class="['font-medium max-w-2xl mt-4', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ asString(section.config.subtitle) }}</p>
                     </div>
                 </div>
-                <AdSection :zone="asString(section.config.zone, 'content_top') as AdZone" />
+                <!-- Falls back to a custom zone: this section is placed by the page builder
+                     anywhere on the homepage, so it must not borrow a page-specific slot. -->
+                <AdSection :zone="asString(section.config.zone, 'custom_zone_1') as AdZone" />
             </div>
         </div>
     </section>

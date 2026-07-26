@@ -27,6 +27,7 @@ import dart from 'highlight.js/lib/languages/dart'
 import shell from 'highlight.js/lib/languages/shell'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { toastChatError, toastChatFailure } from '../Composables/useChatErrors'
 import { useSpeechSynthesis } from '@/Composables/useSpeechSynthesis'
 
 const { t } = useTranslate()
@@ -152,7 +153,14 @@ async function saveEdit() {
     if (!props.conversationUlid || !editContent.value.trim()) return
 
     if (chat) {
-        await chat.editMessage(props.conversationUlid, props.message.id, editContent.value.trim())
+        try {
+            await chat.editMessage(props.conversationUlid, props.message.id, editContent.value.trim())
+        } catch {
+            // Already toasted by the API layer. Keep the editor open with the text intact so
+            // the edit is not lost, rather than rejecting into the console.
+            return
+        }
+
         isEditing.value = false
         editContent.value = ''
     }
@@ -224,7 +232,7 @@ async function submitFeedback(rating: number) {
             return cookie ? decodeURIComponent(cookie.pop() || '') : ''
         }
 
-        await fetch('/api/v1/chat/feedback', {
+        const res = await fetch('/api/v1/chat/feedback', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -238,11 +246,22 @@ async function submitFeedback(rating: number) {
                 rating: rating,
             }),
         })
+
+        // The response was never inspected: a refusal left the thumb lit with nothing
+        // recorded, which reads as "saved" to the person who clicked it.
+        if (!res.ok) {
+            await toastChatError(res, t('Your feedback could not be saved.'))
+            throw new Error(`HTTP ${res.status}`)
+        }
     } catch (error) {
-        console.error('Failed to submit feedback:', error)
         // Revert on error
         liked.value = false
         disliked.value = false
+
+        // A network failure never reached the toast above.
+        if (!(error instanceof Error) || !error.message.startsWith('HTTP ')) {
+            toastChatFailure(t('Your feedback could not be saved.'))
+        }
     }
 }
 
@@ -253,7 +272,9 @@ function repeatMessage() {
 function branchFromHere() {
     if (!props.conversationUlid) return
     if (chat) {
-        chat.branchConversation(props.conversationUlid, props.message.id)
+        // Not awaited, so an unhandled rejection would land in the console. The refusal has
+        // already been toasted by the time it rejects; there is nothing further to do here.
+        void chat.branchConversation(props.conversationUlid, props.message.id).catch(() => {})
     }
 }
 

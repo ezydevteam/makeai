@@ -111,9 +111,11 @@ onUnmounted(() => {
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
+            <!-- z-[120] for the same reason as AppModal: the sticky announcement stack
+                 (z-[60]) and mobile menu (z-[80]) were painting over a z-50 backdrop. -->
             <div
                 v-if="open"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+                class="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="action-confirm-title"
@@ -142,7 +144,7 @@ onUnmounted(() => {
                                 ref="cancelButtonRef"
                                 type="button"
                                 :disabled="processing"
-                                class="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-surface-800"
+                                class="rounded-full px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-surface-800"
                                 @click="close"
                             >
                                 {{ t(cancelLabel) }}
@@ -150,7 +152,7 @@ onUnmounted(() => {
                             <button
                                 type="button"
                                 :disabled="processing"
-                                class="rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
+                                class="rounded-full px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
                                 :class="variant === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'btn-primary'"
                                 @click="emit('confirm')"
                             >

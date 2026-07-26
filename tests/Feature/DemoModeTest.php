@@ -49,6 +49,53 @@ class DemoModeTest extends TestCase
     }
 
     /**
+     * @return array<int, string>
+     */
+    private function allowedAddonRouteNames(): array
+    {
+        $property = (new ReflectionClass(DemoMode::class))->getProperty('allowedAddonRouteNames');
+        $property->setAccessible(true);
+
+        return $property->getValue(new DemoMode());
+    }
+
+    /**
+     * Addon-provided names cannot be asserted to exist — the addon may not be installed,
+     * which is the whole reason they live in a separate list. What CAN be asserted is that
+     * each one is namespaced under `addon.`, so a core route never hides in the lenient
+     * list to dodge the existence check above.
+     */
+    public function test_addon_allowlist_holds_only_addon_route_names(): void
+    {
+        $misplaced = array_values(array_filter(
+            $this->allowedAddonRouteNames(),
+            fn (string $name) => ! str_starts_with($name, 'addon.'),
+        ));
+
+        $this->assertSame([], $misplaced, 'Core route names must live in $allowedRouteNames, where their existence is checked: ' . implode(', ', $misplaced));
+    }
+
+    /**
+     * The allowlist is consulted by NAME, so a registered addon route with a listed name is
+     * allowed through while its neighbours are not. Registered here rather than depending on
+     * the KB addon being installed in the test environment.
+     */
+    public function test_allowlisted_addon_route_is_permitted(): void
+    {
+        config(['demo.enabled' => true]);
+
+        Route::post('help/search', fn () => response()->json(['ok' => true]))
+            ->middleware(DemoMode::class)
+            ->name('addon.kb.public.search');
+        Route::post('help/vote/{article}', fn () => response()->json(['ok' => true]))
+            ->middleware(DemoMode::class)
+            ->name('addon.kb.public.vote');
+
+        $this->postJson('/help/search', ['query' => 'credits'])->assertOk();
+        $this->postJson('/help/vote/01ABC', ['vote' => 1])->assertForbidden();
+    }
+
+    /**
      * An allowlisted name only does something if that route accepts a write
      * method — DemoMode never inspects GET requests, so a GET-only entry is
      * dead weight that reads as protection while granting none.

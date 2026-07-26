@@ -132,6 +132,10 @@ class Setting extends Model
         'public_tool_max_output_chars'           => 'ai',
         'user_daily_credit_limit'                => 'ai',
         'user_monthly_credit_limit'              => 'ai',
+        // Demo installs only: generation requests allowed per minute per IP. Read by
+        // ThrottleAiRequests, which ignores it unless demo.enabled.
+        'demo_generation_rate_limit_per_min'     => 'ai',
+        'demo_ip_daily_credit_limit'             => 'ai',
 
         // support — ticketing/SLA/attachment config
         'ai_reply_suggestion'                    => 'support',

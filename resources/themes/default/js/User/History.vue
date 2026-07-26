@@ -6,6 +6,7 @@ import DiffModal from '@themes/default/js/Components/AI/DiffModal.vue'
 import { useToastr } from '@/Composables/useToastr'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const { t } = useTranslate()
@@ -16,6 +17,7 @@ const props = defineProps<{
   history: Array<{
     ulid: string
     tool_slug: string
+    tool_name: string
     output_preview: string
     label: string | null
     is_favorited: boolean
@@ -26,9 +28,13 @@ const props = defineProps<{
     current_page: number
     last_page: number
     total: number
+    from: number | null
+    to: number | null
     links: Array<{ url: string | null; label: string; active: boolean }>
   }
-  filters: { tool_slug?: string }
+  starredCount: number
+  totalCount: number
+  filters: { tool_slug?: string | null; starred?: boolean }
 }>()
 
 const toast = useToastr()
@@ -43,30 +49,40 @@ const itemToDelete = ref<any>(null)
 const isDeleting = ref(false)
 
 const searchQuery = ref('')
-const activeTab = ref<'all' | 'starred'>('all')
 
-const starredCount = computed(() => {
-  return props.history.filter(item => item.is_favorited).length
-})
+// Starred is a server-side filter, so it paginates on its own. As a local ref it filtered
+// only the 20 rows already loaded while the pager still described the full list — page 2 of
+// "Starred" was really page 2 of everything.
+const activeTab = computed<'all' | 'starred'>(() => (props.filters.starred ? 'starred' : 'all'))
+const starredCount = computed(() => props.starredCount)
+const totalCount = computed(() => props.totalCount)
 
+function switchTab(tab: 'all' | 'starred') {
+  if (activeTab.value === tab) return
+
+  router.get(
+    route('user.dashboard.history.index'),
+    {
+      ...(props.filters.tool_slug ? { tool_slug: props.filters.tool_slug } : {}),
+      ...(tab === 'starred' ? { starred: 1 } : {}),
+    },
+    { preserveScroll: true },
+  )
+}
+
+// Search stays client-side — a quick filter over the page you are looking at.
 const filteredHistory = computed(() => {
-  return props.history.filter(item => {
-    // 1. Tab Filter
-    if (activeTab.value === 'starred' && !item.is_favorited) {
-      return false
-    }
+  const query = searchQuery.value.trim().toLowerCase()
 
-    // 2. Search Filter
-    if (searchQuery.value.trim() !== '') {
-      const query = searchQuery.value.toLowerCase()
-      const matchesSlug = item.tool_slug.toLowerCase().includes(query)
-      const matchesLabel = (item.label || '').toLowerCase().includes(query)
-      const matchesOutput = item.output_preview.toLowerCase().includes(query)
-      return matchesSlug || matchesLabel || matchesOutput
-    }
+  if (query === '') {
+    return props.history
+  }
 
-    return true
-  })
+  return props.history.filter(item =>
+    item.tool_name.toLowerCase().includes(query)
+    || item.tool_slug.toLowerCase().includes(query)
+    || (item.label || '').toLowerCase().includes(query)
+    || item.output_preview.toLowerCase().includes(query))
 })
 
 function toggleFavorite(item: any) {
@@ -162,7 +178,7 @@ function timeAgo(date: string): string {
           v-model="searchQuery"
           type="text"
           placeholder="Search history..."
-          class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-8 text-sm outline-none transition focus:border-primary-500 focus:bg-white dark:border-surface-800 dark:bg-surface-900 dark:text-white dark:focus:border-primary-500"
+          class="w-full !rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-8 text-sm outline-none transition focus:border-primary-500 focus:bg-white dark:border-surface-800 dark:bg-surface-900 dark:text-white dark:focus:border-primary-500"
         />
         <span v-if="searchQuery" class="absolute inset-y-0 right-0 flex items-center pr-2.5">
           <button @click="searchQuery = ''" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -176,7 +192,7 @@ function timeAgo(date: string): string {
     <div class="mb-6 border-b border-gray-200 dark:border-surface-800">
       <div class="flex gap-6">
         <button
-          @click="activeTab = 'all'"
+          @click="switchTab('all')"
           :class="[
             activeTab === 'all'
               ? 'border-primary-500 text-primary-600 dark:text-primary-400'
@@ -193,12 +209,13 @@ function timeAgo(date: string): string {
             ]"
             class="rounded-full px-2 py-0.5 text-xs"
           >
-            {{ props.history.length }}
+            <!-- The account total, not this page's row count. -->
+            {{ totalCount }}
           </span>
         </button>
 
         <button
-          @click="activeTab = 'starred'"
+          @click="switchTab('starred')"
           :class="[
             activeTab === 'starred'
               ? 'border-primary-500 text-primary-600 dark:text-primary-400'
@@ -223,7 +240,8 @@ function timeAgo(date: string): string {
 
     <div v-if="filteredHistory.length === 0" class="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center dark:border-surface-800 dark:bg-gray-900">
       <p class="text-gray-500 dark:text-gray-400">
-        <span v-if="searchQuery || activeTab === 'starred'">No matching history found.</span>
+        <span v-if="searchQuery">{{ t('No matching history found.') }}</span>
+        <span v-else-if="activeTab === 'starred'">{{ t('Nothing starred yet. Star a generation to keep it here.') }}</span>
         <span v-else>No generation history yet. Run an AI tool to get started.</span>
       </p>
     </div>
@@ -241,7 +259,7 @@ function timeAgo(date: string): string {
                 :href="route('ai.tools.show', { slug: item.tool_slug })"
                 class="text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400"
               >
-                {{ item.tool_slug }}
+                {{ item.tool_name }}
               </Link>
             </div>
 
@@ -260,7 +278,7 @@ function timeAgo(date: string): string {
             <Tooltip content="Restore">
               <Link
                 :href="route('ai.tools.show', { slug: item.tool_slug, restore: item.ulid })"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                class="flex h-8 w-8 items-center justify-center rounded-full text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
               >
                 <i class="ti ti-rotate-clockwise text-base"></i>
               </Link>
@@ -269,7 +287,7 @@ function timeAgo(date: string): string {
             <Tooltip v-if="editingLabel === item.ulid" content="Save">
               <button
                 @click="saveLabel(item)"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                class="flex h-8 w-8 items-center justify-center rounded-full text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
               >
                 <i class="ti ti-check text-base"></i>
               </button>
@@ -277,7 +295,7 @@ function timeAgo(date: string): string {
             <Tooltip v-else content="Label">
               <button
                 @click="startEditLabel(item)"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"
+                class="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 <i class="ti ti-tag text-base"></i>
               </button>
@@ -287,7 +305,7 @@ function timeAgo(date: string): string {
               <button
                 @click="toggleFavorite(item)"
                 :class="item.is_favorited ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20' : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20'"
-                class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+                class="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
               >
                 <svg class="h-4 w-4" :fill="item.is_favorited ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
@@ -298,7 +316,7 @@ function timeAgo(date: string): string {
             <Tooltip content="Delete">
               <button
                 @click="confirmDelete(item)"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                class="flex h-8 w-8 items-center justify-center rounded-full text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
               >
                 <i class="ti ti-trash text-base"></i>
               </button>
@@ -319,24 +337,18 @@ function timeAgo(date: string): string {
       </div>
     </div>
 
-    <div v-if="pagination.last_page > 1" class="mt-6 flex justify-center">
-      <nav class="flex gap-1">
-        <Link
-          v-for="link in pagination.links"
-          :key="link.label"
-          :href="link.url || '#'"
-          :class="[
-            'rounded-lg px-3 py-1.5 text-sm font-medium transition',
-            link.active
-              ? 'bg-primary-600 text-white'
-              : link.url
-                ? 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-                : 'cursor-default text-gray-300 dark:text-gray-600',
-          ]"
-          v-html="link.label"
-        />
-      </nav>
-    </div>
+    <!-- Hidden while searching: the search filters only the rows already on screen, so a
+         pager describing the unfiltered list would be misleading. -->
+    <Pagination
+      v-if="!searchQuery.trim()"
+      :links="pagination.links"
+      :from="pagination.from"
+      :to="pagination.to"
+      :total="pagination.total"
+      :current-page="pagination.current_page"
+      :last-page="pagination.last_page"
+      class="mt-6"
+    />
 
     <DiffModal
       v-if="diffModalOpen"

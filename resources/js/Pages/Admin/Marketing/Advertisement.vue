@@ -324,8 +324,7 @@ onBeforeUnmount(() => {
     <Head :title="t('Ads')" />
 
     <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mx-auto max-w-7xl space-y-6">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Advertisements') }}</h1>
                 <p class="mt-2 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Manage ad zones, delivery rules, AdSense settings, and performance from one unified admin workspace.') }}</p>
@@ -460,7 +459,6 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </section>
-        </div>
     </div>
 
     <ActionConfirmModal

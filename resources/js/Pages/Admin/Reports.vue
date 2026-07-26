@@ -624,6 +624,34 @@ const filteredRecentExports = computed(() => {
 
 const hasActiveExportSearch = computed(() => exportSearch.value.trim().length > 0)
 
+// Client-side pagination for Recent Exports. The list is a bounded filesystem listing
+// (one admin's export dir, capped by retention) already loaded and filtered in the browser,
+// so paging here avoids a server round-trip while keeping long histories manageable.
+const EXPORTS_PER_PAGE = 10
+const exportPage = ref(1)
+
+const exportTotalPages = computed(() =>
+    Math.max(1, Math.ceil(filteredRecentExports.value.length / EXPORTS_PER_PAGE)),
+)
+
+const pagedRecentExports = computed(() => {
+    const start = (exportPage.value - 1) * EXPORTS_PER_PAGE
+    return filteredRecentExports.value.slice(start, start + EXPORTS_PER_PAGE)
+})
+
+// Keep the page in range: searching resets to page 1, and deleting the last row on a page
+// (or a shrinking list after reload) pulls the cursor back rather than stranding it on an
+// empty page.
+watch(exportSearch, () => {
+    exportPage.value = 1
+})
+
+watch(exportTotalPages, (total) => {
+    if (exportPage.value > total) {
+        exportPage.value = total
+    }
+})
+
 const focusSearchOnSlash = (event: KeyboardEvent) => {
     if (event.key !== '/' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
         return
@@ -1076,7 +1104,7 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="filteredRecentExports.length" class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-gray-800/80 dark:text-gray-400">
                         <tr>
                             <th class="px-6 py-3 text-left">{{ t('Filename') }}</th>
                             <th class="px-6 py-3 text-center">{{ t('Type') }}</th>
@@ -1087,7 +1115,7 @@ onBeforeUnmount(() => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
-                        <tr v-for="file in filteredRecentExports" :key="file.path" class="hover:bg-primary-50/40 dark:hover:bg-primary-900/10">
+                        <tr v-for="file in pagedRecentExports" :key="file.path" class="hover:bg-primary-50/40 dark:hover:bg-primary-900/10">
                             <td class="px-6 py-4">
                                 <div class="font-medium text-gray-900 dark:text-white">{{ file.filename }}</div>
                             </td>
@@ -1123,6 +1151,43 @@ onBeforeUnmount(() => {
                         </tr>
                     </tbody>
                 </table>
+
+                <!-- Pager: only shown once the history spills past a single page. -->
+                <div
+                    v-if="exportTotalPages > 1"
+                    class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-3 dark:border-surface-800 sm:flex-row"
+                >
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('Showing :from–:to of :total', {
+                            from: (exportPage - 1) * EXPORTS_PER_PAGE + 1,
+                            to: Math.min(exportPage * EXPORTS_PER_PAGE, filteredRecentExports.length),
+                            total: filteredRecentExports.length,
+                        }) }}
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            :disabled="exportPage <= 1"
+                            class="inline-flex h-8 items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                            @click="exportPage--"
+                        >
+                            <i class="ti ti-chevron-left text-sm"></i>
+                            {{ t('Previous') }}
+                        </button>
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            {{ t('Page :page of :total', { page: exportPage, total: exportTotalPages }) }}
+                        </span>
+                        <button
+                            type="button"
+                            :disabled="exportPage >= exportTotalPages"
+                            class="inline-flex h-8 items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                            @click="exportPage++"
+                        >
+                            {{ t('Next') }}
+                            <i class="ti ti-chevron-right text-sm"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div v-else class="px-6 py-14 text-center">
                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">

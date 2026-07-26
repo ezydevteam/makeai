@@ -215,7 +215,7 @@ class AiToolController extends Controller
         $showCreditCosts = (bool) settings('show_tool_credit_costs', true);
         if ($showCreditCosts) {
             // Use cached model_override instead of fetching from fresh model
-            $model = $toolData['model_override'] ?? settings('default_ai_model', 'gpt-4o-mini');
+            $model = $toolData['model_override'] ?? settings('default_ai_model', config('ai.fallback_model'));
             $promptBuilder = app(PromptBuilder::class);
             $estimatedCredits = $promptBuilder->estimateCost($tool, $model, null, auth()->user());
         }

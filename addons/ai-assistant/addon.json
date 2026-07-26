@@ -53,6 +53,7 @@
         { "key": "social_telegram",            "type": "string",  "label": "Telegram Link",                   "default": null,           "group": "channels" },
         { "key": "social_facebook",            "type": "string",  "label": "Facebook Link",                   "default": null,           "group": "channels" },
         { "key": "social_instagram",           "type": "string",  "label": "Instagram Link",                  "default": null,           "group": "channels" },
+        { "key": "social_x",                   "type": "string",  "label": "X (Twitter) Link",                "default": null,           "group": "channels" },
         { "key": "social_website",             "type": "string",  "label": "Website Link",                    "default": null,           "group": "channels" },
 
         { "key": "show_legal_note",            "type": "boolean", "label": "Show Privacy/Terms Note",         "default": true,           "group": "legal", "description": "Hidden automatically unless at least one link below is set." },

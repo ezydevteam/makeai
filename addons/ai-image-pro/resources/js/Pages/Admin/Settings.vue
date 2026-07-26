@@ -7,10 +7,12 @@ import { useTranslate } from '@/Composables/useTranslate'
 import AppSelect from '@/Components/UI/AppSelect.vue'
 import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import RepeaterField from '../../Components/Admin/RepeaterField.vue'
 import type { RepeaterRow, RepeaterFieldDef } from '../../Components/Admin/RepeaterField.vue'
 import SettingsSection from '../../Components/Admin/SettingsSection.vue'
 import { mediaUrl } from '@/lib/media'
+import { toastImageError } from '../../Composables/useImageErrors'
 
 defineOptions({ layout: AdminLayout })
 
@@ -516,8 +518,8 @@ async function uploadWatermarkLogo(event: Event): Promise<void> {
         )
         form.watermark_logo_path = data.path
         uploadedLogoUrl.value = data.url
-    } catch {
-        watermarkError.value = t('Upload failed. Use a PNG or WebP image up to 4 MB.')
+    } catch (e) {
+        watermarkError.value = toastImageError(e, t("Upload failed. Use a PNG or WebP image up to 4 MB."))
     } finally {
         watermarkBusy.value = false
     }
@@ -603,7 +605,7 @@ async function submitPreset() {
         presetModalOpen.value = false
         router.reload({ only: ['presets'] })
     } catch (e) {
-        presetError.value = t('Could not save preset.')
+        presetError.value = toastImageError(e, t("Could not save preset."))
     } finally {
         presetBusy.value = false
     }
@@ -620,7 +622,9 @@ async function confirmDeletePreset() {
         presetDeleteTarget.value = null
         router.reload({ only: ['presets'] })
     } catch (e) {
-        presetError.value = t('Could not delete preset.')
+        // Keep the server's reason (demo mode's block included) rather than flattening
+        // every failure to the same sentence.
+        presetError.value = toastImageError(e, t('Could not delete preset.'))
     } finally {
         presetDeleteBusy.value = false
     }
@@ -1620,20 +1624,21 @@ function opProviderOptions(op: AdminOp) {
         </div>
     </AppModal>
 
-    <!-- Preset delete confirm -->
-    <AppModal
+    <!-- Preset delete confirm. The in-modal copy of `presetError` is gone with the body
+         slot, but nothing is lost: the same error already renders above the presets list
+         (and now arrives as a toast), which is where the eye lands once the modal closes. -->
+    <ActionConfirmModal
         :open="presetDeleteTarget !== null"
-        max-width="max-w-sm"
         :title="t('Delete preset?')"
-        :confirm-text="t('Delete')"
-        confirm-variant="delete"
-        :confirm-loading="presetDeleteBusy"
-        @close="presetDeleteTarget = null"
+        :message="t('This style preset will be removed for all users.')"
+        :confirm-label="t('Delete')"
+        :cancel-label="t('Cancel')"
+        :processing="presetDeleteBusy"
+        :processing-label="t('Deleting…')"
+        variant="danger"
+        @cancel="presetDeleteTarget = null"
         @confirm="confirmDeletePreset"
-    >
-        <p class="text-sm text-gray-600 dark:text-gray-300">{{ t('This style preset will be removed for all users.') }}</p>
-        <p v-if="presetError" class="mt-2 text-sm text-danger-600 dark:text-danger-400">{{ presetError }}</p>
-    </AppModal>
+    />
 </template>
 
 <style scoped>

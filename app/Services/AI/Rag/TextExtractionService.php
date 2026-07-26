@@ -295,7 +295,7 @@ class TextExtractionService
             );
 
             $providerName = addon_setting('ai-assistant', 'provider') ?: settings('default_ai_provider', 'openai');
-            $modelName = addon_setting('ai-assistant', 'model') ?: settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = addon_setting('ai-assistant', 'model') ?: settings('default_ai_model', config('ai.fallback_model'));
 
             // Inject the API key into config so the SDK can read it
             $customApiKey = addon_setting('ai-assistant', 'custom_api_key');
@@ -312,9 +312,12 @@ class TextExtractionService
                 }
             }
 
+            // gpt-3.5 cannot see an image, so OCR has to swap it for something that can.
+            // The substitute was gpt-4o-mini, which the model catalog has since retired —
+            // meaning the escape hatch pointed at a model the provider would reject.
             $visionModel = $modelName;
-            if (str_contains($modelName, 'gpt-3.5') || str_contains($modelName, 'gpt-3.5-turbo')) {
-                $visionModel = 'gpt-4o-mini';
+            if (str_contains($modelName, 'gpt-3.5')) {
+                $visionModel = config('ai.fallback_model');
             }
 
             $imageAttachment = new \Laravel\Ai\Files\LocalImage($filePath);

@@ -191,7 +191,12 @@ class FoundationSeeder extends Seeder
             // dead keys (0 readers) purged 2026_07_09; the live budget key is
             // global_daily_ai_budget_usd. Do not re-add.
             ['key' => 'default_ai_provider', 'value' => 'openai', 'type' => 'string', 'group' => 'ai'],
-            ['key' => 'default_ai_model', 'value' => 'gpt-4o-mini', 'type' => 'string', 'group' => 'ai'],
+            // Seeded from config so the stored default and the code fallback can never drift
+            // apart. The literal that used to sit here (gpt-4o-mini) outlived the model: once
+            // AiModelSeeder retired it, every fresh install shipped pointing at a slug the
+            // catalog no longer had, and each tool failed at the provider until an admin
+            // changed it by hand.
+            ['key' => 'default_ai_model', 'value' => config('ai.fallback_model'), 'type' => 'string', 'group' => 'ai'],
             ['key' => 'max_tokens_per_request', 'value' => '4096', 'type' => 'integer', 'group' => 'ai'],
             ['key' => 'default_credits_new_user', 'value' => '100', 'type' => 'integer', 'group' => 'ai'],
 

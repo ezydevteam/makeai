@@ -330,22 +330,26 @@ const faqCategoryOptions = computed(() => (props.faqCategories ?? []).map((categ
     value: category.id,
     label: category.name,
 })))
+const faqCategoryTabsStyleOptions = computed(() => [
+    { value: 'hidden', label: t('Hide category') },
+    { value: 'top', label: t('Top tabs') },
+    { value: 'sidebar', label: t('Sidebar tabs') },
+])
 const adZoneOptions = computed(() => {
+    // Fallback only — the server passes adZones from config('ads.zones'), which is the
+    // single source of truth. Keep this list in step with that config.
     const zones = props.adZones || {
-        'header_banner': 'Header banner (728x90)',
+        'header_banner': 'Header banner — above the site header (728x90)',
+        'footer_banner': 'Footer banner — above the site footer (728x90)',
         'sidebar_top': 'Sidebar top (300x250)',
         'sidebar_bottom': 'Sidebar bottom (300x250)',
-        'content_top': 'Content top',
-        'content_bottom': 'Content bottom',
-        'content-injection': 'Content injection',
-        'between_posts': 'Between posts',
-        'between_ai_tools': 'Between AI tools',
-        'tool_page_top': 'Tool page top',
-        'tool_page_bottom': 'Tool page bottom',
-        'template_page': 'Template page',
+        'between_posts': 'Blog — between post cards',
+        'blog_after_content': 'Blog — after post content',
+        'between_ai_tools': 'Tools directory — between tool cards',
+        'tool_page_top': 'Tool page — above the tool',
+        'tool_page_bottom': 'Tool page — before the tabs',
         'chat_banner': 'Chat banner',
         'dashboard_top': 'Dashboard top',
-        'footer_banner': 'Footer banner',
         'custom_zone_1': 'Custom zone 1',
         'custom_zone_2': 'Custom zone 2',
     }
@@ -1474,7 +1478,11 @@ const secCfg = (type: string): any => {
     }
     if (type === 'faq') {
         if (!Array.isArray(cfg.faq_categories)) cfg.faq_categories = []
-        if (cfg.show_category_tabs === undefined) cfg.show_category_tabs = true
+        // Migrate the legacy on/off toggle to the layout select (off → hidden, on → sidebar).
+        if (!['hidden', 'top', 'sidebar'].includes(String(cfg.category_tabs_style))) {
+            cfg.category_tabs_style = normalizeBooleanValue(cfg.show_category_tabs, true) ? 'sidebar' : 'hidden'
+        }
+        delete cfg.show_category_tabs
     }
     if (type === 'features') {
         if (cfg.enable_card_style === undefined) cfg.enable_card_style = true
@@ -4133,12 +4141,15 @@ watch(() => [
                                             />
                                             <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('Limit which FAQ categories appear here. Leave empty to show all.') }}</p>
                                         </div>
-                                        <div class="flex items-start justify-between gap-3 rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50 self-start">
-                                            <div>
-                                                <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Category Tabs') }}</span>
-                                                <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the category selector alongside the questions.') }}</span>
-                                            </div>
-                                            <AppSwitch v-model="secCfg('faq').show_category_tabs" />
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                                {{ t('Category Tabs') }}
+                                            </label>
+                                            <AppSelect
+                                                v-model="secCfg('faq').category_tabs_style"
+                                                :options="faqCategoryTabsStyleOptions"
+                                            />
+                                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('Choose how visitors filter the questions by category.') }}</p>
                                         </div>
                                     </div>
                                 </div>

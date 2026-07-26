@@ -166,9 +166,12 @@ const inputClass =
 
     <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10 space-y-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                {{ t('FakerAI — Generator') }}
-            </h1>
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('FakerAI — Generator') }}</h1>
+                <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                    {{ t('Addon') }}
+                </span>
+            </div>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {{ t('Populate your site with realistic sample data. Every run is logged and can be deleted.') }}
             </p>

@@ -124,6 +124,15 @@ const isAiManagementActive = () =>
         'admin.ai.rag.*',
         'admin.settings.integrations.*',
     )
+// Addon sidebar entries can point at core `admin.addons.*` routes, since per-addon
+// settings live under Appearance > Addons. Without this guard the Appearance group and
+// its Addons subitem light up alongside the addon's own item on those pages.
+const isAddonMenuActive = () => {
+    void page.url
+
+    return addonMenuItems.value.some((item: any) => item?.route_pattern && route().current(item.route_pattern, item.route_params || {}))
+}
+const isAddonsManagerActive = () => isActive('admin.addons*') && !isAddonMenuActive()
 const isExportCenterActive = () => isCurrentPath('/admin/reports/export-center')
 const isRateLimitsActive = () => isCurrentPath('/admin/system/rate-limits')
 const isContactMessagesActive = () => isCurrentPath('/admin/contact/messages')
@@ -174,7 +183,9 @@ autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.catego
 autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.subscriptions.*', 'admin.coupons.*', 'admin.credit-settings.*'])
 autoExpandOnRoute('affiliate', ['admin.affiliate.index', 'admin.affiliate.commissions.*', 'admin.affiliate.payouts.*', 'admin.affiliate.affiliates.*', 'admin.affiliate.settings.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
-autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
+autoExpandOnRoute('appearance', isAddonMenuActive()
+    ? ['admin.themes*', 'admin.menus.*', 'admin.sidebar.*']
+    : ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.activity.*', 'admin.appearance.*', 'admin.license.*'])
 autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.settings.extensions.*', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.storage.settings*', 'admin.oauth.settings.*', 'admin.notifications.settings*', 'admin.social-counters.settings.*'])
 autoExpandOnRoute('support', ['admin.support.tickets.*', 'admin.support.departments.*', 'admin.support.canned-responses.*', 'admin.support.settings.*'])
@@ -406,7 +417,7 @@ for (const item of addonMenuItems.value) {
       <div v-if="canAny(['addons.view', 'settings.manage'])">
         <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Appearance') }}</div>
         <Tooltip :content="t('Appearance')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('appearance')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('appearance') || isActive('admin.themes*') || isActive('admin.addons*') || isActive('admin.menus.*') || isActive('admin.sidebar.*'), 'open': isGroupOpen('appearance') }">
+          <button @click="toggleGroup('appearance')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('appearance') || isActive('admin.themes*') || isAddonsManagerActive() || isActive('admin.menus.*') || isActive('admin.sidebar.*'), 'open': isGroupOpen('appearance') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122l9.37-9.37a2.85 2.85 0 114.03 4.03l-9.37 9.37a4.5 4.5 0 01-1.897 1.13L4.14 23.29a.75.75 0 01-.944-.944l.673-3.133a4.5 4.5 0 011.13-1.897l9.37-9.37z" /></svg>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('Appearance') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
@@ -416,7 +427,7 @@ for (const item of addonMenuItems.value) {
           <Link v-if="can('settings.manage')" :href="route('admin.themes')" class="sidebar-subitem" :class="{ active: isActive('admin.themes*') }">{{ t('Themes') }}</Link>
           <Link v-if="can('settings.manage')" :href="route('admin.menus.index')" class="sidebar-subitem" :class="{ active: isActive('admin.menus.*') }">{{ t('Menus') }}</Link>
           <Link v-if="can('settings.manage')" :href="route('admin.sidebar.index')" class="sidebar-subitem" :class="{ active: isActive('admin.sidebar.*') }">{{ t('Sidebar') }}</Link>
-          <Link v-if="can('addons.view')" :href="route('admin.addons')" class="sidebar-subitem" :class="{ active: isActive('admin.addons*') }">{{ t('Addons') }}</Link>
+          <Link v-if="can('addons.view')" :href="route('admin.addons')" class="sidebar-subitem" :class="{ active: isAddonsManagerActive() }">{{ t('Addons') }}</Link>
         </div>
       </div>
 

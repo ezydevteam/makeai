@@ -259,13 +259,13 @@ const bulkApprove = () => {
                                 <th v-if="pendingIds.length > 0" class="w-10 px-6 py-3">
                                     <input type="checkbox" :checked="allPendingSelected" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" :aria-label="t('Select all pending')" @change="toggleSelectAll" />
                                 </th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referrer') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referred') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Order') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Date') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Action') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Referrer') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Referred') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Order') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Amount') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Date') }}</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-gray-700 dark:text-gray-400">{{ t('Action') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -288,11 +288,11 @@ const bulkApprove = () => {
                                 <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">{{ c.created_at ? formatDateTime(c.created_at) : '—' }}</td>
                                 <td class="px-6 py-4 text-right">
                                     <div v-if="c.status === 'pending'" class="inline-flex items-center gap-2">
-                                        <button type="button" :disabled="processing[c.id]" class="rounded-lg border border-primary-500 bg-primary-500 text-white px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" @click="requestApprove(c.id)">
+                                        <button type="button" :disabled="processing[c.id]" class="rounded-full border border-primary-500 bg-primary-500 text-white px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" @click="requestApprove(c.id)">
                                             <span v-if="processing[c.id]"><i class="ti ti-loader-2 animate-spin text-xs"></i></span>
                                             <span v-else>{{ t('Approve') }}</span>
                                         </button>
-                                        <button type="button" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50" @click="requestReject(c.id)">{{ t('Reject') }}</button>
+                                        <button type="button" class="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50" @click="requestReject(c.id)">{{ t('Reject') }}</button>
                                     </div>
                                     <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
                                 </td>
@@ -311,7 +311,6 @@ const bulkApprove = () => {
                 </div>
             </div>
         </div>
-
 
         <ActionConfirmModal :open="approveModal.open" :title="t('Approve commission?')" :message="t('Are you sure you want to approve this commission?')" :confirm-label="t('Approve')" :processing-label="t('Approving...')" :processing="approveModal.processing" variant="primary" @confirm="confirmApprove" @cancel="approveModal.open = false" />
         <ActionConfirmModal :open="rejectModal.open" :title="t('Reject commission?')" :message="t('Are you sure you want to reject this commission? This action cannot be undone.')" :confirm-label="t('Reject')" :processing="rejectModal.processing" variant="danger" @confirm="confirmReject" @cancel="rejectModal.open = false" />

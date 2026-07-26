@@ -120,7 +120,7 @@ const formatViews = (value: number): string => {
         <link rel="alternate" type="application/rss+xml" :href="meta.rss" />
     </Head>
 
-    <div class="min-h-screen bg-gray-50 dark:bg-surface-950">
+    <div class="min-h-screen">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
             <div class="mb-8">
                 <!-- Breadcrumbs -->
@@ -261,7 +261,8 @@ const formatViews = (value: number): string => {
                                         </div>
                                     </div>
                                 </Link>
-                                <AdSection v-if="index === 2 || index === 5" zone="between_posts" class="col-span-full" />
+                                <!-- Spans the full grid row, capped at leaderboard width. -->
+                                <AdSection v-if="index === 2 || index === 5" zone="between_posts" bare class="col-span-full mx-auto w-full max-w-[728px]" />
                             </template>
                         </div>
 
@@ -284,9 +285,9 @@ const formatViews = (value: number): string => {
                 </main>
 
                 <aside v-if="blogSettings.sidebar_position !== 'none'" :class="[blogSettings.sidebar_position === 'left' ? 'lg:order-first' : 'lg:order-last', 'space-y-5']">
-                    <AdSection zone="sidebar_top" class="mb-3" />
+                    <AdSection zone="sidebar_top" bare class="mb-3" />
                     <AppSidebar area="blog" />
-                    <AdSection zone="sidebar_bottom" class="mt-3" />
+                    <AdSection zone="sidebar_bottom" bare class="mt-3" />
                 </aside>
             </div>
         </div>

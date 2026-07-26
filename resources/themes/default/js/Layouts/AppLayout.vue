@@ -86,7 +86,7 @@ useFlashToasts()
             <div class="relative z-10 flex items-center justify-center gap-4 flex-wrap">
                 <p class="text-sm font-semibold text-white">
                     <span class="w-2 h-2 rounded-full bg-white inline-block mr-2 animate-pulse" />
-                    {{ t('You are viewing a demo. Some actions are disabled.') }}
+                    {{ t('You are viewing a demo. Some actions are disabled. AI generations are limited.') }}
                 </p>
                 <a :href="envatoUrl" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1 text-sm font-bold text-white hover:bg-white/30 transition-colors">
                     {{ t('Buy Now') }}
@@ -111,18 +111,13 @@ useFlashToasts()
                 <AnnouncementManager />
             </div>
             <NewsletterPopup />
+            <!-- Above the header: the banner is the first thing on the page. -->
+            <AdSection zone="header_banner" class="mx-auto my-4 w-full max-w-7xl px-6" />
             <AppHeader />
-            <AdSection zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
         </template>
 
         <main class="flex-1 md:pb-0" :style="mobileBottomInsetStyle">
-            <template v-if="!hideHeader">
-                <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
-            </template>
             <slot />
-            <template v-if="!hideHeader">
-                <AdSection zone="content_bottom" class="mx-auto mb-4 w-full max-w-7xl px-6" />
-            </template>
         </main>
 
         <template v-if="!hideFooter">

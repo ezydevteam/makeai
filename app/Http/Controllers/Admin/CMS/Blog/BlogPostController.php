@@ -167,6 +167,9 @@ class BlogPostController extends Controller
     {
         $this->authorize('update', $post);
         $post->load(['categories:id,name', 'tags:id,name', 'revisions.admin:id,name']);
+        // Powers the sidebar stats card. Only approved comments are counted so the number
+        // matches what a visitor actually sees on the public post.
+        $post->loadCount(['comments as comments_count' => fn ($q) => $q->where('status', 'approved')]);
 
         return Inertia::render('Admin/CMS/Blog/Posts/Editor', [
             'post' => $post,

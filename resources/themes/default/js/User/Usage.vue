@@ -4,15 +4,20 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
+import { useDateFormat } from '@/Composables/useDateFormat'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
+import { useToastr } from '@/Composables/useToastr'
+import Pagination from '@/Components/UI/Pagination.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 
 const page = usePage()
 const { t } = useTranslate()
 const { formatNumber } = useNumberFormat()
+const { formatRelative } = useDateFormat()
 const { isDark } = useTheme()
+const toast = useToastr()
 const isPro = computed(() => !!page.props.isProAvailable)
 
 interface Stats {
@@ -31,7 +36,25 @@ interface Stats {
   recent_history: Array<{ ulid: string; tool_slug: string | null; tool_name: string; output_preview: string; created_at: string }>
 }
 
+interface WalletTransaction {
+  id: number
+  amount: number
+  balance_after: number
+  type: string
+  description: string | null
+  created_at: string | null
+}
+
 const stats = page.props.stats as Stats
+const transactions = computed(() => page.props.transactions as {
+  data: WalletTransaction[]
+  links: Array<{ url: string | null; label: string; active: boolean }>
+  current_page: number
+  last_page: number
+  total: number
+  from: number | null
+  to: number | null
+})
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 let chartInstance: InstanceType<typeof import('chart.js').Chart> | null = null
 const parseDateValue = (value: string) => (value.length === 10 ? new Date(`${value}T00:00:00`) : new Date(value))
@@ -41,6 +64,7 @@ const formatShortDate = (value: string) => new Intl.DateTimeFormat(undefined, {
 
 const selectedPeriod = ref('1M')
 const loadingChart = ref(false)
+const exporting = ref(false)
 const chartData = ref<Array<{ label: string; value: number; is_current?: boolean }>>([])
 
 if (Array.isArray(stats.daily_usage)) {
@@ -183,6 +207,9 @@ function formatHour(h: number): string {
 }
 
 async function exportCsv() {
+  if (exporting.value) return
+  exporting.value = true
+
   try {
     const res = await fetch(route('user.dashboard.usage.export'), {
       method: 'POST',
@@ -192,6 +219,17 @@ async function exportCsv() {
         'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
       },
     })
+
+    // Without this the error body (a JSON message, or an HTML page) was downloaded as
+    // "my-ai-usage.xlsx" — a corrupt spreadsheet instead of a visible failure.
+    if (!res.ok) {
+      const message = await res.json().then(body => body?.message).catch(() => null)
+
+      toast.error(message || t('The export could not be generated. Please try again.'))
+
+      return
+    }
+
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -199,7 +237,11 @@ async function exportCsv() {
     a.download = 'my-ai-usage.xlsx'
     a.click()
     URL.revokeObjectURL(url)
-  } catch {}
+  } catch {
+    toast.error(t('The export could not be generated. Please try again.'))
+  } finally {
+    exporting.value = false
+  }
 }
 
 onMounted(() => {
@@ -227,10 +269,11 @@ onBeforeUnmount(() => {
       </div>
       <button
         @click="exportCsv"
-        class="shrink-0 btn-primary"
+        :disabled="exporting"
+        class="shrink-0 btn-primary disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <i class="ti ti-download mr-1"></i>
-        {{ t('Export') }}
+        <i :class="exporting ? 'ti ti-loader animate-spin' : 'ti ti-download'" class="mr-1"></i>
+        {{ exporting ? t('Preparing...') : t('Export') }}
       </button>
     </div>
 
@@ -270,16 +313,6 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
-      <div v-if="loadingChart" class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px] dark:bg-gray-900/50">
-        <div class="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg dark:bg-surface-800">
-          <svg class="h-4 w-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-          <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">{{ t('Updating...') }}</span>
-        </div>
-      </div>
-
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Credit usage chart') }}</h2>
@@ -305,12 +338,20 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
-      <div v-if="!hasChartData" class="flex flex-col items-center justify-center h-64 border border-dashed border-gray-200 dark:border-surface-800 rounded-2xl bg-gray-50/30 dark:bg-surface-900/30">
-        <i class="ti ti-chart-bar-off text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
-        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('No data found') }}</p>
-      </div>
-      <div v-else class="h-64">
-        <canvas ref="chartCanvas"></canvas>
+      <div class="relative h-64">
+        <div v-if="!hasChartData" class="flex h-full flex-col items-center justify-center border border-dashed border-gray-200 dark:border-surface-800 rounded-2xl bg-gray-50/30 dark:bg-surface-900/30">
+          <i class="ti ti-chart-bar-off text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
+          <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('No data found') }}</p>
+        </div>
+        <canvas v-else ref="chartCanvas"></canvas>
+        <!-- Loading overlay — covers the plot only, so the heading and the period switch
+             stay legible while the new range loads. -->
+        <div v-if="loadingChart" class="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[2px] transition-all dark:bg-gray-900/70">
+          <div class="flex flex-col items-center gap-2">
+            <i class="ti ti-loader animate-spin text-2xl text-primary-500"></i>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Updating...') }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -358,23 +399,113 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
-      <div class="flex items-center justify-between gap-3">
+      <div class="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Recent generations') }}</h2>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Your latest credit purchases, usage, and output activity.') }}</p>
         </div>
+        <!-- Only the newest 10 land here; the History page is the full, searchable list. -->
+        <Link
+          v-if="stats.recent_history.length"
+          :href="route('user.dashboard.history.index')"
+          class="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary-700 transition hover:text-primary-800 dark:!text-primary-500 dark:hover:text-primary-400"
+        >
+          {{ t('View more') }}
+          <i class="ti ti-arrow-right text-base"></i>
+        </Link>
       </div>
       <div v-if="stats.recent_history.length === 0" class="py-6 text-center text-sm text-gray-400">{{ t('No generations yet') }}</div>
       <div v-else class="space-y-2">
         <div v-for="item in stats.recent_history" :key="item.ulid" class="flex items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50/60 px-4 py-3 transition hover:border-primary-200 hover:bg-primary-50/40 dark:border-surface-800 dark:bg-gray-950/40 dark:hover:border-primary-800/40 dark:hover:bg-gray-900/60">
           <div class="min-w-0">
-            <Link v-if="item.tool_slug" :href="route('ai.tools.show', { slug: item.tool_slug })" class="text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">{{ item.tool_name }}</Link>
+            <Link v-if="item.tool_slug" :href="route('ai.tools.show', { slug: item.tool_slug })" class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400">{{ item.tool_name }}</Link>
             <span v-else class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ item.tool_name || t('Direct') }}</span>
             <p class="mt-0.5 text-xs text-gray-500 line-clamp-1 dark:text-gray-400">{{ item.output_preview }}</p>
           </div>
           <span class="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">{{ item.created_at ? formatShortDate(item.created_at) : '' }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- Wallet activity — the credit ledger the dashboard's "Wallet activity" panel links to.
+         Separate from the charts above: those count GENERATIONS, this is money in and out. -->
+    <div id="wallet-activity" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
+      <div class="p-5">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Wallet activity') }}</h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Every credit purchase, bonus, and deduction on your account.') }}</p>
+      </div>
+
+      <div v-if="transactions.data.length === 0" class="px-6 pb-6 text-center text-sm text-gray-400">
+        {{ t('No wallet activity yet.') }}
+      </div>
+
+      <div v-else class="min-w-0 overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-gray-50/80 text-xs uppercase tracking-wide text-gray-700 dark:bg-surface-800/60 dark:text-gray-400">
+            <tr>
+              <th class="px-4 py-3 font-semibold">{{ t('Description') }}</th>
+              <th class="px-4 py-3 text-center font-semibold">{{ t('Amount') }}</th>
+              <th class="px-4 py-3 text-center font-semibold">{{ t('Balance') }}</th>
+              <th class="whitespace-nowrap px-4 py-3 text-center font-semibold">{{ t('Date') }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+            <tr v-for="tx in transactions.data" :key="tx.id" class="transition hover:bg-gray-50/60 dark:hover:bg-surface-800/40">
+              <td class="px-4 py-3">
+                <p class="font-medium text-gray-900 dark:text-white">{{ tx.description || t('Credit adjustment') }}</p>
+                <p class="mt-0.5 text-xs capitalize text-gray-500 dark:text-gray-400">{{ tx.type.replace('_', ' ') }}</p>
+              </td>
+              <!-- Signed and coloured: a ledger where a spend and a top-up look identical is
+                   unreadable at a glance. -->
+              <td class="px-4 py-3 text-center">
+                <span
+                  class="block font-bold"
+                  :class="tx.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'"
+                >
+                  {{ tx.amount < 0 ? '−' : '+' }}{{ formatNumber(Math.abs(tx.amount)) }}
+                </span>
+                <!-- Named as well as signed: the sign alone relies on colour, which a
+                     colour-blind reader cannot use and a printed page loses entirely. -->
+                <span
+                  class="text-[10px] font-medium tracking-wide"
+                  :class="tx.amount < 0
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-emerald-600 dark:text-emerald-400'"
+                >
+                  {{ tx.amount < 0 ? t('debit') : t('credit') }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <p class="font-medium text-gray-700 dark:text-gray-200">{{ formatNumber(tx.balance_after) }}</p>
+                <!-- Derived, not stored: balance_after minus the movement IS the balance the
+                     row started from, so it can never disagree with the ledger. -->
+                <p class="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                  {{ t('prev: :balance', { balance: formatNumber(tx.balance_after - tx.amount) }) }}
+                </p>
+              </td>
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+                <!-- Date first, relative underneath: the exact date is the record, "3 days
+                     ago" is the quick read. Same stacked shape as the balance column. -->
+                <template v-if="tx.created_at">
+                  <p class="text-gray-600 dark:text-gray-300">{{ formatShortDate(tx.created_at) }}</p>
+                  <p class="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">{{ formatRelative(tx.created_at) }}</p>
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <Pagination
+        v-if="transactions.last_page > 1"
+        :links="transactions.links"
+        :from="transactions.from"
+        :to="transactions.to"
+        :total="transactions.total"
+        :current-page="transactions.current_page"
+        :last-page="transactions.last_page"
+        class="p-5"
+      />
     </div>
   </div>
 </template>

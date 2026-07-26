@@ -31,7 +31,8 @@ return new class extends Migration
             $table->boolean('show_featured_image')->default(true);
             $table->boolean('show_sidebar')->default(false);
             $table->enum('sidebar_position', ['left', 'right'])->default('right');
-            $table->string('container_width', 50)->default('1280px');
+            // 'default' resolves to the standard 1280px in the theme (Page.vue::pageMaxWidth).
+            $table->string('container_width', 50)->default('default');
             $table->enum('status', ['draft', 'published', 'scheduled'])->default('draft');
             $table->timestamp('published_at')->nullable();
             $table->string('password')->nullable();

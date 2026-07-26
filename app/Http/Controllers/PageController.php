@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
+use App\Support\ContentShortcodes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -66,6 +67,10 @@ class PageController extends Controller
 
         return Inertia::render('Page', [
             'page' => $page,
+            // Content split around any [faqs]-style shortcode, with the data each one
+            // needs resolved server-side. Page.vue mounts real components between the
+            // HTML chunks; a page without shortcodes yields a single html block.
+            'contentBlocks' => ContentShortcodes::blocks($page->content),
             'seo' => [
                 'title' => $documentTitle,
                 'description' => $description,
@@ -92,6 +97,7 @@ class PageController extends Controller
                 'og_image' => $ogImage,
                 'schema' => $schema,
             ],
+            'contactChannels' => $page->slug === 'contact' ? $this->contactChannels() : null,
             'contactSettings' => $page->slug === 'contact' ? [
                 'enabled' => (bool) settings('contact_enabled', true),
                 'subject_mode' => settings('contact_subject_mode', 'text'),
@@ -103,6 +109,61 @@ class PageController extends Controller
                 'success_message' => settings('contact_success_message', 'Your message has been sent successfully. We will get back to you soon!'),
             ] : null,
         ]);
+    }
+
+    /**
+     * Ways to reach us shown beside the contact form. Every entry is resolved from real
+     * configuration or a route that exists — nothing is invented, so an install with no
+     * support address simply shows fewer cards rather than a dead link.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function contactChannels(): array
+    {
+        $channels = [];
+
+        if ($email = trim((string) settings('site_support_email', ''))) {
+            $channels[] = [
+                'icon' => 'ti ti-mail',
+                'label' => translate('Email us'),
+                'value' => $email,
+                'href' => 'mailto:'.$email,
+                'external' => false,
+            ];
+        }
+
+        if ($url = trim((string) settings('site_support_url', ''))) {
+            $channels[] = [
+                'icon' => 'ti ti-lifebuoy',
+                'label' => translate('Help center'),
+                'value' => translate('Browse guides and answers'),
+                'href' => $url,
+                'external' => true,
+            ];
+        }
+
+        if (Page::query()->where('slug', 'faq')->published()->exists()) {
+            $channels[] = [
+                'icon' => 'ti ti-help-circle',
+                'label' => translate('FAQ'),
+                'value' => translate('Find quick answers'),
+                'href' => route('page.show', 'faq'),
+                'external' => false,
+            ];
+        }
+
+        // Tickets live behind auth, so only offer them to someone already signed in.
+        if (auth()->check() && settings('tickets_enabled', true)) {
+            $channels[] = [
+                'icon' => 'ti ti-ticket',
+                'label' => translate('Support tickets'),
+                'value' => translate('Track an existing request'),
+                'href' => route('support.index'),
+                'external' => false,
+            ];
+        }
+
+        return $channels;
     }
 
     /**

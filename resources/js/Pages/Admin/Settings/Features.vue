@@ -25,6 +25,7 @@ const props = defineProps<{
         playground_enabled: boolean
         chains_enabled: boolean
         tool_embeds_enabled: boolean
+        global_tools_brand_voice_enabled: boolean
         optin_preferences_enabled: boolean
         cookie_preferences_enabled: boolean
         phone_required: boolean
@@ -52,6 +53,7 @@ const form = useForm({
     playground_enabled: props.features.playground_enabled,
     chains_enabled: props.features.chains_enabled,
     tool_embeds_enabled: props.features.tool_embeds_enabled,
+    global_tools_brand_voice_enabled: props.features.global_tools_brand_voice_enabled,
     optin_preferences_enabled: props.features.optin_preferences_enabled,
     cookie_preferences_enabled: props.features.cookie_preferences_enabled,
     phone_required: props.features.phone_required,
@@ -115,6 +117,7 @@ const featureGroups: FeatureGroup[] = [
         features: [
             { key: 'playground_enabled', label: 'AI Playground', description: 'Enable the AI Playground for users to test prompts across models.' },
             { key: 'chains_enabled', label: 'AI Chains', description: 'Enable multi-step AI tool chains/workflows.' },
+            { key: 'global_tools_brand_voice_enabled', label: 'Brand Voice', description: 'Let users save a brand voice on their profile and apply it on tools that support it.' },
             { key: 'tool_embeds_enabled', label: 'Tool Embeds', description: 'Allow users to embed AI tools on external websites.' },
             { key: 'byok_enabled', label: 'User BYOK System', description: 'Let users add their own AI provider API keys (bring your own key) and generate without spending platform credits.' },
         ],

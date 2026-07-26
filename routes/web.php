@@ -201,6 +201,10 @@ Route::middleware('auth')->group(function () {
 
             // Billing
             Route::get('/billing', [\App\Http\Controllers\Billing\BillingController::class, 'index'])->name('billing');
+            // Throttled: each download renders a PDF. Ownership is enforced in the controller.
+            Route::get('/billing/invoice/{payment}', [\App\Http\Controllers\Billing\BillingController::class, 'invoice'])
+                ->middleware('throttle:public,20,60')
+                ->name('billing.invoice');
 
             // Credit Top-Up
             Route::middleware('premium')->group(function () {
@@ -252,7 +256,9 @@ Route::middleware('auth')->group(function () {
             // Usage Dashboard
             Route::get('/usage', [UsageDashboardController::class, 'index'])->name('usage.index');
             Route::get('/usage/chart', [UsageDashboardController::class, 'chart'])->name('usage.chart');
-            Route::post('/usage/export', [UsageDashboardController::class, 'export'])->name('usage.export');
+            // Throttled: building the spreadsheet walks 90 days of usage rows, and the route
+            // is reachable in demo mode (DemoMode allowlists it as a read-only download).
+            Route::post('/usage/export', [UsageDashboardController::class, 'export'])->middleware('throttle:public,10,60')->name('usage.export');
 
             // Dashboard Chart API
             Route::get('/chart', [DashboardController::class, 'chartData'])->name('chart.data');
@@ -296,8 +302,8 @@ Route::middleware('auth')->group(function () {
                 Route::post('/{embed}/regenerate-token', [ToolEmbedController::class, 'regenerateToken'])->name('regen');
             });
 
-            // User Export
-            Route::post('/export', [UserExportController::class, 'export'])->name('export');
+            // User Export — same reasoning as the usage export above.
+            Route::post('/export', [UserExportController::class, 'export'])->middleware('throttle:public,10,60')->name('export');
 
             // Onboarding
             Route::prefix('onboarding')->name('onboarding.')->group(function () {

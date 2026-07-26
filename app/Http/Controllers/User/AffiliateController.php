@@ -85,29 +85,39 @@ class AffiliateController extends Controller
                 'alias_link' => $user->affiliate_custom_slug ? route('affiliate.capture', $user->affiliate_custom_slug) : null,
             ],
             'chart' => $this->getChartData($user->id, '1M'),
+            // The commissions status filter is applied server-side (it has to be: the list is
+            // paginated, so filtering the loaded page only ever searched the newest 10 rows).
+            'filters' => ['status' => $request->query('status')],
             'marketing' => [
                 'banners' => $program->marketing_banners ?: [],
                 'emails' => $program->promotional_emails ?: [],
                 'posts' => $program->social_posts ?: [],
             ],
-            'referrals' => AffiliateReferral::query()
+            // Paginated, not ->limit(50): an established affiliate has hundreds of referrals
+            // and the rest were simply unreachable. Each list on this page needs its OWN page
+            // parameter — with the default `page` they share one, so paging the commissions
+            // table silently moved the referrals table too.
+            'referrals' => tap(AffiliateReferral::query()
                 ->with('referred:id,email')
                 ->where('referrer_id', $user->id)
                 ->latest()
-                ->limit(50)
-                ->get()
-                ->map(fn (AffiliateReferral $referral) => [
-                    'email' => $referral->referred ? $this->maskEmail($referral->referred->email) : translate('Pending'),
-                    'joined_at' => $referral->converted_at?->toDateString(),
-                    'status' => $referral->referred_id ? 'registered' : 'clicked',
-                    'commission' => (float) ($commissionByReferred[$referral->referred_id] ?? 0),
-                ]),
+                ->paginate(10, ['*'], 'referrals_page')
+                ->withQueryString(), function ($paginator) use ($commissionByReferred) {
+                    $paginator->getCollection()->transform(fn (AffiliateReferral $referral) => [
+                        'email' => $referral->referred ? $this->maskEmail($referral->referred->email) : translate('Pending'),
+                        'joined_at' => $referral->converted_at?->toDateString(),
+                        'status' => $referral->referred_id ? 'registered' : 'clicked',
+                        'commission' => (float) ($commissionByReferred[$referral->referred_id] ?? 0),
+                    ]);
+                }),
             'commissions' => tap(AffiliateCommission::query()
                 ->with('payment:id,ulid,amount,currency')
                 ->where('referrer_id', $user->id)
                 ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
                 ->latest()
-                ->paginate(10), function ($paginator) {
+                // withQueryString(), or paging while filtered drops the status and lands the
+                // user back in the unfiltered list.
+                ->paginate(10, ['*'], 'commissions_page')->withQueryString(), function ($paginator) {
                     $paginator->getCollection()->transform(fn (AffiliateCommission $commission) => [
                         'id' => $commission->id,
                         'amount' => (float) $commission->amount,
@@ -122,7 +132,9 @@ class AffiliateController extends Controller
             'payouts' => tap(AffiliatePayout::query()
                 ->where('user_id', $user->id)
                 ->latest()
-                ->paginate(10), function ($paginator) {
+                // Own page parameter for the same reason as the two lists above, even though
+                // this table has no pager yet — otherwise it silently follows theirs.
+                ->paginate(10, ['*'], 'payouts_page')->withQueryString(), function ($paginator) {
                     $paginator->getCollection()->transform(fn (AffiliatePayout $payout) => [
                         'id' => $payout->id,
                         'amount' => (float) $payout->amount,

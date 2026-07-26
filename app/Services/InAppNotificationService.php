@@ -125,6 +125,9 @@ class InAppNotificationService
             ->when($status === 'unread', fn ($query) => $query->whereNull('read_at'))
             ->latest()
             ->paginate($perPage)
+            // withQueryString(), or paging while filtered to unread/read drops the filter and
+            // lands the user back in the full list.
+            ->withQueryString()
             ->through(fn (DatabaseNotification $notification) => $this->format($notification));
     }
 

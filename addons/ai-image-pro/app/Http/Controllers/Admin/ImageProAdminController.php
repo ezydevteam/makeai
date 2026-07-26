@@ -6,11 +6,14 @@ namespace Addons\AiImagePro\Http\Controllers\Admin;
 
 use Addons\AiImagePro\Models\AipAsset;
 use Addons\AiImagePro\Models\AipJob;
+use Addons\AiImagePro\Services\ModelCatalog;
+use Addons\AiImagePro\Services\OperationRegistry;
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,6 +37,9 @@ class ImageProAdminController extends Controller
     ];
 
     private const DEFAULT_PERIOD = '30d';
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $operations = null;
 
     public function overview(Request $request): Response
     {
@@ -82,11 +88,7 @@ class ImageProAdminController extends Controller
                 ],
                 'failure_rate' => [
                     'value' => $rate,
-                    // Deliberately 'neutral': in StatsCard, 'up' paints green. A RISING
-                    // failure rate is bad news, so the standard treatment would colour a
-                    // regression as an improvement. Grey with a signed label states the
-                    // change without lying about whether it is good.
-                    'comparison' => $comparable ? $this->comparison($rate, $previousRate, neutral: true) : null,
+                    'comparison' => $comparable ? $this->failureRateComparison($rate, $previousRate) : null,
                 ],
             ],
             'byOperation' => $jobs($from)
@@ -96,6 +98,7 @@ class ImageProAdminController extends Controller
                 ->get()
                 ->map(fn ($row) => [
                     'operation' => (string) $row->operation,
+                    'label' => $this->operationLabel((string) $row->operation),
                     'count' => (int) $row->count,
                     'credits' => round((float) $row->credits, 2),
                 ])
@@ -108,6 +111,7 @@ class ImageProAdminController extends Controller
                 ->get()
                 ->map(fn ($row) => [
                     'model' => (string) $row->model,
+                    'label' => $this->modelLabel((string) $row->model),
                     'count' => (int) $row->count,
                 ])
                 ->all(),
@@ -118,16 +122,57 @@ class ImageProAdminController extends Controller
                 ->get(['ulid', 'operation', 'tier', 'engine', 'model', 'error_message', 'completed_at', 'created_at'])
                 ->map(fn (AipJob $job) => [
                     'ulid' => $job->ulid,
-                    'operation' => $job->operation,
+                    'operation' => $job->operation ? $this->operationLabel($job->operation) : null,
                     'tier' => $job->tier,
                     'engine' => $job->engine,
-                    'model' => $job->model,
+                    'model' => $this->modelLabel($job->model),
                     'error' => $job->error_message,
                     'failed_at' => $job->completed_at?->toISOString(),
                     'created_at' => $job->created_at?->toISOString(),
                 ])
                 ->all(),
         ]);
+    }
+
+    /**
+     * The human name for an operation key.
+     *
+     * `aip_jobs.operation` stores the registry key (`bg_remove`), which is what these panels
+     * were printing verbatim. OperationRegistry already carries a written label for every
+     * operation and is the same source the Studio and the settings screen read, so the admin
+     * sees one name for a thing throughout.
+     *
+     * The fallback matters: a job row outlives the registry entry that made it (an operation
+     * can be renamed or dropped between releases, and `upload` never had an entry at all),
+     * and reporting must not lose those rows. Title-casing the key keeps them legible.
+     */
+    private function operationLabel(string $operation): string
+    {
+        $label = $this->operations()[$operation]['label'] ?? null;
+
+        return is_string($label) && $label !== ''
+            ? $label
+            : Str::headline($operation);
+    }
+
+    /**
+     * Resolved once per request — every row in both panels asks for a label.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function operations(): array
+    {
+        return $this->operations ??= app(OperationRegistry::class)->all();
+    }
+
+    /**
+     * The human name for a model slug, via the same resolver the Studio and Library use, so
+     * `gemini-3.1-flash-image-preview` reads as "Nano Banana" on every screen rather than
+     * only the ones that happened to have the catalogue to hand.
+     */
+    private function modelLabel(?string $slug): ?string
+    {
+        return app(ModelCatalog::class)->displayName($slug);
     }
 
     /**
@@ -183,14 +228,12 @@ class ImageProAdminController extends Controller
      *
      * @return array{label: string, type: string}
      */
-    private function comparison(float|int $current, float|int $previous, bool $neutral = false): array
+    private function comparison(float|int $current, float|int $previous): array
     {
-        $sentiment = fn (string $type): string => $neutral ? 'neutral' : $type;
-
         if ((float) $previous === 0.0) {
             return (float) $current === 0.0
                 ? ['label' => '0%', 'type' => 'neutral']
-                : ['label' => '+100%', 'type' => $sentiment('up')];
+                : ['label' => '+100%', 'type' => 'up'];
         }
 
         $delta = (($current - $previous) / $previous) * 100;
@@ -202,7 +245,29 @@ class ImageProAdminController extends Controller
 
         return [
             'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
-            'type' => $sentiment($delta > 0 ? 'up' : 'down'),
+            'type' => $delta > 0 ? 'up' : 'down',
         ];
+    }
+
+    /**
+     * Failure rate is the one card here where more is worse, so its colour is inverted:
+     * fewer failures is good news and reads green, more is a regression and reads red. Taken
+     * unaltered, the standard treatment would do the exact opposite.
+     *
+     * `type` carries the sentiment (the colour) and `direction` the arrow, because on this
+     * card they disagree — a green improvement is a falling number, so the arrow has to
+     * point down to agree with the minus sign next to it. StatsCard falls back to deriving
+     * the arrow from the sentiment when no direction is given, which is what every other
+     * card does.
+     */
+    private function failureRateComparison(float|int $current, float|int $previous): array
+    {
+        $comparison = $this->comparison($current, $previous);
+
+        return match ($comparison['type']) {
+            'up' => ['label' => $comparison['label'], 'type' => 'down', 'direction' => 'up'],
+            'down' => ['label' => $comparison['label'], 'type' => 'up', 'direction' => 'down'],
+            default => $comparison,
+        };
     }
 }

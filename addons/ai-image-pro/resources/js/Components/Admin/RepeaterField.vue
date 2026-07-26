@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import axios from 'axios'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppModal from '@/Components/UI/AppModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppIconSelect from '@/Components/Admin/IconClassSelect.vue'
 
 /* ── Types ───────────────────────────────────────────────── */
@@ -547,18 +547,15 @@ async function removeImage(index: number, key: string): Promise<void> {
         </div>
 
         <!-- Delete confirm -->
-        <AppModal
+        <ActionConfirmModal
             :open="deleteIndex !== null"
-            max-width="max-w-sm"
             :title="t('Remove this item?')"
-            :confirm-text="t('Remove')"
-            confirm-variant="delete"
-            @close="deleteIndex = null"
+            :message="t('This row will be removed from the list. The change is applied when you save the settings.')"
+            :confirm-label="t('Remove')"
+            :cancel-label="t('Cancel')"
+            variant="danger"
+            @cancel="deleteIndex = null"
             @confirm="confirmDelete"
-        >
-            <p class="text-sm text-gray-600 dark:text-gray-300">
-                {{ t('This row will be removed from the list. The change is applied when you save the settings.') }}
-            </p>
-        </AppModal>
+        />
     </div>
 </template>

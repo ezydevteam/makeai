@@ -155,10 +155,10 @@ watch(
     <Head :title="t('KB Settings')" />
 
     <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('KB Settings') }}</h1>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Knowledge Base Settings') }}</h1>
                     <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                         {{ t('Addon') }}
                     </span>
@@ -171,7 +171,7 @@ watch(
             <button
                 type="button"
                 :disabled="form.processing"
-                class="rounded-lg btn-primary-admin disabled:opacity-60"
+                class="shrink-0 btn-primary-admin disabled:opacity-60"
                 @click="save"
             >
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
@@ -234,7 +234,7 @@ watch(
 
                     <div class="block lg:col-span-2">
                         <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Help Center Logo') }}</span>
-                        <div class="flex flex-wrap items-start gap-4">
+                        <div class="flex flex-wrap items-center gap-4">
                             <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50 dark:border-surface-800 dark:bg-surface-800/60">
                                 <img v-if="logoPreview || storedLogoUrl" :src="logoPreview || storedLogoUrl!" alt="Logo" class="h-full w-full object-contain" />
                                 <i v-else class="ti ti-photo text-xl text-gray-300 dark:text-gray-600"></i>
@@ -354,7 +354,7 @@ watch(
                         <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Answer System Prompt') }}</span>
                         <textarea
                             v-model="form.system_prompt"
-                            rows="3"
+                            rows="5"
                             maxlength="2000"
                             :placeholder="t('e.g. You are the friendly support assistant for Acme Corp. Keep answers warm and concise.')"
                             class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"

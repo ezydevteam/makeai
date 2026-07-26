@@ -22,8 +22,10 @@ class AffiliateService
     {
         // Affiliate is a monetization feature (commissions on paid purchases,
         // gateway payouts), so it requires the Extended License like the rest of
-        // the paid system — on top of the admin toggle.
-        return is_extended_license() && (bool) settings('affiliate_enabled', false);
+        // the paid system — on top of the admin toggle. The toggle defaults ON so a
+        // fresh Extended-license install shows the Affiliate Program by default
+        // (mirrors coupons_enabled); an admin can still switch it off.
+        return is_extended_license() && (bool) settings('affiliate_enabled', true);
     }
 
     /**

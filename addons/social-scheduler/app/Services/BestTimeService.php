@@ -74,7 +74,7 @@ class BestTimeService
 
         $modelName = addon_setting('social-scheduler', 'best_time_model');
         if (empty($modelName)) {
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = settings('default_ai_model', config('ai.fallback_model'));
         }
 
         try {

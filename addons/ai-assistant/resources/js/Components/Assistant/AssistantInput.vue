@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { csrfHeaders } from '../../Composables/useAssistantApi'
+import { toastAssistantError, toastAssistantFailure } from '../../Composables/useAssistantErrors'
 import { useTranslate } from '@/Composables/useTranslate'
 import type { AssistantAttachment, SlashCommand } from '../../types'
 
@@ -137,17 +138,23 @@ async function onFileSelected(e: Event) {
             body: formData,
         })
 
+        if (!response.ok) {
+            // Reads the server's own wording — demo mode's block, the size/type rejection,
+            // a rate limit — and toasts it as well as showing it under the input.
+            throw new Error(await toastAssistantError(response, t('Failed to upload and parse file.')))
+        }
+
         const data = await response.json() as { success?: boolean; filename?: string; text?: string; error?: string }
 
-        if (!response.ok || !data.success || !data.filename) {
-            throw new Error(data.error || t('Failed to upload and parse file.'))
+        if (!data.success || !data.filename) {
+            throw new Error(toastAssistantFailure(data.error || t('Failed to upload and parse file.')))
         }
 
         attachedFile.value = { name: data.filename, text: data.text ?? '' }
     } catch (err: unknown) {
         uploadError.value = err instanceof Error
             ? err.message
-            : t('Something went wrong during file upload.')
+            : toastAssistantFailure(t('Something went wrong during file upload.'))
     } finally {
         uploading.value = false
         target.value = ''

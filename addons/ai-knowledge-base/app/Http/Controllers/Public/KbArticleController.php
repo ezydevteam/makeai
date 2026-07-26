@@ -22,8 +22,21 @@ class KbArticleController extends Controller
             ? KbCategory::active()->where('slug', $request->query('category'))->first()
             : null;
 
+        // Plain keyword filter over the stored text — deliberately not the semantic search
+        // on the home page. That one costs an embedding call per keystroke and answers a
+        // question; this narrows a list the visitor is already looking at.
+        $search = trim((string) $request->query('q', ''));
+
         $articles = KbArticle::published()
             ->when($activeCategory, fn ($q) => $q->inCategory($activeCategory->id))
+            ->when($search !== '', function ($q) use ($search) {
+                $term = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
+
+                $q->where(fn ($inner) => $inner
+                    ->where('title', 'like', $term)
+                    ->orWhere('excerpt', 'like', $term)
+                    ->orWhere('body_plain', 'like', $term));
+            })
             ->with('category')
             ->orderByDesc('published_at')
             ->paginate(12, ['id', 'ulid', 'title', 'slug', 'excerpt', 'views', 'helpful_count', 'published_at'])
@@ -41,6 +54,10 @@ class KbArticleController extends Controller
             'articles' => $articles,
             'categories' => $categories,
             'activeCategory' => $activeCategory,
+            // The "All" chip's count. Not articles.total, which is the count AFTER the
+            // category and search filters — the chip has to state what it would show.
+            'totalArticles' => KbArticle::published()->count(),
+            'filters' => ['q' => $search],
             // Site-free — Articles.vue passes this to <Head :title>, which the global
             // callback suffixes with the site name.
             'meta' => [

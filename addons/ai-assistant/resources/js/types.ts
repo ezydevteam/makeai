@@ -40,6 +40,7 @@ export interface AssistantChannels {
     telegram?: string
     facebook?: string
     instagram?: string
+    x?: string
     website?: string
 }
 

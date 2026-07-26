@@ -16,6 +16,8 @@ type Period = '1d' | '7d' | '30d' | 'all'
 interface Comparison {
     label: string
     type: 'up' | 'down' | 'neutral'
+    // Only sent for "lower is better" metrics, where the arrow and the colour disagree.
+    direction?: 'up' | 'down'
 }
 
 interface Stat {
@@ -31,13 +33,19 @@ interface Stats {
 }
 
 interface OperationRow {
+    /** Registry key — kept for :key, never displayed. */
     operation: string
+    /** Human name, resolved server-side from OperationRegistry. */
+    label: string
     count: number
     credits: number
 }
 
 interface ModelRow {
+    /** Raw slug — kept for :key, never displayed. */
     model: string
+    /** Human name, resolved server-side from ModelCatalog. */
+    label: string
     count: number
 }
 
@@ -135,7 +143,12 @@ function formatDate(value: string | null): string {
         <!-- Header -->
         <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Image Pro') }}</h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Image Pro') }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Ai image all operations overview.') }}
                     <span class="font-medium text-gray-600 dark:text-gray-300">
@@ -155,7 +168,7 @@ function formatDate(value: string | null): string {
                         v-for="option in PERIODS"
                         :key="option.value"
                         type="button"
-                        class="rounded-xl px-3 py-1.75 text-xs font-semibold transition disabled:cursor-not-allowed"
+                        class="rounded-lg px-3 py-1.75 text-xs font-semibold transition disabled:cursor-not-allowed"
                         :class="option.value === period
                             ? 'bg-primary-100 text-primary-600 shadow-sm dark:bg-primary-900/80 dark:text-primary-300'
                             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white'"
@@ -212,6 +225,7 @@ function formatDate(value: string | null): string {
                 :comparison="stats.failure_rate.comparison?.label"
                 :comparison-detail="comparisonDetail"
                 :comparison-type="stats.failure_rate.comparison?.type"
+                :comparison-direction="stats.failure_rate.comparison?.direction"
                 :color="stats.failure_rate.value >= 10 ? 'danger' : 'warning'"
             >
                 <template #icon><i class="ti ti-alert-triangle text-lg"></i></template>
@@ -230,10 +244,10 @@ function formatDate(value: string | null): string {
                 <div v-if="byOperation.length" class="space-y-3">
                     <div v-for="row in byOperation" :key="row.operation">
                         <div class="mb-1 flex items-center justify-between text-sm">
-                            <span class="font-medium text-gray-700 dark:text-gray-200">{{ row.operation }}</span>
+                            <span class="font-medium text-gray-700 dark:text-gray-200">{{ row.label }}</span>
                             <span class="text-gray-500 dark:text-gray-400">
                                 {{ t(':n jobs', { n: row.count }) }}
-                                <span v-if="row.credits" class="text-gray-400">· {{ row.credits }} {{ t('cr') }}</span>
+                                <span v-if="row.credits" class="text-gray-400">· {{ row.credits }} {{ t('credits') }}</span>
                             </span>
                         </div>
                         <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800">
@@ -256,7 +270,7 @@ function formatDate(value: string | null): string {
                 <div v-if="byModel.length" class="space-y-3">
                     <div v-for="row in byModel" :key="row.model">
                         <div class="mb-1 flex items-center justify-between text-sm">
-                            <span class="truncate font-medium text-gray-700 dark:text-gray-200">{{ row.model }}</span>
+                            <span class="truncate font-medium text-gray-700 dark:text-gray-200">{{ row.label }}</span>
                             <span class="text-gray-500 dark:text-gray-400">{{ row.count }}</span>
                         </div>
                         <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800">
@@ -281,7 +295,7 @@ function formatDate(value: string | null): string {
                 <table class="min-w-full divide-y divide-gray-100 dark:divide-surface-800">
                     <thead class="bg-gray-50 dark:bg-surface-800/60">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('When') }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Date / Time') }}</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Operation') }}</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Model / Provider') }}</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('User') }}</th>

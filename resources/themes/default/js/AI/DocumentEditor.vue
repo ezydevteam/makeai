@@ -118,13 +118,13 @@ const saveDocument = () => {
                 <p v-if="form.errors.title" class="text-sm text-danger-500 mt-2">{{ form.errors.title }}</p>
             </div>
 
+            <!-- Middle Ad Slot -->
+            <AdSection zone="tool_page_bottom" class="mx-auto mt-6 w-full max-w-5xl" />
+
             <div>
-                <RichEditor v-model="form.content" variant="minimal" />
+                <RichEditor v-model="form.content" variant="comment" />
                 <p v-if="form.errors.content" class="text-sm text-danger-500 mt-2">{{ form.errors.content }}</p>
             </div>
         </div>
-
-        <!-- Bottom Ad Slot -->
-        <AdSection zone="tool_page_bottom" class="mx-auto mt-6 w-full max-w-5xl" />
     </div>
 </template>

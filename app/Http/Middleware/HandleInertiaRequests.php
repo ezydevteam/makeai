@@ -427,7 +427,7 @@ class HandleInertiaRequests extends Middleware
                 return config('demo.enabled') ? $this->injectDemoNavMenu($menus) : $menus;
             },
 
-            'affiliateEnabled' => fn () => is_extended_license() && (bool) settings('affiliate_enabled', false),
+            'affiliateEnabled' => fn () => is_extended_license() && (bool) settings('affiliate_enabled', true),
             'couponsEnabled' => fn () => coupons_enabled(),
             'byokEnabled' => fn () => (bool) settings('byok_enabled', true),
             'accountDeletionEnabled' => fn () => (bool) settings('account_deletion_enabled', true),
@@ -585,6 +585,10 @@ class HandleInertiaRequests extends Middleware
             'requires_auth' => 'none',
             'sort_order' => $sort,
             'mega_menu' => false,
+            // Marks the item as demo chrome rather than the operator's own navigation, so a
+            // surface that is not the theme header (the Help Center, for one) can leave it
+            // out. The site header shows it; nothing else has to.
+            'is_demo' => true,
         ];
     }
 

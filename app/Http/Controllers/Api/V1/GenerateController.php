@@ -711,7 +711,7 @@ class GenerateController extends Controller
 
         // `?:` not `??` — an empty `model` param must fall through to the override.
         $model = ($validated['model'] ?? '')
-            ?: ($template->model_override ?: settings('default_ai_model', 'gpt-4o-mini'));
+            ?: ($template->model_override ?: settings('default_ai_model', config('ai.fallback_model')));
 
         $user = $this->currentUser();
 

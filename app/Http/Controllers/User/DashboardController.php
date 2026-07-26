@@ -4,8 +4,10 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiTool;
+use App\Models\AiUsageLog;
 use App\Models\CreditTransaction;
 use App\Models\Document;
+use App\Models\GenerationHistory;
 use App\Models\LoginHistory;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -30,7 +32,7 @@ class DashboardController extends Controller
             'chartPeriod' => $period,
             'recentTransactions' => $this->recentTransactions($user),
             'quickTools' => $this->quickTools(),
-            'recentConversations' => $this->recentConversations($user),
+            'recentGenerations' => $this->recentGenerations($user),
             'recentDocuments' => $this->recentDocuments($user),
             'recentLoginHistory' => $this->recentLoginHistory($user),
             'plan' => $this->planData($user),
@@ -55,9 +57,10 @@ class DashboardController extends Controller
         return [
             'credits' => (float) $user->credits,
             'credits_used_month' => (float) $user->credits_used_month,
-            'total_conversations' => (is_addon_active('ai-chatbot') && \Illuminate\Support\Facades\Schema::hasTable('conversations'))
-                ? $user->conversations()->count()
-                : 0,
+            // Generations, not conversations: the conversation count came from the AI Chatbot
+            // ADDON, so on any install without it the card read a permanent 0 and its panel
+            // rendered an empty box. This counts core AI usage, which every install has.
+            'total_generations' => AiUsageLog::where('user_id', $user->id)->count(),
             'total_documents' => $user->documents()->count(),
             'total_open_support_tickets' => SupportTicket::query()
                 ->where('user_id', $user->id)
@@ -126,22 +129,31 @@ class DashboardController extends Controller
             ->all();
     }
 
-    private function recentConversations(User $user): array
+    /**
+     * The 5 most recent generations, replacing the old "Recent conversations" panel.
+     *
+     * That panel read from the AI Chatbot ADDON, so on an install without it the dashboard
+     * carried a permanently empty box. Generation history is core, so this always has
+     * something to show.
+     */
+    private function recentGenerations(User $user): array
     {
-        if (! is_addon_active('ai-chatbot') || ! \Illuminate\Support\Facades\Schema::hasTable('conversations')) {
-            return [];
-        }
+        $history = GenerationHistory::where('user_id', $user->id)
+            ->latest('created_at')
+            ->take(5)
+            ->get(['ulid', 'tool_slug', 'output_preview', 'created_at']);
 
-        return $user->conversations()
-            ->latest('last_message_at')
-            ->take(3)
-            ->get()
-            ->map(fn ($conversation) => [
-                'id' => $conversation->id,
-                'ulid' => $conversation->ulid,
-                'title' => $conversation->title ?: translate('Untitled'),
-                'message_count' => $conversation->message_count,
-                'last_message_at' => optional($conversation->last_message_at)->toISOString(),
+        // Names resolved in one query for the page rather than per row.
+        $toolNames = AiTool::whereIn('slug', $history->pluck('tool_slug')->filter()->unique())
+            ->pluck('name', 'slug');
+
+        return $history
+            ->map(fn (GenerationHistory $item) => [
+                'ulid' => $item->ulid,
+                'tool_slug' => $item->tool_slug,
+                'tool_name' => $toolNames[$item->tool_slug] ?? $item->tool_slug ?? translate('Direct'),
+                'output_preview' => $item->output_preview,
+                'created_at' => optional($item->created_at)->toISOString(),
             ])
             ->values()
             ->all();
@@ -168,7 +180,7 @@ class DashboardController extends Controller
     {
         return $user->loginHistory()
             ->latest()
-            ->take(10)
+            ->take(5)
             ->get()
             ->map(fn (LoginHistory $login) => [
                 'id' => $login->id,

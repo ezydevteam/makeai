@@ -2,6 +2,7 @@
 import { computed, inject, nextTick, onMounted, ref, watch, type Ref } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
+import { toastChatError } from '../Composables/useChatErrors'
 import type { useChat, ChatAttachment } from '../Composables/useChat'
 import { useSpeechRecognition } from '@/Composables/useSpeechRecognition'
 import ModelSelector from './ModelSelector.vue'
@@ -118,9 +119,10 @@ const onFileSelect = async (e: Event) => {
             body: formData,
         })
 
+        // Toasts the server's own wording — demo mode's block, the size/type rejection, the
+        // upload rate limit — as well as showing it under the input.
         if (!res.ok) {
-            const err = await res.json().catch(() => ({ message: 'Upload failed' }))
-            throw new Error(err.message || `Upload failed (${res.status})`)
+            throw new Error(await toastChatError(res, t('File upload failed.')))
         }
 
         const json = await res.json()

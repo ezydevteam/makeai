@@ -252,7 +252,7 @@ onUnmounted(() => {
                 <div class="relative z-10 flex items-center justify-center gap-4 flex-wrap">
                     <p class="text-sm font-semibold text-white flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-                        {{ t('Demo mode active — destructive actions are disabled') }}
+                        {{ t('Demo mode active — destructive actions are disabled. AI generations are limited.') }}
                         <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     </p>
                     <a :href="envatoUrl" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1 text-sm font-bold text-white hover:bg-white/30 transition-colors">
@@ -421,7 +421,7 @@ onUnmounted(() => {
                     <p class="min-w-0">
                         {{ t('© :year :site_name', { year: currentYear, site_name: siteName }) }}
                         <span class="mx-1 text-gray-300 dark:text-gray-600">•</span>
-                        {{ t('Developed by MakeAI') }}
+                        {{ t('Developed by') }} <a href="https://ezydev.net" target="_blank" rel="noopener noreferrer" class="transition hover:text-primary-600 dark:hover:text-primary-300">EzyDev</a>
                     </p>
 
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">

@@ -605,7 +605,7 @@ const mobileHeaderSectionStyle = computed<CSSProperties>(() => {
 })
 const mobileHeaderBackgroundStyle = computed(() => isTransparentMainHeaderActive.value ? {} : sectionBackgroundStyle(mobileHeaderConfig.value))
 const mainRowGapClass = computed(() => {
-    return 'gap-2.5'
+    return 'gap-x-2.5 gap-y-1.5'
 })
 const mainRowLayoutClass = computed(() => {
     if (isStackedCenteredMainHeader.value) return 'flex-col justify-center py-4'
@@ -618,10 +618,16 @@ const mainCenterNavClass = computed(() => {
     return ''
 })
 const mainColumnGroupClass = (col: 'left' | 'center' | 'right') => {
-    return col === 'right' ? 'gap-2.5 shrink-0 flex-nowrap [&>*]:shrink-0' : 'gap-2.5'
+    // The action cluster keeps its items at full size and wraps onto another line when it
+    // runs out of room, instead of squeezing them into each other on a narrow viewport.
+    return col === 'right'
+        ? 'gap-x-2.5 gap-y-1.5 shrink-0 flex-wrap justify-end [&>*]:shrink-0'
+        : 'gap-x-2.5 gap-y-1.5 flex-wrap'
 }
 const mainNavClass = (zone: 'left' | 'center' | 'right') => {
-    const classes = ['hidden', 'items-center']
+    // flex-wrap lets a long menu break onto a second line rather than running over the
+    // logo / action cluster on a narrow viewport.
+    const classes = ['hidden', 'items-center', 'flex-wrap']
 
     if (zone === 'left') {
         if (isStackedCenteredMainHeader.value) {
@@ -659,21 +665,38 @@ const mainColFlexClass = (col: 'left' | 'center' | 'right') => {
         return 'shrink-0 justify-end'
     }
 
+    // flex-auto (basis auto), not flex-1 (basis 0), for the nav column: it still grows to
+    // fill the row, but it is measured at its real width, so a header that no longer fits
+    // wraps the action cluster onto a second line instead of squeezing the menu into a
+    // narrow column of stacked links.
     if (isMinimalMainHeader.value) {
-        if (col === 'center') return 'flex-1 min-w-0 justify-center'
+        if (col === 'center') return 'flex-auto min-w-0 justify-center'
         return col === 'right' ? 'shrink-0 justify-end' : 'shrink-0'
     }
 
     if (col === 'left') return 'shrink-0'
-    if (col === 'center') return 'flex-1 min-w-0 justify-center'
+    if (col === 'center') return 'flex-auto min-w-0 justify-center'
     return 'shrink-0 justify-end'
 }
 const mobileColFlexClass = (col: 'left' | 'right') => {
+    // Both side columns take an equal share in the centered layout so the middle logo
+    // cell stays optically centred without absolute positioning.
+    if (isCenteredMobileTop.value) return 'flex-1 min-w-0'
+
     const flex = (mobileHeaderConfig.value?.column_flex ?? 'default') as string
     if (flex === col || (flex === 'default' && col === 'left')) return 'flex-1 min-w-0'
     return ''
 }
-const mobileLeftBlocks = computed(() => activeMobileBlocks.value.filter((block: any) => (block.config?.block_align || 'left') === 'left'))
+const mobileLeftBlocks = computed(() => activeMobileBlocks.value.filter((block: any) => {
+    if (isCenteredMobileTop.value && block.type === 'logo') return false
+    return (block.config?.block_align || 'left') === 'left'
+}))
+// Centered layout renders the logo as its own in-flow middle cell. It used to be
+// absolutely positioned over the row, which overlapped the side icons as soon as enough
+// mobile blocks were enabled.
+const mobileCenterBlocks = computed(() => isCenteredMobileTop.value
+    ? activeMobileBlocks.value.filter((block: any) => block.type === 'logo')
+    : [])
 const mobileRightBlocks = computed(() => activeMobileBlocks.value.filter((block: any) => block.config?.block_align === 'right'))
 const mobileHamburgerBlock = computed(() => activeMobileBlocks.value.find((block: any) => block.type === 'hamburger'))
 const mobileDrawerMenuSlug = computed(() => mobileHamburgerBlock.value?.config?.menu_slug || 'mobile')
@@ -681,7 +704,6 @@ const mobileDrawerTitle = computed(() => mobileHamburgerBlock.value?.config?.dra
 const mobileTopLayout = computed(() => String(mobileHeaderConfig.value?.layout || 'compact'))
 const isCenteredMobileTop = computed(() => mobileTopLayout.value === 'centered')
 const mobileTopSideClass = computed(() => isCenteredMobileTop.value ? 'relative z-10' : '')
-const mobileTopLogoClass = computed(() => isCenteredMobileTop.value ? 'absolute left-1/2 -translate-x-1/2 rtl:left-auto rtl:right-1/2 rtl:translate-x-1/2' : '')
 
 const activeUserMenu = ref<'main' | 'mobile_top' | 'mobile_bottom' | null>(null)
 const mobileMenuOpen = ref(false)
@@ -1032,20 +1054,50 @@ watch(
     { immediate: true, deep: true }
 )
 
+// The bar can be taller than its configured height once its blocks wrap on a narrow
+// screen, so publish the measured height. Layouts offset their sticky content by this
+// var and would slide under a wrapped bar if it stayed pinned to the configured value.
+const mobileHeaderEl = ref<HTMLElement | null>(null)
+let mobileHeaderResizeObserver: ResizeObserver | null = null
+const publishMobileHeaderHeight = () => {
+    if (typeof window === 'undefined') return
+
+    const config = mobileHeaderConfig.value
+    const configured = config?.enabled ? Number(config.height || 64) : 0
+    const measured = config?.enabled ? (mobileHeaderEl.value?.offsetHeight ?? 0) : 0
+    const height = Math.max(configured, measured)
+
+    document.documentElement.style.setProperty('--header-height', `${height}px`)
+    document.documentElement.style.setProperty('--mobile-top-height', `${height}px`)
+}
+
 watch(
     () => mobileHeaderConfig.value,
-    (config) => {
-        if (typeof window !== 'undefined') {
-            const height = config?.enabled ? Number(config.height || 64) : 0
-            document.documentElement.style.setProperty('--header-height', `${height}px`)
-            document.documentElement.style.setProperty('--mobile-top-height', `${height}px`)
-        }
+    () => {
+        publishMobileHeaderHeight()
+        void nextTick(publishMobileHeaderHeight)
     },
     { immediate: true, deep: true }
 )
 
+watch(mobileHeaderEl, (el) => {
+    mobileHeaderResizeObserver?.disconnect()
+    mobileHeaderResizeObserver = null
+
+    if (!el || typeof ResizeObserver === 'undefined') {
+        publishMobileHeaderHeight()
+        return
+    }
+
+    mobileHeaderResizeObserver = new ResizeObserver(() => publishMobileHeaderHeight())
+    mobileHeaderResizeObserver.observe(el)
+    publishMobileHeaderHeight()
+})
+
 onUnmounted(() => {
     removeHeroOverlayListeners()
+    mobileHeaderResizeObserver?.disconnect()
+    mobileHeaderResizeObserver = null
 })
 const bottomSectionVisibilityClass = (config: any) => isBottomHeaderVisible(config)
     ? 'translate-y-0 opacity-100'
@@ -1063,6 +1115,16 @@ const sectionStyle = (config: any, section: 'main' | 'mobile' | 'mobile_bottom',
     if (section === 'main' && ['centered', 'landing'].includes(String(config?.layout || 'classic'))) {
         return {
             minHeight: `${Math.max(resolvedHeight, 148)}px`,
+            top: stickyTop(section),
+        }
+    }
+
+    // The top bars carry a min-height, not a fixed height: on a narrow viewport their
+    // blocks wrap onto a second row, and the bar has to grow with them instead of letting
+    // them spill over the page. Identical rendering whenever a single row fits.
+    if (section === 'main' || section === 'mobile') {
+        return {
+            minHeight: `${resolvedHeight}px`,
             top: stickyTop(section),
         }
     }
@@ -1970,7 +2032,7 @@ onUnmounted(() => {
                 </template>
             </div>
         </div>
-        <div v-else class="flex h-full items-center" :class="[containerClass(headerConfig), mainRowGapClass, mainRowLayoutClass]" :style="containerStyle(headerConfig)">
+        <div v-else class="flex min-h-[inherit] flex-wrap items-center py-1.5" :class="[containerClass(headerConfig), mainRowGapClass, mainRowLayoutClass]" :style="containerStyle(headerConfig)">
             <!-- Left Column -->
             <div class="flex items-center" :class="[mainColumnGroupClass('left'), mainColFlexClass('left')]">
                 <template v-for="block in mainLeftBlocks" :key="block.id">
@@ -2359,6 +2421,7 @@ onUnmounted(() => {
     <!-- Mobile Header -->
     <header
         v-if="mobileHeaderConfig?.enabled"
+        ref="mobileHeaderEl"
         :class="[
             'w-full md:hidden header-section-overlay',
             sectionPositionClass(mobileHeaderConfig),
@@ -2373,20 +2436,28 @@ onUnmounted(() => {
         ]"
         :style="{ ...mobileHeaderSectionStyle, ...mobileHeaderBackgroundStyle, ...sectionAccentStyle(mobileHeaderConfig) }"
     >
-        <div class="flex h-full items-center justify-between gap-3" :class="[containerClass({ ...mobileHeaderConfig, container_width: '1280px' }, true), isCenteredMobileTop ? 'relative' : '']">
-            <div class="flex items-center gap-2" :class="[mobileColFlexClass('left'), mobileTopSideClass]">
+        <div class="flex min-h-[inherit] flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-1.5" :class="[containerClass({ ...mobileHeaderConfig, container_width: '1280px' }, true), isCenteredMobileTop ? 'relative' : '']">
+            <div class="flex min-w-0 flex-wrap items-center gap-2 [&>*]:shrink-0" :class="[mobileColFlexClass('left'), mobileTopSideClass]">
                 <template v-for="block in mobileLeftBlocks" :key="block.id">
                     <button v-if="block.type === 'hamburger'" type="button" class="mobile-header-utility-btn" :class="iconSurfaceClass(block, [mobileIconButtonClass, mobileHeaderConfig?.text_color ? 'text-current' : 'text-gray-600 dark:text-gray-300'].join(' '))" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
-                    <Link v-else-if="block.type === 'logo'" href="/" class="flex items-center gap-2 text-base font-bold" :class="[mobileTopLogoClass, mobileHeaderConfig?.text_color ? '' : 'text-gray-900 dark:text-white']">
+                    <Link v-else-if="block.type === 'logo'" href="/" class="flex min-w-0 items-center gap-2 text-base font-bold" :class="mobileHeaderConfig?.text_color ? '' : 'text-gray-900 dark:text-white'">
                         <img v-if="getLogoImage()" :src="getLogoImage()" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
-                        <span v-if="!getLogoImage()">{{ siteName }}</span>
+                        <span v-if="!getLogoImage()" class="truncate">{{ siteName }}</span>
                     </Link>
                 </template>
             </div>
-            <div class="flex items-center gap-1" :class="[mobileColFlexClass('right'), mobileTopSideClass]">
+            <div v-if="mobileCenterBlocks.length" class="flex min-w-0 shrink items-center justify-center" :class="mobileTopSideClass">
+                <template v-for="block in mobileCenterBlocks" :key="block.id">
+                    <Link href="/" class="flex min-w-0 items-center gap-2 text-base font-bold" :class="mobileHeaderConfig?.text_color ? '' : 'text-gray-900 dark:text-white'">
+                        <img v-if="getLogoImage()" :src="getLogoImage()" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
+                        <span v-if="!getLogoImage()" class="truncate">{{ siteName }}</span>
+                    </Link>
+                </template>
+            </div>
+            <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 [&>*]:shrink-0" :class="[mobileColFlexClass('right'), mobileTopSideClass]">
                 <template v-for="block in mobileRightBlocks" :key="block.id">
                     <NotificationBell v-if="block.type === 'notification_bell'" context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                     <button v-else-if="block.type === 'dark_mode'" type="button" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" @click="toggleDark()">

@@ -126,7 +126,7 @@ class CheckCredits
         }
 
         return $template?->model_override
-            ?? settings('default_ai_model', 'gpt-4o-mini');
+            ?? settings('default_ai_model', config('ai.fallback_model'));
     }
 
     private function currentUser(Request $request): ?User

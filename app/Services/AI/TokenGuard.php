@@ -36,9 +36,7 @@ class TokenGuard
         // Estimate cost, then enforce per-user limits/balance and the global budget.
         $estimatedCost = self::estimateCreditCost($template, $model);
         self::assertUserCanSpend($user, $estimatedCost);
-        if (! $user) {
-            self::assertGuestCanSpend(request()?->ip(), $estimatedCost);
-        }
+        self::assertIpCanSpend($user, request()?->ip(), $estimatedCost);
         self::assertGlobalBudget();
 
         self::emitSoftWarnings($user);
@@ -61,9 +59,7 @@ class TokenGuard
 
         $estimatedCost = self::mediaCreditCost($mediaType, $model, $units);
         self::assertUserCanSpend($user, $estimatedCost);
-        if (! $user) {
-            self::assertGuestCanSpend(request()?->ip(), $estimatedCost);
-        }
+        self::assertIpCanSpend($user, request()?->ip(), $estimatedCost);
         self::assertGlobalBudget();
 
         self::emitSoftWarnings($user);
@@ -220,9 +216,12 @@ class TokenGuard
                     }
                 }
             }
-        } elseif (! $user && $deductCredits) {
-            // Anonymous visitor on a public tool — meter the per-IP daily guest quota.
-            self::incrementGuestUsage(request()?->ip(), $credits);
+        }
+
+        // Meter the per-IP daily allowance. Anonymous visitors always have one; on a demo
+        // so does everyone signed in as the shared account (see ipDailyCreditLimit).
+        if ($deductCredits) {
+            self::incrementIpUsage($user, request()?->ip(), $credits);
         }
 
         // Update global spend tracker — tokens were consumed either way
@@ -310,9 +309,10 @@ class TokenGuard
             $deducted = true;
         } elseif ($billable) {
             $deducted = $user->deductCredits($credits, "AI {$mediaType}: ".($model ?? $provider), $mediaMeta);
-        } elseif (! $user && $deductCredits) {
-            // Anonymous visitor — meter the per-IP daily guest quota.
-            self::incrementGuestUsage(request()?->ip(), $credits);
+        }
+
+        if ($deductCredits) {
+            self::incrementIpUsage($user, request()?->ip(), $credits);
         }
 
         self::incrementGlobalSpend($costUsd);
@@ -370,10 +370,13 @@ class TokenGuard
             $deducted = $user->deductCredits($cost, $reason, $chargeMeta);
         } else {
             $deducted = false;
-            if (! $user && $deductCredits && $cost > 0) {
-                // Anonymous visitor on a public integration tool — meter the guest quota.
-                self::incrementGuestUsage(request()?->ip(), $cost);
-            }
+        }
+
+        // Outside the branch above: a signed-in demo visitor IS billable, so leaving this in
+        // the not-billable arm would have metered anonymous traffic only — exactly the case
+        // the per-IP demo cap exists to cover.
+        if ($deductCredits && $cost > 0) {
+            self::incrementIpUsage($user, request()?->ip(), $cost);
         }
 
         if ($user) {
@@ -564,7 +567,7 @@ class TokenGuard
     private static function estimateCreditCost(?AiTool $template, ?string $model): float
     {
         $estimatedTokens = $template?->avg_output_tokens ?? 500;
-        $modelSlug = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelSlug = $model ?? settings('default_ai_model', config('ai.fallback_model'));
 
         $dbModel = self::resolveModelForPricing($modelSlug);
 
@@ -642,11 +645,15 @@ class TokenGuard
         return round($totalTokens * $ratio, 2);
     }
 
-    // ─── Guest per-IP daily quota (public tools) ─────────────────
+    // ─── Per-IP daily quota ──────────────────────────────────────
 
     /**
-     * Credits an anonymous visitor (per IP) has spent today. Stored as an integer
-     * count of milli-credits in the cache to avoid float drift, keyed by IP + date.
+     * Credits spent from this IP today. Stored as an integer count of milli-credits in the
+     * cache to avoid float drift, keyed by IP + date.
+     *
+     * One counter per IP regardless of who was signed in: on a demo the same person may
+     * browse anonymously and then sign in to the shared account, and that is one visitor
+     * spending the operator's money either way.
      */
     public static function guestUsedToday(?string $ip): float
     {
@@ -658,31 +665,106 @@ class TokenGuard
     }
 
     /**
-     * Enforce the guest per-IP daily credit allowance before a public-tool run.
+     * The per-IP daily credit ceiling that applies to this caller, or 0 for "no ceiling".
+     *
+     * Anonymous visitors have always had one. Signed-in users normally do not — their quota
+     * is their own account's — but a demo site breaks that assumption: the credentials are
+     * published on the sign-in page, so every visitor shares ONE account and its daily
+     * allowance is a pool the whole internet draws from. Metering signed-in demo traffic per
+     * IP as well gives each visitor a slice instead of letting the first one take the lot.
+     *
+     * Off outside demo mode (the setting is only seeded there), so a real install keeps the
+     * original behaviour: guests capped, account holders governed by their own limits.
+     */
+    private static function ipDailyCreditLimit(?User $user): float
+    {
+        if (! $user) {
+            return (float) settings('guest_daily_credit_limit', 0);
+        }
+
+        if (! config('demo.enabled')) {
+            return 0.0;
+        }
+
+        // The internal system user (admin AI-assist) is the operator's own automation, not a
+        // visitor, and must not be throttled by whichever IP happens to trigger it.
+        if ($user->isInternalAi()) {
+            return 0.0;
+        }
+
+        return (float) settings('demo_ip_daily_credit_limit', 0);
+    }
+
+    /**
+     * Has this IP used up its daily allowance? Non-throwing sibling of assertIpCanSpend(),
+     * for callers that must degrade rather than fail — the Knowledge Base answers a search
+     * with "browse the articles below" instead of an error, the same way it handles the
+     * global budget being spent.
+     */
+    public static function ipAllowanceExhausted(?User $user, ?string $ip): bool
+    {
+        $limit = self::ipDailyCreditLimit($user);
+
+        return $limit > 0 && $ip !== null && self::guestUsedToday($ip) >= $limit;
+    }
+
+    /**
+     * Count credits against an IP's daily allowance from outside the normal after() path.
+     *
+     * after() meters automatically, but only when it is charging someone. Work the operator
+     * absorbs — a public help-centre answer — passes `deductCredits: false` and so bills
+     * nobody, which would leave it the one AI surface with no per-visitor ceiling at all.
+     * Those callers meter here explicitly.
+     */
+    public static function meterIpUsage(?User $user, ?string $ip, float $credits): void
+    {
+        self::incrementIpUsage($user, $ip, $credits);
+    }
+
+    /**
+     * What a completion of this size costs on this model, in credits.
+     *
+     * Exposed for the callers above: they need the figure to meter with, but must not
+     * re-implement pricing — calculateCredits() and the model lookup behind it are the
+     * single source of truth for what an AI call is worth.
+     */
+    public static function creditsForTokens(?string $model, int $inputTokens, int $outputTokens): float
+    {
+        return self::calculateCredits(
+            $model !== null ? self::resolveModelForPricing($model) : null,
+            $inputTokens,
+            $outputTokens,
+        );
+    }
+
+    /**
+     * Enforce the per-IP daily credit allowance before a run.
      * No-op when the limit is disabled (<= 0) or the IP is unknown.
      *
      * @throws CreditLimitException
      */
-    private static function assertGuestCanSpend(?string $ip, float $estimatedCost): void
+    private static function assertIpCanSpend(?User $user, ?string $ip, float $estimatedCost): void
     {
-        $limit = (float) settings('guest_daily_credit_limit', 0);
+        $limit = self::ipDailyCreditLimit($user);
         if ($limit <= 0 || ! $ip) {
             return;
         }
 
         $used = self::guestUsedToday($ip);
         if (($used + $estimatedCost) > $limit) {
+            // 'guest' is the exception's existing scope for "this IP is out of allowance";
+            // the message it produces reads correctly for a signed-in demo visitor too.
             throw new CreditLimitException('guest', max(0, $limit - $used));
         }
     }
 
     /**
-     * Record credits an anonymous visitor spent, against the per-IP daily quota.
-     * TTL resets at end of day. No-op when the limit is disabled or IP is unknown.
+     * Record credits spent against the per-IP daily quota. TTL resets at end of day.
+     * No-op when no ceiling applies to this caller, or the IP is unknown.
      */
-    private static function incrementGuestUsage(?string $ip, float $credits): void
+    private static function incrementIpUsage(?User $user, ?string $ip, float $credits): void
     {
-        $limit = (float) settings('guest_daily_credit_limit', 0);
+        $limit = self::ipDailyCreditLimit($user);
         if ($limit <= 0 || ! $ip || $credits <= 0) {
             return;
         }

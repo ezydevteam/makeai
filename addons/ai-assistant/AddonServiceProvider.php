@@ -85,6 +85,7 @@ class AddonServiceProvider extends ServiceProvider
                 'telegram' => addon_setting('ai-assistant', 'social_telegram'),
                 'facebook' => addon_setting('ai-assistant', 'social_facebook'),
                 'instagram' => addon_setting('ai-assistant', 'social_instagram'),
+                'x' => addon_setting('ai-assistant', 'social_x'),
                 'website' => addon_setting('ai-assistant', 'social_website'),
             ]);
 
@@ -152,7 +153,7 @@ class AddonServiceProvider extends ServiceProvider
                 // so on an install defaulting to any other provider the "Use the site
                 // default" state showed models from the wrong provider (usually none).
                 'default_provider' => settings('default_ai_provider', 'openai'),
-                'default_model' => settings('default_ai_model', 'gpt-4o-mini'),
+                'default_model' => settings('default_ai_model', config('ai.fallback_model')),
             ];
         });
 

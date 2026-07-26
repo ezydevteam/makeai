@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\ExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -121,6 +123,113 @@ class BillingController extends Controller
             'subscription_ends_at' => optional($user->subscription_ends_at)->toISOString(),
             'trial_ends_at' => optional($user->trial_ends_at)->toISOString(),
         ];
+    }
+
+    /**
+     * Stream a PDF invoice for a single payment.
+     *
+     * Ownership is checked explicitly rather than left to route-model binding: the Payment
+     * model binds by ulid, which is unguessable but still only an identifier — without this
+     * check any signed-in user could fetch another account's invoice by id.
+     */
+    public function invoice(Request $request, Payment $payment): \Symfony\Component\HttpFoundation\Response
+    {
+        abort_unless($payment->user_id === $request->user()->id, 403);
+
+        $payment->loadMissing('plan:id,name,slug');
+
+        $pdf = app(ExportService::class)->renderPdfString('billing.invoice', [
+            'payment' => $payment,
+            'user' => $request->user(),
+            'invoiceNumber' => $this->invoiceNumber($payment),
+            'formattedAmount' => format_currency((float) $payment->amount, $payment->currency),
+            'gatewayLabel' => Str::headline($payment->gateway ?: 'manual'),
+            'lineItem' => $this->invoiceLineItem($payment),
+            'company' => [
+                'name' => settings('site_name', config('app.name')),
+                'email' => settings('mail_from_address', ''),
+                'url' => settings('site_url', config('app.url')),
+                'support' => settings('site_support_email', ''),
+                'logo' => $this->invoiceLogoPath(),
+            ],
+        ]);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$this->invoiceNumber($payment).'.pdf"',
+        ]);
+    }
+
+    /**
+     * Absolute filesystem path to the site logo, or null to fall back to the site name.
+     *
+     * mPDF renders server-side, so it cannot follow the root-relative URL media_url() builds
+     * — it needs a real path on disk. A logo stored as an external URL is deliberately NOT
+     * used: fetching it would make invoice rendering depend on an outbound request (slow,
+     * and a fetch of a stored URL from inside our own process). The name renders instead.
+     */
+    private function invoiceLogoPath(): ?string
+    {
+        // Light logo first: the invoice is printed on white.
+        $stored = settings('site_logo_light', '') ?: settings('site_logo_dark', '');
+
+        if (blank($stored) || preg_match('#^(https?:)?//#i', $stored) || str_starts_with($stored, 'data:')) {
+            return null;
+        }
+
+        $relative = ltrim($stored, '/');
+
+        if (str_starts_with($relative, 'storage/')) {
+            $relative = substr($relative, strlen('storage/'));
+        }
+
+        $path = \Illuminate\Support\Facades\Storage::disk('public')->path($relative);
+
+        // SVG is skipped: mPDF's SVG support is partial and a logo it cannot parse renders as
+        // a broken box in the middle of an invoice.
+        if (! is_file($path) || strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /**
+     * Stable, human-readable invoice number derived from the payment itself, so the same
+     * payment always produces the same number no matter when it is downloaded.
+     */
+    private function invoiceNumber(Payment $payment): string
+    {
+        return 'INV-'.$payment->created_at->format('Ym').'-'.str_pad((string) $payment->id, 5, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @return array{title: string, subtitle: string|null}
+     */
+    private function invoiceLineItem(Payment $payment): array
+    {
+        $period = $payment->created_at->format('F j, Y');
+
+        return match ($payment->type) {
+            'subscription' => [
+                'title' => translate(':plan subscription', ['plan' => $payment->plan?->name ?? translate('Plan')]),
+                'subtitle' => translate('Billed on :date', ['date' => $period]),
+            ],
+            'credit_topup' => [
+                'title' => translate('Credit top-up'),
+                'subtitle' => translate('Purchased on :date', ['date' => $period]),
+            ],
+            'bank_transfer' => [
+                'title' => translate('Bank transfer'),
+                'subtitle' => translate('Received on :date', ['date' => $period]),
+            ],
+            default => [
+                'title' => $payment->plan?->name
+                    ? translate(':plan purchase', ['plan' => $payment->plan->name])
+                    : translate('One-time purchase'),
+                'subtitle' => translate('Purchased on :date', ['date' => $period]),
+            ],
+        };
     }
 
     private function normalizePlanFeatures(mixed $features): array

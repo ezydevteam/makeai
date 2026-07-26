@@ -6,6 +6,7 @@
  * the server-side visibility gate sees the session.
  */
 import { csrfHeaders } from './useAssistantApi'
+import { toastAssistantError, toastAssistantFailure } from './useAssistantErrors'
 import type { ConversationSummary, HelpArticle, HelpArticleDetail } from '../types'
 
 async function getJson<T>(url: string): Promise<T | null> {
@@ -62,8 +63,17 @@ export async function deleteConversation(endpoint: string, sessionId: string): P
             credentials: 'same-origin',
             body: JSON.stringify({ session_id: sessionId }),
         })
-        return response.ok
+
+        // A bare `false` told the caller nothing and the visitor even less — in demo mode
+        // the row simply stayed put with no explanation.
+        if (!response.ok) {
+            await toastAssistantError(response, 'This conversation could not be deleted.')
+            return false
+        }
+
+        return true
     } catch {
+        toastAssistantFailure('This conversation could not be deleted.')
         return false
     }
 }
@@ -95,13 +105,20 @@ export async function submitMessage(
             return { ok: true, message: data.message ?? 'Your message has been sent.' }
         }
 
-        return {
-            ok: false,
-            message: data?.message ?? 'Your message could not be sent. Please try again.',
-            errors: data?.errors,
+        // Field errors belong inline next to the field; anything else (demo mode, a rate
+        // limit) has no inline home, so it goes to a toast as well as the returned message.
+        const message = data?.message ?? 'Your message could not be sent. Please try again.'
+
+        if (!data?.errors) {
+            toastAssistantFailure(message)
         }
+
+        return { ok: false, message, errors: data?.errors }
     } catch {
-        return { ok: false, message: 'Your message could not be sent. Please try again.' }
+        const message = 'Your message could not be sent. Please try again.'
+        toastAssistantFailure(message)
+
+        return { ok: false, message }
     }
 }
 
@@ -116,8 +133,15 @@ export async function submitCsat(
             credentials: 'same-origin',
             body: JSON.stringify(payload),
         })
-        return response.ok
+
+        if (!response.ok) {
+            await toastAssistantError(response, 'Your rating could not be saved.')
+            return false
+        }
+
+        return true
     } catch {
+        toastAssistantFailure('Your rating could not be saved.')
         return false
     }
 }

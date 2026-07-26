@@ -363,6 +363,16 @@ const formatDate = (value: string | null) => value
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
     : t('Not published')
 
+// Compact view counts (1500 -> 1.5k, 1700000 -> 1.7m). Matches the public blog/tool
+// pages and the server-side formatShorthand() used by the stat cards above the table.
+const formatViews = (value: number): string => {
+    const views = Number(value) || 0
+    if (views >= 1_000_000) return (views / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'm'
+    if (views >= 1_000) return (views / 1_000).toFixed(1).replace(/\.0$/, '') + 'k'
+
+    return String(views)
+}
+
 const postViewHref = (post: BlogPost) => post.status === 'published'
     ? route('blog.show', post.slug)
     : route('admin.blog.posts.preview', post.ulid)
@@ -670,7 +680,7 @@ onBeforeUnmount(() => {
                                         {{ t(isTrashed ? 'trashed' : post.status) }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ new Intl.NumberFormat().format(post.views_count) }}</td>
+                                <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ formatViews(post.views_count) }}</td>
                                 <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ isTrashed ? formatDate(post.deleted_at) : formatDate(post.published_at) }}</td>
                                 <td class="px-4 py-4 text-end">
                                     <TableActionMenu v-if="!isTrashed">

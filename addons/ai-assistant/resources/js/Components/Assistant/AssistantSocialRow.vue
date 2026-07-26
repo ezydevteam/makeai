@@ -18,6 +18,7 @@ const items = computed(() => {
         { key: 'telegram', icon: 'ti ti-brand-telegram', label: 'Telegram' },
         { key: 'facebook', icon: 'ti ti-brand-facebook', label: 'Facebook' },
         { key: 'instagram', icon: 'ti ti-brand-instagram', label: 'Instagram' },
+        { key: 'x', icon: 'ti ti-brand-x', label: 'X' },
         { key: 'website', icon: 'ti ti-world', label: 'Website' },
     ]
     return order

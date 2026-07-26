@@ -61,7 +61,7 @@ class NotificationController extends Controller
         if (! isProAvailable()) {
             $hiddenGroups[] = 'billing';
         }
-        if (! (is_extended_license() && (bool) settings('affiliate_enabled', false))) {
+        if (! (is_extended_license() && (bool) settings('affiliate_enabled', true))) {
             $hiddenGroups[] = 'affiliate';
         }
 

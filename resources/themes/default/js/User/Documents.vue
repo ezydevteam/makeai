@@ -159,7 +159,7 @@ function formatToolName(slug: string | null): string {
                     v-model="search"
                     type="text"
                     :placeholder="t('Search documents...')"
-                    class="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2.5 pl-10 pr-9 text-sm outline-none transition focus:border-primary-500 focus:bg-white dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:focus:border-primary-500"
+                    class="w-full !rounded-full border border-gray-200 bg-gray-50/50 py-2.5 pl-10 pr-9 text-sm outline-none transition focus:border-primary-500 focus:bg-white dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:focus:border-primary-500"
                 />
                 <span v-if="search" class="absolute inset-y-0 right-0 flex items-center pr-3">
                     <button @click="search = ''" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">

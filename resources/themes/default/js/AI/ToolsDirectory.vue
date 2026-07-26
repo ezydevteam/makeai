@@ -714,7 +714,7 @@ watch([search, activeCategory, activeTag], () => {
             <template v-else>
                 <div v-if="filtered.length && viewMode === 'grid'" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <template v-for="(item, index) in paginatedTools" :key="'grid-'+item.id">
-                        <AdSection v-if="index > 0 && index % 4 === 0" zone="between_ai_tools" class="col-span-full" />
+                        <AdSection v-if="index > 0 && index % 8 === 0" zone="between_ai_tools" bare class="col-span-full mx-auto w-full max-w-[728px]" />
                         <Link
                             :href="route('ai.tools.show', item.slug)"
                             class="group card relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:!border-primary-200 hover:shadow-lg dark:border-white/5 dark:bg-white/[0.03] dark:hover:!border-primary-500/30"
@@ -753,7 +753,7 @@ watch([search, activeCategory, activeTag], () => {
 
                 <div v-else-if="filtered.length && viewMode === 'list'" class="flex flex-col gap-3">
                     <template v-for="(item, index) in paginatedTools" :key="'list-'+item.id">
-                        <AdSection v-if="index > 0 && index % 6 === 0" zone="between_ai_tools" class="w-full" />
+                        <AdSection v-if="index > 0 && index % 8 === 0" zone="between_ai_tools" bare class="mx-auto w-full max-w-[728px]" />
                         <Link
                             :href="route('ai.tools.show', item.slug)"
                             class="group relative flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:!border-primary-200 hover:shadow-md dark:border-white/5 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between dark:hover:!border-primary-500/30"

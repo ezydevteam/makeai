@@ -24,7 +24,9 @@ class RepurposeService
 
     public function generateFormat(string $transcript, string $title, string $format, array $options = []): string
     {
-        $model = addon_setting('ai-repurposer', 'ai_model', 'gpt-4o-mini');
+        // The addon's own ai_model setting defaults to null, so this fallback is what most
+        // installs actually generate with — it has to be a slug the catalog still carries.
+        $model = addon_setting('ai-repurposer', 'ai_model') ?: settings('default_ai_model', config('ai.fallback_model'));
         $truncated = $this->truncateTranscript($transcript, $format);
 
         $prompt = $this->buildPrompt($truncated, $title, $format, $options);

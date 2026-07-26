@@ -51,7 +51,8 @@ class TwoFactorRequiredTest extends TestCase
             'notifications_enabled', 'registration_enabled', 'email_verification_enabled',
             'onboarding_enabled', 'tools_review_approval_enabled', 'byok_enabled',
             'account_deletion_enabled', 'playground_enabled', 'chains_enabled',
-            'tool_embeds_enabled', 'optin_preferences_enabled', 'cookie_preferences_enabled',
+            'tool_embeds_enabled', 'global_tools_brand_voice_enabled',
+            'optin_preferences_enabled', 'cookie_preferences_enabled',
             'phone_required', 'two_factor_required', 'two_factor_sms_enabled',
         ];
 

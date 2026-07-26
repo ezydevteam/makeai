@@ -26,6 +26,7 @@ import {
     type StudioLimits,
     type TrackedJob,
 } from '../../Composables/useImageJobs'
+import { imageErrorMessage, toastImageError } from '../../Composables/useImageErrors'
 
 /**
  * The Studio serves two audiences from one route: a signed-in user working
@@ -277,10 +278,21 @@ const freeToolCount = computed(
 /* ------------------------------------------------------------------ *
  * Helpers
  * ------------------------------------------------------------------ */
+/**
+ * The message for an inline slot — no toast. Used where the error already has a dedicated
+ * place on screen that the visitor is looking at (the guest wall).
+ */
 function errorText(error: unknown, fallback: string): string {
-    const response = (error as { response?: { data?: { message?: string } } }).response
+    return imageErrorMessage(error, fallback)
+}
 
-    return response?.data?.message ?? fallback
+/**
+ * The message AND a toast. Everything that can fail out of view — a queued operation, a
+ * favourite toggled from the grid, a delete — goes through here, so a refusal (demo mode's
+ * block included) is announced rather than written into a panel that may be scrolled away.
+ */
+function reportError(error: unknown, fallback: string): string {
+    return toastImageError(error, fallback)
 }
 
 function errorStatus(error: unknown): number | null {
@@ -370,7 +382,7 @@ async function generate(payload: GeneratePayload): Promise<void> {
         })
     } catch (error) {
         if (!handleGuestWall(error)) {
-            composerError.value = errorText(error, t('We could not start the generation. Please try again.'))
+            composerError.value = reportError(error, t("We could not start the generation. Please try again."))
         }
     } finally {
         generating.value = false
@@ -456,7 +468,7 @@ async function runAsyncOp(op: Op, asset: Asset, params: ParamMap, files?: OpFile
 
         return true
     } catch (error) {
-        panelError.value = errorText(error, t('The operation could not be started.'))
+        panelError.value = reportError(error, t("The operation could not be started."))
         editorError.value = panelError.value
 
         return false
@@ -474,7 +486,7 @@ async function runSyncTool(op: Op, asset: Asset, params: ParamMap): Promise<bool
 
         return true
     } catch (error) {
-        panelError.value = errorText(error, t('The operation failed. Please try again.'))
+        panelError.value = reportError(error, t("The operation failed. Please try again."))
 
         return false
     }
@@ -611,7 +623,7 @@ async function toggleFavorite(asset: Asset): Promise<void> {
         const target = results.value.find((item) => item.ulid === asset.ulid)
         if (target) target.is_favorite = data.is_favorite
     } catch (error) {
-        flashNotice(errorText(error, t('Could not update favorite.')))
+        flashNotice(reportError(error, t("Could not update favorite.")))
     }
 }
 
@@ -623,7 +635,7 @@ async function deleteAsset(asset: Asset): Promise<void> {
         // The image it was showing no longer exists.
         if (previewAsset.value?.ulid === asset.ulid) previewAsset.value = null
     } catch (error) {
-        flashNotice(errorText(error, t('Could not delete this image.')))
+        flashNotice(reportError(error, t("Could not delete this image.")))
     }
 }
 

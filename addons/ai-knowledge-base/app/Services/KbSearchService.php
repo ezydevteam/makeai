@@ -165,7 +165,7 @@ class KbSearchService
 
         $modelName = addon_setting('ai-knowledge-base', 'ai_model');
         if (empty($modelName)) {
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
+            $modelName = settings('default_ai_model', config('ai.fallback_model'));
         }
 
         // Cost governance: KB answers are free to end users, but the operator still
@@ -173,7 +173,14 @@ class KbSearchService
         // not an exception), then record the spend afterward so the budget stays
         // accurate — WITHOUT charging any user (deductCredits: false). Behaves
         // identically under Regular and Extended licenses (no per-user credit involved).
-        if (TokenGuard::globalBudgetExceeded()) {
+        //
+        // The per-IP allowance is checked alongside it. Because these answers bill nobody,
+        // the global budget used to be their ONLY ceiling — one visitor could run the site's
+        // whole daily allowance through the help centre. Same graceful degrade: the sources
+        // are already on screen, so the reader still gets the articles.
+        $ip = request()?->ip();
+
+        if (TokenGuard::globalBudgetExceeded() || TokenGuard::ipAllowanceExhausted(request()?->user(), $ip)) {
             yield json_encode(['type' => 'delta', 'text' => 'The assistant is temporarily unavailable due to high demand. Please browse the articles below or try again later.']) . "\n";
 
             $log = KbSearch::create([
@@ -226,6 +233,16 @@ class KbSearchService
                     ['tool_slug' => 'kb-answer'],
                     false,      // deductCredits — never charge end users for public help
                     $answered,
+                );
+
+                // after() only meters the per-IP allowance when it is charging someone, and
+                // this deliberately charges nobody — so the visitor's share is counted here.
+                // Same pricing function the charge would have used; no second opinion on
+                // what an answer is worth.
+                TokenGuard::meterIpUsage(
+                    request()?->user(),
+                    $ip,
+                    TokenGuard::creditsForTokens($modelName, $inputTokens, $outputTokens),
                 );
             } catch (\Throwable $e) {
                 // Cost accounting must never break the user-facing answer.

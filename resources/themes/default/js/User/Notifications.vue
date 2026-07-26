@@ -34,6 +34,11 @@ const props = defineProps<{
     notifications: {
         data: NotificationItem[]
         links: Array<{ url: string | null, label: string, active: boolean }>
+        current_page: number
+        last_page: number
+        total: number
+        from: number | null
+        to: number | null
     }
     unreadCount: number
     filters: { status: string | null }
@@ -110,40 +115,40 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
     <Head :title="t('Notifications')" />
 
     <div class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Notifications') }}</h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Review account updates, payments, documents, and admin messages.') }}</p>
-                </div>
-                <div class="shrink-0 flex flex-wrap items-center gap-3">
-                    <button
-                        v-if="unreadCount > 0"
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm transition hover:border-primary-300 hover:bg-primary-100 dark:border-primary-800/50 dark:bg-primary-900/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
-                        @click="markAllAsRead"
-                    >
-                        <i class="ti ti-checks text-base"></i>
-                        {{ t('Mark all as read') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="openPreferencesModal"
-                    >
-                        <i class="ti ti-settings text-lg"></i>
-                        {{ t('Preferences') }}
-                    </button>
-                    <div class="flex flex-wrap items-center gap-2 rounded-full border border-gray-200 bg-gray-50 p-1.5 shadow-sm dark:border-surface-700 dark:bg-surface-800">
-                        <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="!props.filters.status ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus(null)">{{ t('All') }}</button>
-                        <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="props.filters.status === 'unread' ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus('unread')">{{ t('Unread') }}</button>
-                        <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="props.filters.status === 'read' ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus('read')">{{ t('Read') }}</button>
-                    </div>
-                </div>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Notifications') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Review account updates, payments, documents, and admin messages.') }}</p>
+            </div>
+            <div class="shrink-0 flex flex-wrap items-center gap-3">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 btn-primary"
+                    @click="openPreferencesModal"
+                >
+                    <i class="ti ti-adjustments-horizontal text-base"></i>
+                    {{ t('Preferences') }}
+                </button>
             </div>
         </div>
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 border-b border-gray-100">
+                <button
+                    v-if="unreadCount > 0"
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-full border border-green-500 px-5 py-2 text-sm font-semibold text-green-600 transition hover:!bg-green-600 hover:!text-white dark:border-green-900/80 dark:text-green-300"
+                    @click="markAllAsRead"
+                >
+                    <i class="ti ti-checks text-base"></i>
+                    {{ t('Mark all as read') }}
+                </button>
+                <div class="flex flex-wrap items-center justify-center gap-2 rounded-full border border-gray-200 bg-gray-50 p-1.5 shadow-sm dark:border-surface-700 dark:bg-surface-800">
+                    <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="!props.filters.status ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus(null)">{{ t('All') }}</button>
+                    <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="props.filters.status === 'unread' ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus('unread')">{{ t('Unread') }}</button>
+                    <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="props.filters.status === 'read' ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus('read')">{{ t('Read') }}</button>
+                </div>
+            </div>
             <div v-for="item in notifications.data" :key="item.id" class="flex gap-4 border-b border-gray-100 p-5 last:border-b-0 dark:border-surface-800">
                 <div :class="levelClass(item.level)" class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm">
                     <i :class="[resolveNotificationIconClass(item), 'text-lg']"></i>
@@ -171,7 +176,17 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
             </div>
         </section>
 
-        <Pagination :links="notifications.links" />
+        <!-- from/to/total drive the component's "showing X to Y of Z" row; with only :links
+             it rendered the page buttons and an empty count line. -->
+        <Pagination
+            v-if="notifications.last_page > 1"
+            :links="notifications.links"
+            :from="notifications.from"
+            :to="notifications.to"
+            :total="notifications.total"
+            :current-page="notifications.current_page"
+            :last-page="notifications.last_page"
+        />
     </div>
 
     <!-- Preferences Modal -->

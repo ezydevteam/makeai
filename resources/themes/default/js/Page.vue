@@ -3,15 +3,23 @@ import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Layout from '@themes/default/js/Layouts/AppLayout.vue';
 import ContactForm from '@themes/default/js/Components/ContactForm.vue';
+import ContactInfoPanel from '@themes/default/js/Components/ContactInfoPanel.vue';
 import FaqAccordion from '@themes/default/js/Components/FaqAccordion.vue';
+import FaqBlock from '@themes/default/js/Components/FaqBlock.vue';
 import AppSidebar from '@themes/default/js/Components/AppSidebar.vue';
 import { useTranslate } from '@/Composables/useTranslate';
 import { mediaUrl } from '@/lib/media'
+
+type ContentBlock =
+    | { type: 'html'; html: string }
+    | { type: 'faqs'; props: Record<string, any> };
 
 const props = defineProps<{
     page: any
     seo?: any
     contactSettings?: any
+    contactChannels?: any[] | null
+    contentBlocks?: ContentBlock[]
 }>();
 
 const { t } = useTranslate();
@@ -27,6 +35,27 @@ const canonicalUrl = computed(() => props.seo?.canonical || '');
 const robots = computed(() => props.seo?.robots || 'index,follow');
 const ogImage = computed(() => props.seo?.og_image || (props.page.og_image ? mediaUrl(props.page.og_image) : ''));
 const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.schema) : '');
+
+// container_width is stored as either a CSS length ('1080px', '1536px'), 'full', or the
+// semantic 'default'. 'default' (and any empty/legacy value) resolves to the standard
+// 1280px — critically, 'default' is NOT valid CSS, so it must be mapped here rather than
+// passed straight into max-width.
+// Server-split content. Falls back to a single html block so a page rendered from a
+// cached Inertia response without the prop still shows its content.
+const blocks = computed<ContentBlock[]>(() =>
+    props.contentBlocks ?? [{ type: 'html', html: props.page?.content ?? '' }]
+);
+
+// The legacy `/faq` page parses its own <h3> markup into an accordion. Skip that path
+// once the page uses a shortcode, so the two renderers can't both claim the content.
+const usesShortcodes = computed(() => blocks.value.some((block) => block.type !== 'html'));
+
+const pageMaxWidth = computed(() => {
+    const width = props.page?.container_width;
+    if (width === 'full') return '100%';
+    if (!width || width === 'default') return '1280px';
+    return width;
+});
 </script>
 
 <template>
@@ -50,7 +79,7 @@ const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.s
 
     <Layout>
         <div class="w-full pt-6 md:pt-10 pb-12">
-            <div :style="{ '--page-width': page.container_width === 'full' ? '100%' : (page.container_width || '1280px'), maxWidth: page.container_width === 'full' ? '100%' : (page.container_width || '1280px') }" class="mx-auto px-4 sm:px-6">
+            <div :style="{ '--page-width': pageMaxWidth, maxWidth: pageMaxWidth }" class="mx-auto px-4 sm:px-6">
 
                 <div class="flex flex-col lg:flex-row gap-12">
                     <!-- Main Content -->
@@ -78,14 +107,32 @@ const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.s
                                 <img :src="mediaUrl(page.featured_image)" :alt="page.title" class="w-full h-auto object-cover">
                             </div>
 
+                            <!-- Contact: intro copy and reachable channels on the left, the form
+                                 alongside it. Collapses to a single column below lg. -->
                             <div v-if="page.slug === 'contact'" class="not-prose">
-                                <div v-html="page.content" class="cms-content text-gray-700 dark:text-gray-300 leading-relaxed mb-12"></div>
-                                <ContactForm :settings="contactSettings" />
+                                <div class="grid gap-10 lg:grid-cols-12 lg:items-start lg:gap-12">
+                                    <div class="lg:col-span-5 lg:sticky lg:top-24 space-y-8">
+                                        <template v-for="(block, i) in blocks" :key="i">
+                                            <div v-if="block.type === 'html'" v-html="block.html" class="cms-content text-gray-700 dark:text-gray-300 leading-relaxed"></div>
+                                            <FaqBlock v-else-if="block.type === 'faqs'" v-bind="block.props" />
+                                        </template>
+                                        <ContactInfoPanel :channels="contactChannels" />
+                                    </div>
+
+                                    <div class="lg:col-span-7">
+                                        <ContactForm :settings="contactSettings" />
+                                    </div>
+                                </div>
                             </div>
-                            <div v-else-if="page.slug === 'faq'" class="not-prose">
+                            <div v-else-if="page.slug === 'faq' && !usesShortcodes" class="not-prose">
                                 <FaqAccordion :content="page.content" />
                             </div>
-                            <div v-else v-html="page.content" class="cms-content text-gray-700 dark:text-gray-300 leading-relaxed space-y-6"></div>
+                            <template v-else>
+                                <template v-for="(block, i) in blocks" :key="i">
+                                    <div v-if="block.type === 'html'" v-html="block.html" class="cms-content text-gray-700 dark:text-gray-300 leading-relaxed space-y-6"></div>
+                                    <FaqBlock v-else-if="block.type === 'faqs'" v-bind="block.props" />
+                                </template>
+                            </template>
                         </article>
                     </div>
 

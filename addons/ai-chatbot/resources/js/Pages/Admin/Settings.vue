@@ -434,7 +434,12 @@ const removeLogo = () => {
     <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ addon.name }}</h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ addon.name }}</h1>
+                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {{ t('Addon') }}
+                    </span>
+                </div>
                 <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
                     {{ addon.description || t('Configure chatbot options, model selection, limits, plans, and customized system models.') }}
                 </p>

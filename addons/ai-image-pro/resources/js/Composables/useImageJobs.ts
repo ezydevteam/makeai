@@ -113,14 +113,21 @@ export function operationLabel(operations: Op[], key: string | null | undefined)
 export function modelLabel(
     models: Model[],
     id: string | null | undefined,
+    names: Record<string, string> = {},
 ): { name: string; provider: string | null } | null {
     if (!id) return null
 
     const known = models.find((model) => model.id === id)
 
-    return known
-        ? { name: known.name, provider: known.provider }
-        : { name: id, provider: null }
+    if (known) {
+        return { name: known.name, provider: known.provider }
+    }
+
+    // Not offered any more, but the asset that used it still is. `names` is the server's
+    // full slug+alias map (ModelCatalog::displayNameMap), which covers every model on
+    // record rather than only the ones currently on sale. The alias remains the last
+    // resort — it is public and readable, just not a name.
+    return { name: names[id] ?? id, provider: null }
 }
 
 export interface AspectRatio {

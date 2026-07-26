@@ -241,6 +241,24 @@ const formatViews = (views: number): string => {
     return views.toString()
 }
 
+// Meta row visibility (category • uses • rating). Kept as named flags because the raw
+// conditions were repeated inline in two layouts, and the duplication hid a bug: the first
+// divider used "category && (usage || rating)", so with a 0 usage count a tool with both a
+// category and a rating rendered BOTH dividers as "• •". A divider must only sit between
+// two adjacent items that are actually visible.
+const showCategoryMeta = computed(() => Boolean(props.tool.category) && !toolPageSettings.value.hide_category)
+const showUsageMeta = computed(() => Boolean(props.tool.usage_count || props.tool.views_count) && !toolPageSettings.value.hide_usage_count)
+const showRatingMeta = computed(() => !toolPageSettings.value.hide_rating && Boolean(props.tool.avg_rating))
+const showCategoryUsageDivider = computed(() => showCategoryMeta.value && showUsageMeta.value)
+const showRatingDivider = computed(() => (showCategoryMeta.value || showUsageMeta.value) && showRatingMeta.value)
+
+// Fraction of the 5-star bar to fill amber, so the stars reflect avg_rating precisely
+// (a 4.3 shows 86% filled) rather than a single always-full star.
+const ratingPercent = computed(() => {
+    const value = Math.max(0, Math.min(5, Number(props.tool.avg_rating) || 0))
+    return (value / 5) * 100
+})
+
 const shareUrl = computed(() => typeof window !== 'undefined' ? window.location.href : '')
 
 const fields = computed<ToolField[]>(() => {
@@ -816,7 +834,7 @@ const copyToolLink = () => {
                                         <!-- Simple Metadata Row just below title -->
                                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
                                             <!-- Category -->
-                                            <span v-if="tool.category && !toolPageSettings.hide_category" class="flex items-center gap-1">
+                                            <span v-if="showCategoryMeta" class="flex items-center gap-1">
                                                 <i class="ti ti-folder text-base text-gray-400"></i>
                                                 <Link :href="routeTo('ai.tools.category', tool.category.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
                                                     {{ tool.category.name }}
@@ -824,20 +842,20 @@ const copyToolLink = () => {
                                             </span>
 
                                             <!-- Divider -->
-                                            <span v-if="tool.category && !toolPageSettings.hide_category && (((tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count) || (!toolPageSettings.hide_rating && tool.avg_rating))" class="text-gray-300 dark:text-surface-700">•</span>
+                                            <span v-if="showCategoryUsageDivider" class="text-[10px] leading-none text-gray-300 dark:text-surface-700 -mx-1.5">•</span>
 
                                             <!-- Usage Count -->
-                                            <span v-if="(tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count" class="flex items-center gap-1">
+                                            <span v-if="showUsageMeta" class="flex items-center gap-1">
                                                 <i class="ti ti-player-play text-base text-gray-400"></i>
                                                 <span>{{ formatViews(tool.usage_count || tool.views_count || 0) }} {{ t('uses') }}</span>
                                             </span>
 
                                             <!-- Divider -->
-                                            <span v-if="((tool.category && !toolPageSettings.hide_category) || ((tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count)) && (!toolPageSettings.hide_rating && tool.avg_rating)" class="text-gray-300 dark:text-surface-700">•</span>
+                                            <span v-if="showRatingDivider" class="text-[10px] leading-none text-gray-300 dark:text-surface-700 -mx-1.5">•</span>
 
                                             <!-- Rating -->
-                                            <span v-if="!toolPageSettings.hide_rating && tool.avg_rating" class="flex items-center gap-1">
-                                                <i class="ti ti-star-filled text-base text-amber-400"></i>
+                                            <span v-if="showRatingMeta" class="flex items-center gap-1">
+                                                <span class="relative inline-block whitespace-nowrap text-base leading-none" aria-hidden="true"><span class="text-gray-300 dark:text-surface-600"><i class="ti ti-star-filled"></i></span><span class="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap text-amber-400" :style="{ width: ratingPercent + '%' }"><i class="ti ti-star-filled"></i></span></span>
                                                 <span class="font-bold text-gray-700 dark:text-gray-200">{{ Number(tool.avg_rating).toFixed(1) }}</span>
                                                 <span class="text-xs text-gray-400" v-if="tool.review_count">({{ tool.review_count }})</span>
                                             </span>
@@ -978,7 +996,7 @@ const copyToolLink = () => {
                             <!-- Simple Metadata Row just below title (Minimalist & Modern layouts) -->
                             <div v-if="toolPageSettings.layout === 'minimalist' || toolPageSettings.layout === 'modern'" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1.5 mb-2">
                                 <!-- Category -->
-                                <span v-if="tool.category && !toolPageSettings.hide_category" class="flex items-center gap-1">
+                                <span v-if="showCategoryMeta" class="flex items-center gap-1">
                                     <i class="ti ti-folder text-base text-gray-400"></i>
                                     <Link :href="routeTo('ai.tools.category', tool.category.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
                                         {{ tool.category.name }}
@@ -986,20 +1004,20 @@ const copyToolLink = () => {
                                 </span>
 
                                 <!-- Divider -->
-                                <span v-if="tool.category && !toolPageSettings.hide_category && (((tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count) || (!toolPageSettings.hide_rating && tool.avg_rating))" class="text-gray-300 dark:text-surface-700">•</span>
+                                <span v-if="showCategoryUsageDivider" class="text-[10px] leading-none text-gray-300 dark:text-surface-700 -mx-1.5">•</span>
 
                                 <!-- Usage Count -->
-                                <span v-if="(tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count" class="flex items-center gap-1">
+                                <span v-if="showUsageMeta" class="flex items-center gap-1">
                                     <i class="ti ti-player-play text-base text-gray-400"></i>
                                     <span>{{ formatViews(tool.usage_count || tool.views_count || 0) }} {{ t('uses') }}</span>
                                 </span>
 
                                 <!-- Divider -->
-                                <span v-if="((tool.category && !toolPageSettings.hide_category) || ((tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count)) && (!toolPageSettings.hide_rating && tool.avg_rating)" class="text-gray-300 dark:text-surface-700">•</span>
+                                <span v-if="showRatingDivider" class="text-[10px] leading-none text-gray-300 dark:text-surface-700 -mx-1.5">•</span>
 
                                 <!-- Rating -->
-                                <span v-if="!toolPageSettings.hide_rating && tool.avg_rating" class="flex items-center gap-1">
-                                    <i class="ti ti-star-filled text-base text-amber-400"></i>
+                                <span v-if="showRatingMeta" class="flex items-center gap-1">
+                                    <span class="relative inline-block whitespace-nowrap text-base leading-none" aria-hidden="true"><span class="text-gray-300 dark:text-surface-600"><i class="ti ti-star-filled"></i></span><span class="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap text-amber-400" :style="{ width: ratingPercent + '%' }"><i class="ti ti-star-filled"></i></span></span>
                                     <span class="font-bold text-gray-700 dark:text-gray-200">{{ Number(tool.avg_rating).toFixed(1) }}</span>
                                     <span class="text-xs text-gray-400" v-if="tool.review_count">({{ tool.review_count }})</span>
                                 </span>
@@ -1014,7 +1032,9 @@ const copyToolLink = () => {
                 </div>
             </div>
 
-            <AdSection zone="tool_page_top" class="mx-auto mb-4 w-full max-w-7xl" />
+            <!-- Creative places this inside the left column, under the title card (below),
+                 because that layout has no full-width band above the grid to sit in. -->
+            <AdSection v-if="toolPageSettings.layout !== 'creative'" zone="tool_page_top" bare class="mx-auto mb-4 w-full max-w-[728px]" />
 
             <div class="grid min-h-0 gap-6 lg:grid-cols-12" :class="[
                 toolPageSettings.layout === 'minimalist' ? 'max-w-4xl mx-auto w-full' : '',
@@ -1098,6 +1118,12 @@ const copyToolLink = () => {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Creative layout: the top slot lives here, directly under the title
+                         card in the left column. The zone shares one creative with the other
+                         layouts (a 728x90 leaderboard), so it just fills the column width and
+                         scales down proportionally rather than being capped. -->
+                    <AdSection v-if="toolPageSettings.layout === 'creative'" zone="tool_page_top" bare class="w-full" />
 
                     <!-- Parameters Form Card -->
                     <div :class="[
@@ -1266,6 +1292,10 @@ const copyToolLink = () => {
                             {{ t('Edit in Editor') }}
                         </Link>
                     </div>
+
+                    <!-- Creative layout: bottom slot sits after the output content and
+                         before the nested tabs, matching the other layouts' placement. -->
+                    <AdSection v-if="toolPageSettings.layout === 'creative'" zone="tool_page_bottom" bare class="mx-auto mt-6 w-full max-w-[728px]" />
 
                     <!-- Nested Content Tabs (Creative Layout) -->
                     <div v-if="contentTabsVisible && toolPageSettings.layout === 'creative'" class="mt-6 w-full max-w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/5 dark:bg-white/[0.03]">
@@ -1498,6 +1528,11 @@ const copyToolLink = () => {
             </div>
 
             <!-- Bottom Content (Default, Modern & Minimalist Layouts) -->
+            <!-- Sits between the tool itself and the About/Reviews tabs, which is a natural
+                 break in the page — it used to render at the very bottom, below everything.
+                 Creative renders its own copy higher up, inside the output column. -->
+            <AdSection v-if="toolPageSettings.layout !== 'creative'" zone="tool_page_bottom" bare class="mx-auto mt-8 w-full max-w-[728px]" />
+
             <div v-if="contentTabsVisible && (toolPageSettings.layout === 'default' || toolPageSettings.layout === 'minimalist' || toolPageSettings.layout === 'modern')" :class="[
                 toolPageSettings.layout === 'minimalist'
                     ? 'mt-10 max-w-4xl mx-auto w-full space-y-12 pb-12'
@@ -2083,7 +2118,6 @@ const copyToolLink = () => {
             </div>
         </div>
 
-        <AdSection zone="tool_page_bottom" class="mx-auto mb-4 w-full max-w-7xl" />
     </div>
 
 

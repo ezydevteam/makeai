@@ -100,6 +100,9 @@ class ModelCatalog
      */
     private ?array $aliasMap = null;
 
+    /** @var array<string, string>|null */
+    private ?array $displayNames = null;
+
     /**
      * The public identifier for a model — what the frontend, the URL and the API
      * payloads use. The real slug never leaves the server.
@@ -124,6 +127,66 @@ class ModelCatalog
         $slug = $slug !== null ? trim($slug) : '';
 
         return $slug !== '' ? ($this->aliasMap()[$slug] ?? null) : null;
+    }
+
+    /**
+     * The name to show a human for a model, given either its real slug or its public alias.
+     *
+     * The one resolver both surfaces use. Admin reporting reads raw slugs out of `aip_jobs`
+     * and the Studio/Library read aliases off assets, and before this they each had their
+     * own idea of what to print when the model was not in the offered set — the admin showed
+     * `gemini-3.1-flash-image-preview`, the Library the `google-nano-banana` alias. Both now
+     * come through here and say "Nano Banana".
+     *
+     * Resolution order, most authoritative first:
+     *   1. the `ai_models` row's own name — operator-editable, and what the model picker,
+     *      the Studio and the Library already display;
+     *   2. `config('ai.model_names')`, which covers core catalogue models the image addon
+     *      never registered a row for;
+     *   3. a title-cased slug, so a model deleted from the catalogue still reads as a name
+     *      rather than vanishing from a report.
+     *
+     * Deliberately NOT limited to available(): reporting and history are about models that
+     * were used, which includes ones since disabled or removed.
+     */
+    public function displayName(?string $slugOrAlias): ?string
+    {
+        $key = $slugOrAlias !== null ? trim($slugOrAlias) : '';
+
+        if ($key === '') {
+            return null;
+        }
+
+        return $this->displayNameMap()[$key]
+            ?? config('ai.model_names', [])[$key]
+            ?? Str::headline($key);
+    }
+
+    /**
+     * Slug AND alias => display name, so a caller holding either form resolves in one lookup.
+     *
+     * @return array<string, string>
+     */
+    public function displayNameMap(): array
+    {
+        if ($this->displayNames !== null) {
+            return $this->displayNames;
+        }
+
+        $names = [];
+
+        foreach (AiModel::query()->ofType('image')->get(['slug', 'name', 'provider', 'meta']) as $model) {
+            $name = trim((string) $model->name);
+
+            if ($name === '') {
+                continue;
+            }
+
+            $names[$model->slug] = $name;
+            $names[$this->alias($model)] = $name;
+        }
+
+        return $this->displayNames = $names;
     }
 
     /**

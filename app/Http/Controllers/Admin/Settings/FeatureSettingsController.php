@@ -16,9 +16,9 @@ class FeatureSettingsController extends Controller
         return Inertia::render('Admin/Settings/Features', [
             'features' => [
                 'favorites_enabled' => (bool) settings('favorites_enabled', true),
-                'subscriptions_enabled' => is_extended_license() && (bool) settings('subscriptions_enabled', false),
+                'subscriptions_enabled' => is_extended_license() && (bool) settings('subscriptions_enabled', true),
                 'coupons_enabled' => is_extended_license() && (bool) settings('coupons_enabled', true),
-                'affiliate_enabled' => is_extended_license() && (bool) settings('affiliate_enabled', false),
+                'affiliate_enabled' => is_extended_license() && (bool) settings('affiliate_enabled', true),
                 'tickets_enabled' => (bool) settings('tickets_enabled', true),
                 'contact_enabled' => (bool) settings('contact_enabled', true),
                 'blog_enabled' => (bool) settings('blog_enabled', true),
@@ -32,6 +32,10 @@ class FeatureSettingsController extends Controller
                 'playground_enabled' => (bool) settings('playground_enabled', true),
                 'chains_enabled' => (bool) settings('chains_enabled', true),
                 'tool_embeds_enabled' => (bool) settings('tool_embeds_enabled', true),
+                // Shares its source of truth with the Appearance › Tool Page toggle —
+                // `global_tools_*` keys are routed to the theme settings blob by the
+                // settings()/settings_set() helpers, so both screens edit one value.
+                'global_tools_brand_voice_enabled' => (bool) settings('global_tools_brand_voice_enabled', true),
                 'optin_preferences_enabled' => (bool) settings('optin_preferences_enabled', true),
                 'cookie_preferences_enabled' => (bool) settings('cookie_preferences_enabled', true),
                 'phone_required' => (bool) settings('phone_required', false),
@@ -71,6 +75,14 @@ class FeatureSettingsController extends Controller
         foreach ($features as $feature) {
             settings_set($feature, (bool) $request->validated($feature), 'boolean', 'features');
         }
+
+        // Not a `features` group row: settings_set() routes `global_tools_*` keys into
+        // the theme tool-page blob, which is also what Appearance › Tool Page writes.
+        settings_set(
+            'global_tools_brand_voice_enabled',
+            (bool) $request->validated('global_tools_brand_voice_enabled'),
+            'boolean',
+        );
 
         // Premium subscriptions AND the affiliate program require an Extended
         // License (both are monetization features). Enforced server-side — hiding

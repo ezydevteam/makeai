@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useIntersectionObserver } from '@vueuse/core'
 import { mediaUrl } from '@/lib/media'
 
-type AdZone = 'header_banner' | 'sidebar_top' | 'sidebar_bottom' | 'content_top' | 'content_bottom' | 'content-injection' | 'between_posts' | 'between_ai_tools' | 'tool_page_top' | 'tool_page_bottom' | 'template_page' | 'chat_banner' | 'dashboard_top' | 'footer_banner' | 'custom_zone_1' | 'custom_zone_2'
+// Must mirror the keys in config/ads.php.
+type AdZone = 'header_banner' | 'footer_banner' | 'sidebar_top' | 'sidebar_bottom' | 'between_posts' | 'blog_after_content' | 'between_ai_tools' | 'tool_page_top' | 'tool_page_bottom' | 'chat_banner' | 'dashboard_top' | 'custom_zone_1' | 'custom_zone_2'
 
 interface AdPayload {
     id: number
@@ -20,9 +21,17 @@ interface AdPayload {
     click_url: string | null
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     zone: AdZone
-}>()
+    /**
+     * Drop the card chrome (border + panel + shadow). Use where the ad sits inside
+     * content that already provides its own surface, so the slot does not read as a
+     * second nested card.
+     */
+    bare?: boolean
+}>(), {
+    bare: false,
+})
 
 const ad = ref<AdPayload | null>(null)
 const adRef = ref<HTMLElement | null>(null)
@@ -90,7 +99,17 @@ onMounted(() => {
 </script>
 
 <template>
-    <div v-if="hasRenderableAd && ad" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
+    <!-- Image creatives carry their own artwork and background, so the card chrome
+         (border + white panel + shadow) only framed them with an unwanted letterbox.
+         Keep it for custom_html and adsense, which have no backdrop of their own. -->
+    <div
+        v-if="hasRenderableAd && ad"
+        ref="adRef"
+        class="ad-container overflow-hidden rounded-lg"
+        :class="(ad.type === 'image_link' || bare)
+            ? ''
+            : 'border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900'"
+    >
         <a v-if="ad.type === 'image_link' && ad.image_url && ad.click_url" :href="ad.click_url" :target="ad.link_target" rel="noopener noreferrer" class="block">
             <img :src="mediaUrl(ad.image_url)" :alt="ad.title" class="h-auto w-full object-cover" loading="lazy" />
         </a>

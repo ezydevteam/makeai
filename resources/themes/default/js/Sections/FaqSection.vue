@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useSectionStyle } from '../composables/useSectionStyle'
 import { useTheme } from '@/Composables/useTheme'
@@ -71,8 +71,17 @@ const scopedFaqs = computed<Faq[]>(() => {
     })
 })
 
-// Category tabs are opt-out via the admin toggle (default on).
-const showCategoryTabs = computed<boolean>(() => props.section.config.show_category_tabs !== false)
+// Category selector layout: 'hidden' | 'top' | 'sidebar'. Falls back to the legacy
+// boolean toggle for sections saved before the style select existed.
+const categoryTabsStyle = computed<'hidden' | 'top' | 'sidebar'>(() => {
+    const raw = asString(props.section.config.category_tabs_style)
+    if (raw === 'hidden' || raw === 'top' || raw === 'sidebar') return raw
+    const legacy = props.section.config.show_category_tabs
+    const legacyOff = legacy === false || legacy === 0 || legacy === '0' || legacy === 'false'
+    return legacyOff ? 'hidden' : 'sidebar'
+})
+
+const showCategoryTabs = computed<boolean>(() => categoryTabsStyle.value !== 'hidden')
 
 const effectiveCardWrapperClass = computed(() => {
     const style = asString(props.section.config.card_bg_style, 'default')
@@ -108,15 +117,29 @@ const getCategoryCount = (categoryId: number | 'all') => {
     ).length
 }
 
-// Show the category selector only when enabled by the admin and there is more than one category.
-const showTabs = computed(() => showCategoryTabs.value && categories.value.length > 1)
+// Show the category selector only when enabled by the admin and there is more than one
+// category to choose between. `categories` leads with the synthetic "All" entry, so the
+// comparison is against the real ones — restricting the section to a single category
+// leaves nothing to filter, and an "All / <only category>" pair is just noise.
+const realCategoryCount = computed(() => categories.value.length - 1)
+const showTabs = computed(() => showCategoryTabs.value && realCategoryCount.value > 1)
+const showSidebarTabs = computed(() => showTabs.value && categoryTabsStyle.value === 'sidebar')
+const showTopTabs = computed(() => showTabs.value && categoryTabsStyle.value === 'top')
 
-// Tabs on → wide dual-column; tabs turned off by the admin → single column at max-w-5xl;
-// otherwise (single category) keep the compact max-w-3xl.
+// Sidebar tabs → wide dual-column; top tabs → single column with room for the tab bar;
+// tabs hidden by the admin → single column at max-w-4xl; single category → compact max-w-3xl.
 const containerMaxWidth = computed(() => {
-    if (showTabs.value) return 'max-w-6xl'
+    if (showSidebarTabs.value) return 'max-w-6xl'
+    // `!` is required — app.ts injects `main .mx-auto { max-width: var(--page-width) !important }`.
+    if (showTopTabs.value) return '!max-w-5xl'
     return showCategoryTabs.value ? 'max-w-3xl' : '!max-w-4xl'
 })
+
+const tabsAlignClass = computed(() =>
+    titleAlignClass(asString(props.section.config.title_align, 'center')) === 'text-center'
+        ? 'justify-center'
+        : 'justify-start'
+)
 
 // Live filter FAQs (by category only, search removed)
 const filteredFaqs = computed(() => {
@@ -132,6 +155,12 @@ const filteredFaqs = computed(() => {
 
     const max = parseInt(String(props.section.config.max_items ?? 12), 10)
     return items.slice(0, max)
+})
+
+// An accordion left open in the previous category made the list swap jump by its
+// expanded height — collapse it so only the list content changes.
+watch(selectedCategoryId, () => {
+    openFaqId.value = null
 })
 
 const sectionRef = ref<HTMLElement | null>(null)
@@ -232,15 +261,45 @@ onUnmounted(() => gsapCtx?.revert())
                     </div>
                 </div>
 
+                <!-- Top Tabs: pill row above the questions -->
+                <div v-if="showTopTabs" :class="[tabsAlignClass]" class="mb-10 flex section-header">
+                    <div :class="[tabsAlignClass]" class="max-w-full flex flex-wrap items-center gap-2 overflow-x-auto scrollbar-none">
+                        <button
+                            v-for="cat in categories"
+                            :key="cat.id"
+                            @click="selectedCategoryId = cat.id"
+                            type="button"
+                            :class="[
+                                selectedCategoryId === cat.id
+                                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/25 dark:bg-primary-500 dark:border-primary-500 dark:text-white'
+                                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 border-gray-100 hover:border-gray-200 dark:bg-surface-900/40 dark:hover:bg-surface-900/70 dark:text-gray-300 dark:hover:text-white dark:border-surface-800'
+                            ]"
+                            class="shrink-0 flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition-all duration-200 cursor-pointer"
+                        >
+                            <span>{{ cat.name }}</span>
+                            <span
+                                :class="[
+                                    selectedCategoryId === cat.id
+                                        ? 'bg-white/25 text-white'
+                                        : 'bg-gray-200/80 text-gray-500 dark:bg-surface-800 dark:text-gray-400'
+                                ]"
+                                class="rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-all duration-200"
+                            >
+                                {{ getCategoryCount(cat.id) }}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Dual Column Layout or Single Column Container -->
-                <div :class="[showTabs ? 'lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start' : '']">
+                <div :class="[showSidebarTabs ? 'lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start' : '']">
 
                     <!-- Sticky Sidebar/Header Column: Category selector -->
-                    <div :class="[showTabs ? 'lg:col-span-4 mb-10 lg:mb-0 lg:sticky lg:top-24 space-y-6 section-header' : '']">
+                    <div v-if="showSidebarTabs" class="lg:col-span-4 mb-10 lg:mb-0 lg:sticky lg:top-24 space-y-6 section-header">
 
 
                         <!-- Desktop Category List (Vertical Tabs) -->
-                        <div v-if="showTabs" class="hidden lg:block space-y-2 pt-2">
+                        <div class="hidden lg:block space-y-2 pt-2">
                             <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-1 mb-3">
                                 {{ t('Categories') }}
                             </h3>
@@ -271,7 +330,7 @@ onUnmounted(() => gsapCtx?.revert())
                         </div>
 
                         <!-- Mobile/Tablet Category List (Horizontal Scrolling Tabs) -->
-                        <div v-if="showTabs" class="lg:hidden w-full overflow-hidden">
+                        <div class="lg:hidden w-full overflow-hidden">
                             <div class="flex overflow-x-auto gap-2 pb-3 scrollbar-none -mx-4 px-4">
                                 <button
                                     v-for="cat in categories"
@@ -302,13 +361,12 @@ onUnmounted(() => gsapCtx?.revert())
                     </div>
 
                     <!-- FAQs Column -->
-                    <div :class="[showTabs ? 'lg:col-span-8' : '']">
+                    <div :class="[showSidebarTabs ? 'lg:col-span-8' : '']">
                         <div v-if="filteredFaqs.length > 0" class="relative">
-                            <TransitionGroup
-                                name="faq-list"
-                                tag="div"
-                                class="space-y-4"
-                            >
+                            <!-- Keyed per category with out-in so the outgoing list never overlaps
+                                 the incoming one (that overlap read as a flicker on tab switch). -->
+                            <Transition name="faq-list" mode="out-in">
+                            <div :key="String(selectedCategoryId)" class="space-y-4">
                                 <div
                                     v-for="faq in filteredFaqs"
                                     :key="faq.id"
@@ -371,7 +429,8 @@ onUnmounted(() => gsapCtx?.revert())
                                         </div>
                                     </div>
                                 </div>
-                            </TransitionGroup>
+                            </div>
+                            </Transition>
                         </div>
 
                         <!-- Empty state -->
@@ -395,20 +454,21 @@ onUnmounted(() => gsapCtx?.revert())
 </template>
 
 <style scoped>
-/* Smooth list filtering animation */
-.faq-list-move,
-.faq-list-enter-active,
-.faq-list-leave-active {
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+/* Smooth list filtering animation — the outgoing list finishes before the
+   incoming one mounts (mode="out-in"), so nothing overlaps mid-switch. */
+.faq-list-enter-active {
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-.faq-list-enter-from,
+.faq-list-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.faq-list-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
 .faq-list-leave-to {
   opacity: 0;
-  transform: translateY(20px);
-}
-.faq-list-leave-active {
-  position: absolute;
-  width: 100%;
+  transform: translateY(-6px);
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

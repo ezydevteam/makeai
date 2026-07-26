@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Head, Link, usePage, router } from '@inertiajs/vue3'
+import { Head, usePage, router } from '@inertiajs/vue3'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -127,7 +127,29 @@ function copyToken(token: string) {
 
 const embedUrl = (token: string) => route('embed.show', token)
 
+// Preview modal. An inactive embed is deliberately 404'd by the public endpoint, so it is
+// never framed — the modal explains the state instead of showing the error page.
+const previewEmbed = ref<Embed | null>(null)
+
+function openPreview(embed: Embed) {
+  previewEmbed.value = embed
+  document.addEventListener('keydown', closePreviewOnEscape)
+}
+
+function closePreview() {
+  previewEmbed.value = null
+  document.removeEventListener('keydown', closePreviewOnEscape)
+}
+
+function closePreviewOnEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closePreview()
+  }
+}
+
 onBeforeUnmount(() => {
+  document.removeEventListener('keydown', closePreviewOnEscape)
+
   if (copyResetTimer) {
     clearTimeout(copyResetTimer)
   }
@@ -236,13 +258,13 @@ onBeforeUnmount(() => {
 
           <div class="flex items-center gap-1.5">
             <Tooltip :content="t('Preview')" placement="top">
-              <Link
-                :href="route('embed.show', embed.token)"
-                target="_blank"
+              <button
+                type="button"
+                @click="openPreview(embed)"
                 class="inline-flex h-8 w-8 items-center justify-center rounded-full !text-amber-500 transition hover:bg-amber-100 hover:text-amber-500 dark:text-amber-500 dark:hover:bg-slate-800 dark:hover:text-amber-400"
               >
                 <i class="ti ti-eye text-base"></i>
-              </Link>
+              </button>
             </Tooltip>
             <Tooltip :content="t('Re-generate token')" placement="top">
               <button
@@ -267,6 +289,67 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="previewEmbed"
+        class="fixed inset-0 z-[120] flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm"
+        @click.self="closePreview"
+      >
+        <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-gray-900">
+          <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+            <div class="min-w-0">
+              <h3 class="truncate font-semibold text-gray-900 dark:text-white">
+                {{ previewEmbed.label || previewEmbed.tool_slug }}
+              </h3>
+              <p class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{{ previewEmbed.tool_slug }}</p>
+            </div>
+            <button
+              type="button"
+              @click="closePreview"
+              :aria-label="t('Close')"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+            >
+              <i class="ti ti-x text-lg"></i>
+            </button>
+          </div>
+
+          <!-- A paused embed returns 404 to visitors by design, so there is nothing to
+               frame — say so instead of putting an error page inside the modal. -->
+          <div v-if="!previewEmbed.is_active" class="px-6 py-12 text-center">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/30">
+              <i class="ti ti-player-pause text-2xl text-amber-500"></i>
+            </div>
+            <h4 class="text-base font-bold text-gray-900 dark:text-white">{{ t('This embed is paused') }}</h4>
+            <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+              {{ t('Paused embeds are not served to visitors, so there is nothing to preview. Activate it to make it live again.') }}
+            </p>
+          </div>
+
+          <div v-else class="min-h-0 flex-1 bg-gray-50 dark:bg-surface-950">
+            <iframe
+              :src="embedUrl(previewEmbed.token)"
+              :title="previewEmbed.label || previewEmbed.tool_slug"
+              class="h-[60vh] w-full border-0"
+            ></iframe>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 dark:border-surface-800">
+            <p class="truncate text-xs text-gray-400">{{ embedUrl(previewEmbed.token) }}</p>
+            <a
+              v-if="previewEmbed.is_active"
+              :href="embedUrl(previewEmbed.token)"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-primary-600 transition hover:text-primary-700 dark:text-primary-400"
+            >
+              <i class="ti ti-external-link"></i>
+              {{ t('Open in new tab') }}
+            </a>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <ActionConfirmModal
       :open="confirmDelete !== null"

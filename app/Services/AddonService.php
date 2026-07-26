@@ -492,7 +492,7 @@ class AddonService
             $settings[] = [
                 'key' => 'free_max_messages_5h',
                 'type' => 'integer',
-                'label' => 'Free Tier: Max Messages per 5 Hours',
+                'label' => 'Max Messages per 5 Hours',
                 'default' => 0,
                 'group' => 'free_tier',
                 'description' => '0 for unlimited.'
@@ -500,7 +500,7 @@ class AddonService
             $settings[] = [
                 'key' => 'free_max_messages_weekly',
                 'type' => 'integer',
-                'label' => 'Free Tier: Max Messages per Week',
+                'label' => 'Max Messages per Week',
                 'default' => 0,
                 'group' => 'free_tier',
                 'description' => '0 for unlimited.'
@@ -508,7 +508,7 @@ class AddonService
             $settings[] = [
                 'key' => 'free_max_messages_monthly',
                 'type' => 'integer',
-                'label' => 'Free Tier: Max Messages per Month',
+                'label' => 'Max Messages per Month',
                 'default' => 0,
                 'group' => 'free_tier',
                 'description' => '0 for unlimited.'
@@ -523,28 +523,28 @@ class AddonService
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_credits_per_message",
                         'type' => 'string',
-                        'label' => "{$plan->name} Plan: Credits per Message",
+                        'label' => "Credits per Message",
                         'default' => '0',
                         'group' => $groupName
                     ];
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_tokens",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max Tokens per Request",
+                        'label' => "Max Tokens per Request",
                         'default' => 4096,
                         'group' => $groupName
                     ];
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_file_size_mb",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max File Upload Size (MB)",
+                        'label' => "Max File Upload Size (MB)",
                         'default' => 50,
                         'group' => $groupName
                     ];
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_chat_history",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max Chat History Messages",
+                        'label' => "Max Chat History Messages",
                         'default' => 0,
                         'group' => $groupName,
                         'description' => '0 for unlimited.'
@@ -552,7 +552,7 @@ class AddonService
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_messages_5h",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max Messages per 5 Hours",
+                        'label' => "Max Messages per 5 Hours",
                         'default' => 0,
                         'group' => $groupName,
                         'description' => '0 for unlimited.'
@@ -560,7 +560,7 @@ class AddonService
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_messages_weekly",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max Messages per Week",
+                        'label' => "Max Messages per Week",
                         'default' => 0,
                         'group' => $groupName,
                         'description' => '0 for unlimited.'
@@ -568,7 +568,7 @@ class AddonService
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_messages_monthly",
                         'type' => 'integer',
-                        'label' => "{$plan->name} Plan: Max Messages per Month",
+                        'label' => "Max Messages per Month",
                         'default' => 0,
                         'group' => $groupName,
                         'description' => '0 for unlimited.'

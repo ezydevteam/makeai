@@ -56,7 +56,7 @@ class AgentService
         $allTools = array_merge($agent['tools'], $tools);
 
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
-        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $modelName = $model ?? settings('default_ai_model', config('ai.fallback_model'));
 
         $adapter = ProviderRegistry::resolve($providerName);
 

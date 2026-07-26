@@ -55,7 +55,9 @@ class PageRequest extends FormRequest
             'show_featured_image' => ['required', 'boolean'],
             'show_sidebar' => ['required', 'boolean'],
             'sidebar_position' => ['required', Rule::in(['left', 'right'])],
-            'container_width' => ['required', Rule::in(['1280px', 'full', '1080px', '1536px'])],
+            // 'default' resolves to the standard 1280px in the theme (Page.vue). It replaces
+            // the raw '1280px' value so the stored width reads semantically.
+            'container_width' => ['required', Rule::in(['default', 'full', '1080px', '1536px'])],
             'remove_featured_image' => ['nullable', 'boolean'],
             'remove_og_image' => ['nullable', 'boolean'],
         ];

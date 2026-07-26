@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
 import UserLayout from '@themes/default/js/Layouts/UserLayout.vue'
 import AppPagination from '@/Components/UI/Pagination.vue'
+import AdSection from '@themes/default/js/Components/AdSection.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserLayout })
@@ -250,9 +251,10 @@ const isProTool = (tool: Template) => {
         <template v-else>
             <!-- Tool Grid -->
             <div v-if="filteredTools.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <Link
-                    v-for="tool in paginatedTools"
-                    :key="tool.id"
+                <template v-for="(tool, index) in paginatedTools" :key="tool.id">
+                    <!-- Same zone as the tools directory: a leaderboard after every 8 tools. -->
+                    <AdSection v-if="index > 0 && index % 8 === 0" zone="between_ai_tools" bare class="col-span-full mx-auto w-full max-w-[728px]" />
+                    <Link
                     :href="route('ai.tools.show', tool.slug)"
                     class="group card relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:!border-primary-200 hover:shadow-lg dark:border-white/5 dark:hover:!border-primary-500/30 dark:bg-white/[0.03] flex flex-col justify-between"
                 >
@@ -282,6 +284,7 @@ const isProTool = (tool: Template) => {
                         </span>
                     </div>
                 </Link>
+                </template>
             </div>
 
             <!-- Pagination Controls -->
