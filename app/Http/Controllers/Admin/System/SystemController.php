@@ -329,14 +329,18 @@ class SystemController extends Controller
     {
         $lastRun = $this->lastSchedulerRun();
         $isConfigured = $lastRun?->greaterThan(now()->subMinutes(5)) ?? false;
+        $php = $this->cliPhpBinary();
 
         return [
             'is_configured' => $isConfigured,
+            // Never-run and stopped are different faults with different fixes, and rendering
+            // both as "Setup Required" sent buyers hunting for a cron entry that already exists.
+            'has_ever_run' => $lastRun !== null,
             'last_run_at' => $lastRun?->toDateTimeString(),
             'last_run_human' => $lastRun?->diffForHumans(),
-            'required_entry' => '* * * * * cd '.base_path().' && php artisan schedule:run >> /dev/null 2>&1',
+            'required_entry' => '* * * * * cd '.base_path().' && '.$php.' artisan schedule:run >> /dev/null 2>&1',
             'project_path' => base_path(),
-            'php_binary' => PHP_BINARY,
+            'php_binary' => $php,
             'cpanel_detected' => $this->isCpanelDetected(),
             'tasks' => collect($this->scheduledTasks())->map(function (array $task): array {
                 $lastRun = settings('cron_task_last_run_'.$task['key']);
@@ -488,6 +492,45 @@ class SystemController extends Controller
             'Daily at 00:05', 'Daily at 09:00' => translate('Within 24 hours'),
             default => translate('Scheduled'),
         };
+    }
+
+    /**
+     * Absolute path to a PHP **CLI** binary, for the cron entry shown to the operator.
+     *
+     * Deliberately not PHP_BINARY. Under PHP-FPM — which is what cPanel and most managed
+     * hosts run — PHP_BINARY is the FPM binary (…/sbin/php-fpm), which cannot run artisan.
+     * The page used to print bare `php` instead, and that is worse on exactly the hosts
+     * that need this most: cron on cPanel often has no `php` on PATH, or resolves it to a
+     * PHP 5.x/7.x that fatals. Either way `>> /dev/null 2>&1` eats the error and the page
+     * sits on "Setup Required" with nothing to go on. That was the single largest source
+     * of "I set the cron up and it still says not configured".
+     *
+     * PHP_BINDIR is the winner for FPM installs: for ea-php83 it is
+     * /opt/cpanel/ea-php83/root/usr/bin, whose `php` is the matching CLI build.
+     */
+    private function cliPhpBinary(): string
+    {
+        $candidates = [
+            PHP_BINDIR.DIRECTORY_SEPARATOR.'php',
+            '/usr/local/bin/php',
+            '/usr/bin/php',
+        ];
+
+        // On CLI (artisan tinker, tests) PHP_BINARY is already the right answer, so prefer
+        // it over guessing — but only when it really is a CLI SAPI.
+        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
+            array_unshift($candidates, PHP_BINARY);
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($candidate && @is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        // Nothing verifiable — bare `php` at least works on hosts with a sane PATH, and
+        // the operator can compare it against their host's documented binary.
+        return 'php';
     }
 
     private function isCpanelDetected(): bool

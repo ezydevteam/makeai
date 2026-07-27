@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -21,6 +21,7 @@ type CronTask = {
 
 type CronStatus = {
     is_configured: boolean
+    has_ever_run: boolean
     last_run_at: string | null
     last_run_human: string | null
     required_entry: string
@@ -37,6 +38,20 @@ const props = defineProps<{
 const { t } = useTranslate()
 const cronCopied = ref(false)
 const cronRunForm = useForm({ task: '' })
+
+/**
+ * "Never ran" and "ran, then stopped" both used to render as a bare "Setup Required",
+ * which reads as "your cron entry is missing" even when it is present and firing.
+ */
+const statusDetail = computed(() => {
+    if (props.cron.is_configured) {
+        return null
+    }
+
+    return props.cron.has_ever_run
+        ? t('The scheduler last ran :time and has stopped since. The cron entry exists but is no longer firing — check that it was not disabled, and that the PHP binary below still matches your hosting PHP version.').replace(':time', props.cron.last_run_human ?? '')
+        : t('No scheduler run has been recorded yet. If you just saved the cron entry, wait about two minutes for the next run and refresh this page before changing anything.')
+})
 
 const copyCronEntry = async () => {
     await navigator.clipboard.writeText(props.cron.required_entry)
@@ -63,6 +78,7 @@ const runCronTask = (taskKey: string) => {
                     </span>
                 </div>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Cron jobs, environment info, and platform logs.') }}</p>
+                <p v-if="statusDetail" class="mt-2 max-w-3xl rounded-lg bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">{{ statusDetail }}</p>
             </div>
 
             <Link
@@ -93,7 +109,7 @@ const runCronTask = (taskKey: string) => {
                     <div class="mt-1 break-all font-mono text-xs font-semibold text-gray-900 dark:text-white">{{ cron.project_path }}</div>
                 </div>
                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('PHP binary') }}</div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('PHP binary (CLI)') }}</div>
                     <div class="mt-1 break-all font-mono text-xs font-semibold text-gray-900 dark:text-white">{{ cron.php_binary }}</div>
                 </div>
             </div>
@@ -113,11 +129,12 @@ const runCronTask = (taskKey: string) => {
 
             <div v-if="cron.cpanel_detected" class="mt-5 rounded-xl border border-gray-200 bg-secondary-50 p-4 text-secondary-900 dark:border-secondary-900/40 dark:bg-secondary-900/20 dark:text-secondary-100">
                 <h3 class="text-sm font-semibold text-[#0058ff]">{{ t('cPanel detected') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed">{{ t('Open cPanel Cron Jobs, choose Once Per Minute, paste the command above, and save. The warning banner disappears after the scheduler heartbeat runs.') }}</p>
+                <p class="mt-1 text-sm leading-relaxed">{{ t('Open cPanel Cron Jobs, choose Once Per Minute, paste the command above, and save. Cron fires on the next minute boundary, so wait about two minutes and refresh this page — the warning clears once the scheduler heartbeat runs.') }}</p>
+                <p class="mt-2 text-sm leading-relaxed">{{ t('Still showing Setup Required after a few minutes? The PHP binary is the usual cause — confirm the path above matches the PHP version selected for this domain in cPanel.') }}</p>
             </div>
             <div v-else class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hosting setup') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed">{{ t('Use your server cron manager, cPanel, Plesk, or supervisor to run the Laravel scheduler once every minute.') }}</p>
+                <p class="mt-1 text-sm leading-relaxed">{{ t('Use your server cron manager, cPanel, Plesk, or supervisor to run the Laravel scheduler once every minute. Cron fires on the next minute boundary, so wait about two minutes and refresh this page before changing anything.') }}</p>
             </div>
 
             <div class="mt-6 overflow-hidden rounded-xl border border-gray-200 dark:border-surface-700">
