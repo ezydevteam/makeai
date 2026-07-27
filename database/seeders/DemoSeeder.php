@@ -72,8 +72,30 @@ use Illuminate\Support\Str;
 
 class DemoSeeder extends Seeder
 {
+    /**
+     * Fixed PRNG seed, so the demo is the SAME demo on every reset.
+     *
+     * `demo:reset` re-runs this seeder every six hours. With an unseeded generator each
+     * run invented a different business — different revenue, different chart shapes — so
+     * a buyer who looked twice in one day saw two unrelated products, and no screenshot or
+     * documentation could ever match what they were looking at.
+     *
+     * Seeding `mt_srand` covers `mt_rand`, `array_rand` and `shuffle`, which all draw from
+     * the same Mt19937 engine. It deliberately does NOT cover `mt_rand()` — that is a
+     * CSPRNG with no seeding API — which is why this seeder uses `mt_rand()` throughout.
+     * Do not "harden" those back to `mt_rand()`: nothing here is a secret, and doing so
+     * silently returns the demo to being different on every reset.
+     *
+     * Rows are still anchored to now(), so the data keeps moving with the calendar while
+     * the numbers stay put. Change this constant only to deliberately reshuffle the demo.
+     */
+    private const RANDOM_SEED = 20260727;
+
     public function run(): void
     {
+        mt_srand(self::RANDOM_SEED);
+
+
         // Passwords come from config (DEMO_*_PASSWORD) and have no default, so a
         // demo site cannot be stood up with a password that ships in the source.
         // These accounts are published on the sign-in page — refuse rather than
@@ -160,8 +182,8 @@ class DemoSeeder extends Seeder
          * the id, the name and the credits together, so they cannot fall out of step.
          */
         $demoPlans = [
-            ['id' => $freePlan->id, 'name' => 'free', 'credits' => fn () => random_int(10, 100)],
-            ['id' => $professionalPlan->id, 'name' => 'professional', 'credits' => fn () => random_int(1000, 5000)],
+            ['id' => $freePlan->id, 'name' => 'free', 'credits' => fn () => mt_rand(10, 100)],
+            ['id' => $professionalPlan->id, 'name' => 'professional', 'credits' => fn () => mt_rand(1000, 5000)],
         ];
 
         AffiliateProgram::current()->update([
@@ -205,8 +227,8 @@ class DemoSeeder extends Seeder
             $plan = $demoPlans[$i % count($demoPlans)];
             $isFree = $plan['name'] === 'free';
             $profile = $userProfiles[$i % count($userProfiles)];
-            $creditsUsedMonth = random_int(0, 5000);
-            $joinedAt = now()->subDays(random_int(1, 365));
+            $creditsUsedMonth = mt_rand(0, 5000);
+            $joinedAt = now()->subDays(mt_rand(1, 365));
 
             $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name . ' Demo',
@@ -222,9 +244,9 @@ class DemoSeeder extends Seeder
                 // AccessLevelService both guard for a null plan, so this is safe.
                 'plan_id' => $isFree ? null : $plan['id'],
                 'subscription_status' => $isFree ? 'none' : 'active',
-                'subscription_ends_at' => $isFree ? null : now()->addMonths(random_int(1, 12)),
+                'subscription_ends_at' => $isFree ? null : now()->addMonths(mt_rand(1, 12)),
                 'credits_used_month' => $creditsUsedMonth,
-                'credits_used_today' => min($creditsUsedMonth, random_int(0, 320)),
+                'credits_used_today' => min($creditsUsedMonth, mt_rand(0, 320)),
                 'country' => $profile['country'],
                 'profession' => $professions[$i % count($professions)],
                 // National number kept globally unique so the users(phone, phone_country)
@@ -232,7 +254,7 @@ class DemoSeeder extends Seeder
                 'phone' => sprintf('555%07d', 1000 + $i),
                 'phone_country' => $profile['country'],
                 // ~80% have confirmed their number; the rest model the un-verified state.
-                'phone_verified_at' => $i % 5 === 0 ? null : now()->subDays(random_int(1, 200)),
+                'phone_verified_at' => $i % 5 === 0 ? null : now()->subDays(mt_rand(1, 200)),
                 'locale' => $profile['locale'],
                 'timezone' => $profile['timezone'],
                 'use_case' => $useCases[$i % count($useCases)],
@@ -242,14 +264,14 @@ class DemoSeeder extends Seeder
                 // Unique per user (index guarantees it) so the affiliate/referral UI shows
                 // a real code for everyone instead of blanks.
                 'referral_code' => strtoupper(substr($name, 0, 3)) . str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
-                'onboarding_completed_at' => now()->subDays(random_int(1, 300)),
+                'onboarding_completed_at' => now()->subDays(mt_rand(1, 300)),
                 // Every demo user gets an avatar, so their tool reviews and blog comments
                 // (all authored by these accounts) show a face rather than a fallback.
                 'avatar' => $this->demoAvatar($name . ' Demo', 'avatars/demo-user-' . ($i + 1) . '.svg'),
                 'is_active' => true,
-                'last_login_ip' => '203.0.113.' . random_int(2, 254),
-                'email_verified_at' => now()->subDays(random_int(1, 365)),
-                'last_login_at' => now()->subHours(random_int(1, 168)),
+                'last_login_ip' => '203.0.113.' . mt_rand(2, 254),
+                'email_verified_at' => now()->subDays(mt_rand(1, 365)),
+                'last_login_at' => now()->subHours(mt_rand(1, 168)),
             ]);
 
             $this->backdate($user, $joinedAt);
@@ -262,7 +284,7 @@ class DemoSeeder extends Seeder
         foreach (range(0, 16) as $offset) {
             $recentUser = $demoUsers[30 + $offset] ?? null;
             $recentUser?->forceFill([
-                'created_at' => now()->subDays($offset)->setTime(random_int(8, 20), random_int(0, 59)),
+                'created_at' => now()->subDays($offset)->setTime(mt_rand(8, 20), mt_rand(0, 59)),
             ])->save();
         }
 
@@ -308,8 +330,8 @@ class DemoSeeder extends Seeder
         $createUsage = function ($user, $createdAt) use ($providers, $models, $types, $toolSlugs) {
             $provider = $providers[array_rand($providers)];
             $model = $models[$provider][array_rand($models[$provider])];
-            $inputTokens = random_int(50, 4000);
-            $outputTokens = random_int(20, 2000);
+            $inputTokens = mt_rand(50, 4000);
+            $outputTokens = mt_rand(20, 2000);
 
             $log = AiUsageLog::create([
                 'user_id' => $user->id,
@@ -321,9 +343,9 @@ class DemoSeeder extends Seeder
                 'output_tokens' => $outputTokens,
                 'cost_usd' => round(($inputTokens * 0.00001) + ($outputTokens * 0.00002), 6),
                 'credits_used' => max(1, round(($inputTokens * 0.001) + ($outputTokens * 0.003), 2)),
-                'response_time_ms' => random_int(750, 9500),
+                'response_time_ms' => mt_rand(750, 9500),
                 // A small share fail so the AI failure-rate chart is not flat-zero.
-                'status' => random_int(1, 22) === 1 ? 'failed' : 'completed',
+                'status' => mt_rand(1, 22) === 1 ? 'failed' : 'completed',
                 'metadata' => ['demo' => true],
             ]);
 
@@ -333,26 +355,26 @@ class DemoSeeder extends Seeder
         $pickUser = fn () => $demoUsers[array_rand($demoUsers)];
 
         // Today — spread across the hours up to now so the hourly chart is full.
-        for ($hour = 0; $hour <= now()->hour; $hour += random_int(1, 2)) {
-            foreach (range(1, random_int(1, 3)) as $ignored) {
-                $createUsage($pickUser(), now()->startOfDay()->addHours($hour)->addMinutes(random_int(0, 59)));
+        for ($hour = 0; $hour <= now()->hour; $hour += mt_rand(1, 2)) {
+            foreach (range(1, mt_rand(1, 3)) as $ignored) {
+                $createUsage($pickUser(), now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
             }
         }
 
         // Last 90 days — a few per day for continuous 7d / 30d / 90d lines.
         for ($day = 1; $day <= 90; $day++) {
-            foreach (range(1, random_int(2, 4)) as $ignored) {
-                $createUsage($pickUser(), now()->subDays($day)->setTime(random_int(6, 22), random_int(0, 59)));
+            foreach (range(1, mt_rand(2, 4)) as $ignored) {
+                $createUsage($pickUser(), now()->subDays($day)->setTime(mt_rand(6, 22), mt_rand(0, 59)));
             }
         }
 
         // Months 4-13 ago — volume per month so the lifetime (monthly) chart is continuous.
         for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            foreach (range(1, random_int(8, 15)) as $ignored) {
+            foreach (range(1, mt_rand(8, 15)) as $ignored) {
                 $createUsage(
                     $pickUser(),
-                    $monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(6, 22), random_int(0, 59))
+                    $monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(6, 22), mt_rand(0, 59))
                 );
             }
         }
@@ -372,8 +394,8 @@ class DemoSeeder extends Seeder
         $createInternalUsage = function ($createdAt) use ($internalUser, $providers, $models, $internalTypes) {
             $provider = $providers[array_rand($providers)];
             $model = $models[$provider][array_rand($models[$provider])];
-            $inputTokens = random_int(200, 6000);
-            $outputTokens = random_int(50, 1500);
+            $inputTokens = mt_rand(200, 6000);
+            $outputTokens = mt_rand(50, 1500);
 
             $log = AiUsageLog::create([
                 'user_id' => $internalUser->id,
@@ -385,7 +407,7 @@ class DemoSeeder extends Seeder
                 'output_tokens' => $outputTokens,
                 'cost_usd' => round(($inputTokens * 0.00001) + ($outputTokens * 0.00002), 6),
                 'credits_used' => 0, // internal AI is exempt from per-user credits
-                'response_time_ms' => random_int(600, 8000),
+                'response_time_ms' => mt_rand(600, 8000),
                 'status' => 'completed',
                 'metadata' => ['demo' => true, 'internal' => true],
             ]);
@@ -393,18 +415,18 @@ class DemoSeeder extends Seeder
             $this->backdate($log, $createdAt);
         };
 
-        for ($hour = 0; $hour <= now()->hour; $hour += random_int(2, 4)) {
-            $createInternalUsage(now()->startOfDay()->addHours($hour)->addMinutes(random_int(0, 59)));
+        for ($hour = 0; $hour <= now()->hour; $hour += mt_rand(2, 4)) {
+            $createInternalUsage(now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
         }
         for ($day = 1; $day <= 90; $day++) {
-            foreach (range(1, random_int(1, 2)) as $ignored) {
-                $createInternalUsage(now()->subDays($day)->setTime(random_int(0, 23), random_int(0, 59)));
+            foreach (range(1, mt_rand(1, 2)) as $ignored) {
+                $createInternalUsage(now()->subDays($day)->setTime(mt_rand(0, 23), mt_rand(0, 59)));
             }
         }
         for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            foreach (range(1, random_int(4, 8)) as $ignored) {
-                $createInternalUsage($monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(0, 23), random_int(0, 59)));
+            foreach (range(1, mt_rand(4, 8)) as $ignored) {
+                $createInternalUsage($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(0, 23), mt_rand(0, 59)));
             }
         }
 
@@ -432,7 +454,7 @@ class DemoSeeder extends Seeder
 
         foreach ($chatTopics as $i => $topic) {
             $user = $demoUsers[array_rand($demoUsers)];
-            $chatStartedAt = now()->subDays(random_int(0, 90));
+            $chatStartedAt = now()->subDays(mt_rand(0, 90));
             $chat = AiChat::create([
                 'user_id' => $user->id,
                 'title' => $topic['title'],
@@ -443,7 +465,7 @@ class DemoSeeder extends Seeder
             $this->backdate($chat, $chatStartedAt);
 
             // Add 4-6 messages per chat
-            $msgCount = random_int(4, 6);
+            $msgCount = mt_rand(4, 6);
             $userMessages = ['Can you help me with this?', 'What would you suggest?',
                 'That sounds great, tell me more.', 'Can you elaborate on that?',
                 'Give me some examples.', 'How do I implement this?'];
@@ -532,7 +554,7 @@ class DemoSeeder extends Seeder
             // Views were seeded but shares never were, so every post rendered its share
             // counter as absent (Blog/Show.vue hides it at zero). Roughly one reader in
             // sixty shares, which keeps the two numbers in a believable ratio.
-            $postViews = random_int(50, 5000);
+            $postViews = mt_rand(50, 5000);
 
             $attributes = [
                 'author_id' => $admin ? $admin->id : 1,
@@ -548,14 +570,14 @@ class DemoSeeder extends Seeder
                 'status' => 'published',
                 'is_featured' => $i < 6,
                 'published_at' => now()->subDays(365 - ($i * 12)),
-                'reading_time' => random_int(3, 15),
+                'reading_time' => mt_rand(3, 15),
                 'views_count' => $postViews,
                 'meta_title' => $title . ' | MakeAI Blog',
                 'meta_description' => 'Learn about ' . strtolower($title) . ' in this comprehensive guide.',
             ];
 
             if ($hasShareCount) {
-                $attributes['share_count'] = (int) round($postViews / random_int(45, 90));
+                $attributes['share_count'] = (int) round($postViews / mt_rand(45, 90));
             }
 
             $post = BlogPost::updateOrCreate(['slug' => Str::slug($title)], $attributes);
@@ -587,7 +609,7 @@ class DemoSeeder extends Seeder
             $user->forceFill([
                 'oauth_provider' => $provider,
                 'oauth_id' => $provider . '-demo-' . $user->id,
-                'created_at' => now()->subDays(random_int(2, 60))->setTime(random_int(8, 20), random_int(0, 59)),
+                'created_at' => now()->subDays(mt_rand(2, 60))->setTime(mt_rand(8, 20), mt_rand(0, 59)),
             ])->save();
         }
 
@@ -598,7 +620,7 @@ class DemoSeeder extends Seeder
             $referrer = $recentOauthUsers[$index % max(1, $recentOauthUsers->count())] ?? $adminUser;
             $user->forceFill([
                 'referred_by' => $referrer?->id,
-                'created_at' => now()->subDays(random_int(3, 28)),
+                'created_at' => now()->subDays(mt_rand(3, 28)),
             ])->save();
         }
 
@@ -615,7 +637,7 @@ class DemoSeeder extends Seeder
         ];
 
         foreach ($paymentRows as $index => $row) {
-            $paidAt = now()->subDays($row['days'])->setTime(random_int(9, 19), random_int(0, 59));
+            $paidAt = now()->subDays($row['days'])->setTime(mt_rand(9, 19), mt_rand(0, 59));
 
             $this->backdate(Payment::updateOrCreate(
                 ['gateway_payment_id' => 'demo-pay-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT)],
@@ -645,7 +667,7 @@ class DemoSeeder extends Seeder
             $type = $revenueTypes[array_rand($revenueTypes)];
             $amount = $type === 'subscription'
                 ? $subscriptionAmounts[array_rand($subscriptionAmounts)]
-                : round(random_int(9, 89) + 0.99, 2);
+                : round(mt_rand(9, 89) + 0.99, 2);
 
             $payment = Payment::updateOrCreate(
                 ['gateway_payment_id' => 'demo-rev-' . str_pad((string) $revSeq, 4, '0', STR_PAD_LEFT)],
@@ -666,19 +688,19 @@ class DemoSeeder extends Seeder
 
         // Today + last 75 days: a sale on ~80% of days (1-2 each) for a continuous daily line.
         for ($day = 0; $day <= 75; $day++) {
-            if ($day > 0 && random_int(1, 10) <= 2) {
+            if ($day > 0 && mt_rand(1, 10) <= 2) {
                 continue; // ~20% quiet days for realism
             }
-            foreach (range(1, random_int(1, 2)) as $ignored) {
-                $makeRevenue(now()->subDays($day)->setTime(random_int(8, 21), random_int(0, 59)));
+            foreach (range(1, mt_rand(1, 2)) as $ignored) {
+                $makeRevenue(now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
         }
 
         // Months 3-13 ago: several sales per month for continuous lifetime revenue.
         for ($monthsAgo = 3; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            foreach (range(1, random_int(4, 9)) as $ignored) {
-                $makeRevenue($monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(8, 21), random_int(0, 59)));
+            foreach (range(1, mt_rand(4, 9)) as $ignored) {
+                $makeRevenue($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
         }
 
@@ -714,12 +736,12 @@ class DemoSeeder extends Seeder
                 default => 'active',
             };
 
-            $createdAt = now()->subDays($daysAgo)->setTime(random_int(8, 20), random_int(0, 59));
+            $createdAt = now()->subDays($daysAgo)->setTime(mt_rand(8, 20), mt_rand(0, 59));
             $periodEnd = $cycle === 'yearly' ? $createdAt->copy()->addYear() : $createdAt->copy()->addMonth();
             $cancelledAt = $status === 'cancelled'
-                ? $createdAt->copy()->addDays(random_int(3, 20))
+                ? $createdAt->copy()->addDays(mt_rand(3, 20))
                 : null;
-            $trialEndsAt = $status === 'trialing' ? now()->addDays(random_int(3, 12)) : null;
+            $trialEndsAt = $status === 'trialing' ? now()->addDays(mt_rand(3, 12)) : null;
 
             $subscription = \App\Models\GatewaySubscription::updateOrCreate(
                 ['gateway_subscription_id' => 'demo-sub-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT)],
@@ -775,13 +797,13 @@ class DemoSeeder extends Seeder
         foreach ($loginUsers as $user) {
             $isOauth = ! empty($user->oauth_provider);
 
-            foreach (range(1, random_int(2, 4)) as $ignored) {
+            foreach (range(1, mt_rand(2, 4)) as $ignored) {
                 $geo = $loginCountries[$countryWeights[array_rand($countryWeights)]];
-                $createdAt = now()->subDays(random_int(0, 89))->setTime(random_int(0, 23), random_int(0, 59));
+                $createdAt = now()->subDays(mt_rand(0, 89))->setTime(mt_rand(0, 23), mt_rand(0, 59));
 
                 $this->backdate(LoginHistory::create([
                     'user_id' => $user->id,
-                    'ip' => '192.168.' . random_int(10, 250) . '.' . random_int(10, 250),
+                    'ip' => '192.168.' . mt_rand(10, 250) . '.' . mt_rand(10, 250),
                     'user_agent' => $isOauth
                         ? 'Mozilla/5.0 Demo OAuth Login'
                         : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) DemoBrowser/1.0',
@@ -902,7 +924,7 @@ class DemoSeeder extends Seeder
                     'closed_at' => $status === 'closed' ? $offset(48) : null,
                     'last_reply_at' => $offset($lastPublic['at']),
                     'last_reply_by' => $lastPublic['author'],
-                    'satisfaction_rating' => $status === 'closed' ? random_int(4, 5) : null,
+                    'satisfaction_rating' => $status === 'closed' ? mt_rand(4, 5) : null,
                     'satisfaction_comment' => $status === 'closed' ? 'Issue was resolved quickly.' : null,
                     'user_last_read_at' => $offset($lastPublic['at'] + 1),
                     'admin_last_read_at' => $lastAdminPublic === null ? null : $offset($lastAdminPublic['at']),
@@ -1064,8 +1086,8 @@ class DemoSeeder extends Seeder
                 // date then clamping: clamping could land the comment before publication.
                 $windowMinutes = max(1, (int) $publishedAt->diffInMinutes(now()));
 
-                foreach (range(1, random_int(2, 6)) as $ignored) {
-                    $createdAt = $publishedAt->copy()->addMinutes(random_int(1, $windowMinutes));
+                foreach (range(1, mt_rand(2, 6)) as $ignored) {
+                    $createdAt = $publishedAt->copy()->addMinutes(mt_rand(1, $windowMinutes));
 
                     // Status first: a row marked spam must READ like spam, otherwise the
                     // moderation queue shows "Great breakdown, thanks!" flagged as
@@ -1075,7 +1097,7 @@ class DemoSeeder extends Seeder
 
                     // Spammers post logged-out; roughly one in seven genuine comments is
                     // also from a visitor.
-                    $isGuest = $isSpam || random_int(1, 7) === 1;
+                    $isGuest = $isSpam || mt_rand(1, 7) === 1;
                     $guest = $isSpam
                         ? $spamAuthors[$guestIndex++ % count($spamAuthors)]
                         : $guestAuthors[$guestIndex++ % count($guestAuthors)];
@@ -1091,13 +1113,13 @@ class DemoSeeder extends Seeder
                             : $topLevelComments[$contentIndex++ % count($topLevelComments)],
                         'status' => $status,
                         // Spam does not organically attract likes.
-                        'likes_count' => $isSpam ? 0 : random_int(0, 24),
+                        'likes_count' => $isSpam ? 0 : mt_rand(0, 24),
                     ]);
 
                     $this->backdate($comment, $createdAt);
 
                     // ~40% of visible comments start a thread.
-                    if ($comment->status !== 'approved' || random_int(1, 10) > 4) {
+                    if ($comment->status !== 'approved' || mt_rand(1, 10) > 4) {
                         continue;
                     }
 
@@ -1105,8 +1127,8 @@ class DemoSeeder extends Seeder
                     // can never predate the comment it answers (capped at ~60h for realism).
                     $replyWindow = max(1, min((int) $createdAt->diffInMinutes(now()), 3600));
 
-                    foreach (range(1, random_int(1, 2)) as $ignored2) {
-                        $replyAt = $createdAt->copy()->addMinutes(random_int(1, $replyWindow));
+                    foreach (range(1, mt_rand(1, 2)) as $ignored2) {
+                        $replyAt = $createdAt->copy()->addMinutes(mt_rand(1, $replyWindow));
 
                         $this->backdate(Comment::create([
                             'commentable_type' => BlogPost::class,
@@ -1115,7 +1137,7 @@ class DemoSeeder extends Seeder
                             'user_id' => $demoUsers[($postIndex + $replyIndex + 5) % count($demoUsers)]->id,
                             'content' => $replyComments[$replyIndex++ % count($replyComments)],
                             'status' => 'approved',
-                            'likes_count' => random_int(0, 12),
+                            'likes_count' => mt_rand(0, 12),
                         ]), $replyAt);
                     }
                 }
@@ -1157,7 +1179,7 @@ class DemoSeeder extends Seeder
         foreach ($reportableComments as $comment) {
             // A comment already flagged as spam drew more complaints than a merely
             // disputed one.
-            $reportCount = $comment->status === 'spam' ? random_int(2, 4) : random_int(1, 3);
+            $reportCount = $comment->status === 'spam' ? mt_rand(2, 4) : mt_rand(1, 3);
 
             // comment_reports is unique on (comment_id, user_id) AND (comment_id, ip_hash),
             // so each reporter for a given comment must be distinct.
@@ -1168,7 +1190,7 @@ class DemoSeeder extends Seeder
             foreach ($reporters as $position => $reporter) {
                 // Land the report inside the comment→now window so it can never predate
                 // the comment it flags (same rule as the comment/reply timestamps above).
-                $reportedAt = $commentAt->copy()->addMinutes(random_int(1, min($window, 10080)));
+                $reportedAt = $commentAt->copy()->addMinutes(mt_rand(1, min($window, 10080)));
 
                 // Roughly every third report comes from a logged-out visitor.
                 $isGuestReport = $position % 3 === 2;
@@ -1202,16 +1224,16 @@ class DemoSeeder extends Seeder
                 continue;
             }
 
-            $landedAt = now()->subDays(random_int(2, 24));
+            $landedAt = now()->subDays(mt_rand(2, 24));
 
             $this->backdate(AffiliateReferral::updateOrCreate(
                 ['referral_code' => $code],
                 [
                     'referrer_id' => $referrer->id,
                     'referred_id' => $referred->id,
-                    'ip_address' => '172.16.' . random_int(10, 250) . '.' . random_int(10, 250),
+                    'ip_address' => '172.16.' . mt_rand(10, 250) . '.' . mt_rand(10, 250),
                     'landed_at' => $landedAt,
-                    'converted_at' => $landedAt->copy()->addHours(random_int(1, 48)),
+                    'converted_at' => $landedAt->copy()->addHours(mt_rand(1, 48)),
                 ]
             ), $landedAt);
         }
@@ -1233,9 +1255,9 @@ class DemoSeeder extends Seeder
             // Funnel must narrow: recipients >= sent >= opened. Independent random
             // ranges let sent_count exceed recipient_count, which reads as broken
             // analytics on the campaign report.
-            $recipientCount = random_int(600, 2000);
-            $sentCount = random_int((int) round($recipientCount * 0.9), $recipientCount);
-            $openedCount = random_int((int) round($sentCount * 0.25), (int) round($sentCount * 0.6));
+            $recipientCount = mt_rand(600, 2000);
+            $sentCount = mt_rand((int) round($recipientCount * 0.9), $recipientCount);
+            $openedCount = mt_rand((int) round($sentCount * 0.25), (int) round($sentCount * 0.6));
 
             DB::table('newsletter_campaigns')->updateOrInsert(
                 ['subject' => $campaign['subject']],
@@ -1384,8 +1406,8 @@ class DemoSeeder extends Seeder
                 'scheduled' => [now()->addDays(5), now()->addDays(35), true],
                 'expired' => [now()->subDays(60), now()->subDays(30), false],
                 // Seeded and in-window, but toggled off so it does not render yet.
-                'paused' => [now()->subDays(random_int(5, 40)), now()->addDays(random_int(20, 90)), false],
-                default => [now()->subDays(random_int(5, 40)), now()->addDays(random_int(20, 90)), true],
+                'paused' => [now()->subDays(mt_rand(5, 40)), now()->addDays(mt_rand(20, 90)), false],
+                default => [now()->subDays(mt_rand(5, 40)), now()->addDays(mt_rand(20, 90)), true],
             };
 
             $imageKey = null;
@@ -1415,8 +1437,8 @@ class DemoSeeder extends Seeder
                     'start_at' => $startAt,
                     'end_at' => $endAt,
                     // A retired campaign keeps its lifetime totals; a scheduled one has none yet.
-                    'impressions' => $state === 'scheduled' ? 0 : random_int(500, 9000),
-                    'clicks' => $state === 'scheduled' ? 0 : random_int(15, 260),
+                    'impressions' => $state === 'scheduled' ? 0 : mt_rand(500, 9000),
+                    'clicks' => $state === 'scheduled' ? 0 : mt_rand(15, 260),
                     'sort_order' => $sortOrder,
                     'created_at' => $createdAt,
                     'updated_at' => $createdAt,
@@ -1549,18 +1571,18 @@ class DemoSeeder extends Seeder
                     // blog_posts and user_collections do — this one does not).
                     'helpful_count' => 0,
                 ]
-            ), now()->subDays(random_int(1, 45))->subHours(random_int(0, 23)));
+            ), now()->subDays(mt_rand(1, 45))->subHours(mt_rand(0, 23)));
 
             // Add some votes to approved reviews
             if ($review->is_approved) {
-                $voteCount = random_int(0, 8);
+                $voteCount = mt_rand(0, 8);
                 $helpfulVotes = 0;
                 for ($v = 0; $v < $voteCount; $v++) {
                     $voter = $demoUsers[($i + $v + 1) % count($demoUsers)];
                     if ($voter->id === $user->id) {
                         continue;
                     }
-                    $isHelpful = (random_int(1, 10) > 2); // 80% helpful, 20% unhelpful
+                    $isHelpful = (mt_rand(1, 10) > 2); // 80% helpful, 20% unhelpful
                     $helpfulVotes += $isHelpful ? 1 : 0;
                     \App\Models\ToolReviewVote::updateOrCreate(
                         ['review_id' => $review->id, 'user_id' => $voter->id],
@@ -1593,8 +1615,8 @@ class DemoSeeder extends Seeder
 
         foreach ($allTools as $position => $tool) {
             $isPopular = $position % 7 === 0;
-            $usage = $isPopular ? random_int(2500, 24000) : random_int(40, 1900);
-            $views = $usage + random_int((int) ($usage * 0.4), (int) ($usage * 2.5)) + random_int(20, 400);
+            $usage = $isPopular ? mt_rand(2500, 24000) : mt_rand(40, 1900);
+            $views = $usage + mt_rand((int) ($usage * 0.4), (int) ($usage * 2.5)) + mt_rand(20, 400);
 
             DB::table('ai_tools')->where('id', $tool->id)->update([
                 'usage_count' => $usage,
@@ -1651,11 +1673,11 @@ class DemoSeeder extends Seeder
         foreach ($allTools as $position => $tool) {
             [$chance, $minReviews, $maxReviews] = $reviewTierFor($toolUsage[$tool->id] ?? 0);
 
-            if (random_int(1, 100) > $chance) {
+            if (mt_rand(1, 100) > $chance) {
                 continue; // this tool draws no reviews
             }
 
-            $reviewCount = random_int($minReviews, $maxReviews);
+            $reviewCount = mt_rand($minReviews, $maxReviews);
             // Distinct reviewers for this tool, offset by position so the sample rotates
             // through the whole user base rather than always hitting the same few.
             $reviewerIds = collect($demoUserIds)
@@ -1665,16 +1687,16 @@ class DemoSeeder extends Seeder
 
             foreach ($reviewerIds as $reviewerIndex => $reviewerId) {
                 $rating = $ratingPool[array_rand($ratingPool)];
-                $createdAt = now()->subDays(random_int(1, 180))->subHours(random_int(0, 23));
+                $createdAt = now()->subDays(mt_rand(1, 180))->subHours(mt_rand(0, 23));
 
                 $this->backdate(\App\Models\ToolReview::updateOrCreate(
                     ['user_id' => $reviewerId, 'tool_slug' => $tool->slug],
                     [
                         // Most reviews are visible; a few sit unapproved in the queue.
-                        'is_approved' => random_int(1, 6) !== 1,
+                        'is_approved' => mt_rand(1, 6) !== 1,
                         'rating' => $rating,
                         'comment' => $reviewBodies[$rating][array_rand($reviewBodies[$rating])],
-                        'helpful_count' => random_int(0, 18),
+                        'helpful_count' => mt_rand(0, 18),
                     ]
                 ), $createdAt);
             }
@@ -1691,7 +1713,7 @@ class DemoSeeder extends Seeder
             }
 
             $isLoved = $position % 11 === 0;
-            $favCount = $isLoved ? random_int(12, 30) : random_int(1, 9);
+            $favCount = $isLoved ? mt_rand(12, 30) : mt_rand(1, 9);
 
             $fans = collect($demoUserIds)->shuffle()->take($favCount)->values();
 
@@ -1758,7 +1780,7 @@ class DemoSeeder extends Seeder
                     'is_read' => $msg['is_read'],
                     'replied_at' => $msg['replied_at'],
                 ]
-            ), now()->subDays(random_int(1, 10))->subHours(random_int(1, 23)));
+            ), now()->subDays(mt_rand(1, 10))->subHours(mt_rand(1, 23)));
         }
 
         // ─── 17. Testimonials ───────────────────────────────────────────
@@ -1888,7 +1910,7 @@ class DemoSeeder extends Seeder
         ];
 
         foreach ($testimonials as $index => $testimonial) {
-            $createdAt = now()->subDays(($index + 1) * 9)->setTime(random_int(9, 18), random_int(0, 59));
+            $createdAt = now()->subDays(($index + 1) * 9)->setTime(mt_rand(9, 18), mt_rand(0, 59));
 
             $this->backdate(\App\Models\Testimonial::updateOrCreate(
                 ['name' => $testimonial['name']],
@@ -2013,20 +2035,20 @@ class DemoSeeder extends Seeder
 
         foreach (range(1, 3) as $ignored) {
             $subscriberDates[] = now()->startOfDay()
-                ->addHours(random_int(8, min(20, max(8, (int) now()->hour))))
-                ->addMinutes(random_int(0, 59));
+                ->addHours(mt_rand(8, min(20, max(8, (int) now()->hour))))
+                ->addMinutes(mt_rand(0, 59));
         }
 
         foreach (range(1, 30) as $ignored) {
-            $subscriberDates[] = now()->subDays(random_int(1, 89))->setTime(random_int(7, 22), random_int(0, 59));
+            $subscriberDates[] = now()->subDays(mt_rand(1, 89))->setTime(mt_rand(7, 22), mt_rand(0, 59));
         }
 
         for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, 3) as $ignored) {
                 $subscriberDates[] = $monthStart->copy()
-                    ->addDays(random_int(0, $monthStart->daysInMonth - 1))
-                    ->setTime(random_int(7, 22), random_int(0, 59));
+                    ->addDays(mt_rand(0, $monthStart->daysInMonth - 1))
+                    ->setTime(mt_rand(7, 22), mt_rand(0, 59));
             }
         }
 
@@ -2074,7 +2096,7 @@ class DemoSeeder extends Seeder
                         : null,
                     'subscribed_at' => $subscribedAt,
                     'unsubscribed_at' => $status === 'unsubscribed'
-                        ? $subscribedAt->copy()->addDays(random_int(5, 90))->min(now())
+                        ? $subscribedAt->copy()->addDays(mt_rand(5, 90))->min(now())
                         : null,
                 ]
             );
@@ -2197,7 +2219,7 @@ class DemoSeeder extends Seeder
         ];
 
         foreach ($announcements as $index => $announcement) {
-            $createdAt = ($announcement['starts_at'] ?? now())->copy()->subDays(2)->setTime(random_int(9, 17), random_int(0, 59));
+            $createdAt = ($announcement['starts_at'] ?? now())->copy()->subDays(2)->setTime(mt_rand(9, 17), mt_rand(0, 59));
 
             $record = Announcement::updateOrCreate(
                 ['title' => $announcement['title']],
@@ -2264,7 +2286,7 @@ class DemoSeeder extends Seeder
         ];
 
         foreach ($smsCampaigns as $campaignIndex => $row) {
-            $startedAt = now()->subDays($row['days'])->setTime(random_int(9, 17), random_int(0, 59));
+            $startedAt = now()->subDays($row['days'])->setTime(mt_rand(9, 17), mt_rand(0, 59));
             $audience = $smsEligible->take((int) round($smsEligible->count() * $row['share']));
 
             $campaign = SmsCampaign::updateOrCreate(
@@ -2279,7 +2301,7 @@ class DemoSeeder extends Seeder
                     'created_by_admin_id' => $announcementAuthorId,
                     // A draft has never run, so it has no start/finish timestamps.
                     'started_at' => $row['status'] === 'draft' ? null : $startedAt,
-                    'finished_at' => $row['status'] === 'sent' ? $startedAt->copy()->addMinutes(random_int(3, 25)) : null,
+                    'finished_at' => $row['status'] === 'sent' ? $startedAt->copy()->addMinutes(mt_rand(3, 25)) : null,
                 ]
             );
 
@@ -2308,7 +2330,7 @@ class DemoSeeder extends Seeder
 
                 $sentAt = $recipientStatus === 'pending'
                     ? null
-                    : $startedAt->copy()->addSeconds($position * random_int(2, 9));
+                    : $startedAt->copy()->addSeconds($position * mt_rand(2, 9));
 
                 $this->backdate(SmsCampaignRecipient::create([
                     'campaign_id' => $campaign->id,
@@ -2349,10 +2371,10 @@ class DemoSeeder extends Seeder
                 ->delete();
 
             foreach ($rows as $index => $row) {
-                $createdAt = now()->subDays($row['days'])->subHours(random_int(0, 20))->subMinutes(random_int(0, 59));
+                $createdAt = now()->subDays($row['days'])->subHours(mt_rand(0, 20))->subMinutes(mt_rand(0, 59));
                 // Older items are already read; the newest few stay unread so the bell shows a count.
                 $isRead = $row['days'] > 2;
-                $readAt = $isRead ? $createdAt->copy()->addHours(random_int(1, 12)) : null;
+                $readAt = $isRead ? $createdAt->copy()->addHours(mt_rand(1, 12)) : null;
 
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(),
@@ -3271,26 +3293,26 @@ class DemoSeeder extends Seeder
             // healthy week-over-week growth rather than a suspiciously flat 0%. Never zero:
             // an empty day punches a hole in the 30-day trends chart.
             $perDay = match (true) {
-                $daysAgo <= 6 => random_int(4, 6),
-                $daysAgo <= 13 => random_int(2, 4),
-                default => random_int(1, 3),
+                $daysAgo <= 6 => mt_rand(4, 6),
+                $daysAgo <= 13 => mt_rand(2, 4),
+                default => mt_rand(1, 3),
             };
 
             for ($n = 0; $n < $perDay; $n++) {
                 $thread = $threads[$threadIndex % count($threads)];
                 $threadIndex++;
 
-                $startedAt = now()->subDays($daysAgo)->setTime(random_int(7, 21), random_int(0, 59));
+                $startedAt = now()->subDays($daysAgo)->setTime(mt_rand(7, 21), mt_rand(0, 59));
 
                 // Today's slots would otherwise land in the evening of a day that has not
                 // happened yet — a chat dated two hours from now.
                 if ($startedAt->isFuture()) {
-                    $startedAt = now()->subMinutes(random_int(5, 180));
+                    $startedAt = now()->subMinutes(mt_rand(5, 180));
                 }
 
                 // Roughly one chat in eight is an anonymous visitor, which is the traffic mix
                 // guest access is switched on for above.
-                $isGuest = $hasSessionColumn && random_int(1, 100) <= 12;
+                $isGuest = $hasSessionColumn && mt_rand(1, 100) <= 12;
                 $owner = $isGuest ? null : $users[$userIndex++ % count($users)];
 
                 $model = $modelPool[array_rand($modelPool)];
@@ -3326,7 +3348,7 @@ class DemoSeeder extends Seeder
                 $lastAnswer = null;
 
                 foreach ($turns as $turnIndex => $turn) {
-                    $askedAt = $startedAt->copy()->addMinutes($turnIndex * random_int(2, 5));
+                    $askedAt = $startedAt->copy()->addMinutes($turnIndex * mt_rand(2, 5));
 
                     // Input grows with the thread because the whole history is re-sent on every
                     // turn — the reason a long chat costs more than the same question asked cold.
@@ -3345,7 +3367,7 @@ class DemoSeeder extends Seeder
                     ]);
                     $question->forceFill(['created_at' => $askedAt])->save();
 
-                    $answeredAt = $askedAt->copy()->addSeconds(random_int(20, 90));
+                    $answeredAt = $askedAt->copy()->addSeconds(mt_rand(20, 90));
 
                     // Usage lives on the assistant row only, the way ChatController writes it.
                     $lastAnswer = ConversationMessage::create([
@@ -3375,13 +3397,13 @@ class DemoSeeder extends Seeder
                 $this->backdate($conversation, $startedAt, $lastMessageAt);
 
                 // Guests cannot rate: chat_message_feedback.user_id is a non-nullable FK.
-                if (! $canRecordFeedback || ! $owner || ! $lastAnswer || random_int(1, 100) > 42) {
+                if (! $canRecordFeedback || ! $owner || ! $lastAnswer || mt_rand(1, 100) > 42) {
                     continue;
                 }
 
                 // ~80% positive, which puts the like/dislike split in a believable band while
                 // still leaving the admin something to read the complaints on.
-                $positive = random_int(1, 100) <= 80;
+                $positive = mt_rand(1, 100) <= 80;
 
                 // The panel shows the ten most recent ratings, so the freshest week always
                 // carries a written comment — an all-blank comment column looks broken.
@@ -3400,7 +3422,7 @@ class DemoSeeder extends Seeder
                     'comment' => $comment,
                 ]);
 
-                $this->backdate($feedback, $lastMessageAt->copy()->addMinutes(random_int(1, 20)));
+                $this->backdate($feedback, $lastMessageAt->copy()->addMinutes(mt_rand(1, 20)));
             }
         }
     }
@@ -3860,7 +3882,7 @@ class DemoSeeder extends Seeder
             // row's own timestamps drive the admin list's "Updated" column.
             $this->backdate(
                 $article,
-                $publishedAt?->copy()->subDays(random_int(1, 4)) ?? now()->subDays($row['days']),
+                $publishedAt?->copy()->subDays(mt_rand(1, 4)) ?? now()->subDays($row['days']),
                 $publishedAt ?? now()->subDays(max(0, $row['days'] - 2))
             );
 
@@ -3923,11 +3945,11 @@ class DemoSeeder extends Seeder
 
                     $castAt = ($article->published_at ?? now()->subDays(30))
                         ->copy()
-                        ->addDays(random_int(0, max(1, (int) $article->published_at?->diffInDays(now()))))
-                        ->setTime(random_int(7, 22), random_int(0, 59));
+                        ->addDays(mt_rand(0, max(1, (int) $article->published_at?->diffInDays(now()))))
+                        ->setTime(mt_rand(7, 22), mt_rand(0, 59));
 
                     if ($castAt->isFuture()) {
-                        $castAt = now()->subHours(random_int(1, 48));
+                        $castAt = now()->subHours(mt_rand(1, 48));
                     }
 
                     $row = KbArticleVote::create([
@@ -3950,7 +3972,7 @@ class DemoSeeder extends Seeder
             $article->forceFill([
                 'helpful_count' => $helpful,
                 'not_helpful_count' => $notHelpful,
-                'views' => (($helpful + $notHelpful) * random_int(9, 26)) + random_int(15, 90),
+                'views' => (($helpful + $notHelpful) * mt_rand(9, 26)) + mt_rand(15, 90),
             ])->save();
         }
     }
@@ -4042,25 +4064,25 @@ class DemoSeeder extends Seeder
             // audience. Today is deliberately well-populated: "Searches Today" is the first
             // number on the screen.
             $perDay = match (true) {
-                $daysAgo === 0 => random_int(11, 16),
-                $daysAgo <= 6 => random_int(13, 20),
-                $daysAgo <= 13 => random_int(8, 13),
-                default => random_int(4, 9),
+                $daysAgo === 0 => mt_rand(11, 16),
+                $daysAgo <= 6 => mt_rand(13, 20),
+                $daysAgo <= 13 => mt_rand(8, 13),
+                default => mt_rand(4, 9),
             };
 
             for ($n = 0; $n < $perDay; $n++) {
                 $pick = $pool[array_rand($pool)];
                 $sessionIndex++;
 
-                $at = now()->subDays($daysAgo)->setTime(random_int(6, 22), random_int(0, 59));
+                $at = now()->subDays($daysAgo)->setTime(mt_rand(6, 22), mt_rand(0, 59));
 
                 if ($at->isFuture()) {
-                    $at = now()->subMinutes(random_int(5, 240));
+                    $at = now()->subMinutes(mt_rand(5, 240));
                 }
 
                 // A handful of articles come back per hit, and the answer cites the top few.
                 $hits = $pick['answered']
-                    ? (array) array_rand(array_flip($articleIds), min(count($articleIds), random_int(2, 4)))
+                    ? (array) array_rand(array_flip($articleIds), min(count($articleIds), mt_rand(2, 4)))
                     : [];
 
                 $user = ($users !== [] && $sessionIndex % 4 === 0)
@@ -4489,7 +4511,7 @@ class DemoSeeder extends Seeder
                 'created_by' => $adminId,
             ]);
 
-            $this->backdate($batch, $createdAt, $createdAt->copy()->addMinutes(random_int(1, 6)));
+            $this->backdate($batch, $createdAt, $createdAt->copy()->addMinutes(mt_rand(1, 6)));
 
             if ($plan['status'] !== 'completed') {
                 continue;
@@ -5223,7 +5245,7 @@ class DemoSeeder extends Seeder
             $at = now()->subDays($row['days'])->setTime($row['hour'], ($row['days'] * 13) % 60);
 
             if ($at->isFuture()) {
-                $at = now()->subMinutes(random_int(15, 180));
+                $at = now()->subMinutes(mt_rand(15, 180));
             }
 
             $parent = isset($row['parent']) ? ($created[$row['parent']] ?? null) : null;
@@ -5246,7 +5268,7 @@ class DemoSeeder extends Seeder
                     'credits_charged' => $row['credits'],
                     'billing_mode' => $row['billing'],
                     'started_at' => $at,
-                    'completed_at' => $at->copy()->addSeconds($row['seconds'] ?? random_int(4, 40)),
+                    'completed_at' => $at->copy()->addSeconds($row['seconds'] ?? mt_rand(4, 40)),
                 ]);
 
                 $this->backdate($job, $at, $job->completed_at);
@@ -5774,25 +5796,25 @@ class DemoSeeder extends Seeder
         // head, which reads as an install being adopted rather than one switched on today.
         for ($daysAgo = 89; $daysAgo >= 0; $daysAgo--) {
             $perDay = match (true) {
-                $daysAgo <= 6 => random_int(7, 12),
-                $daysAgo <= 13 => random_int(4, 8),
-                $daysAgo <= 29 => random_int(2, 5),
-                $daysAgo <= 59 => random_int(2, 4),
-                default => random_int(1, 2),
+                $daysAgo <= 6 => mt_rand(7, 12),
+                $daysAgo <= 13 => mt_rand(4, 8),
+                $daysAgo <= 29 => mt_rand(2, 5),
+                $daysAgo <= 59 => mt_rand(2, 4),
+                default => mt_rand(1, 2),
             };
 
             for ($n = 0; $n < $perDay; $n++) {
                 [$operation, $tier, $engine, $model, $billing, $credits] = $pool[array_rand($pool)];
                 $index++;
 
-                $at = now()->subDays($daysAgo)->setTime(random_int(7, 22), random_int(0, 59));
+                $at = now()->subDays($daysAgo)->setTime(mt_rand(7, 22), mt_rand(0, 59));
 
                 if ($at->isFuture()) {
-                    $at = now()->subMinutes(random_int(5, 240));
+                    $at = now()->subMinutes(mt_rand(5, 240));
                 }
 
                 // Around one paid job in fifteen fails; the credits come straight back.
-                $failed = $tier !== 'local' && random_int(1, 15) === 1;
+                $failed = $tier !== 'local' && mt_rand(1, 15) === 1;
                 $user = $users[$index % count($users)];
 
                 $job = AipJob::create([
@@ -5802,13 +5824,13 @@ class DemoSeeder extends Seeder
                     'status' => $failed ? AipJob::STATUS_FAILED : AipJob::STATUS_COMPLETED,
                     'engine' => $engine,
                     'model' => $model,
-                    'batch_size' => $tier === 'generate' ? random_int(1, 4) : 1,
+                    'batch_size' => $tier === 'generate' ? mt_rand(1, 4) : 1,
                     'credits_charged' => $credits,
                     'billing_mode' => $billing,
                     'refunded' => $failed,
                     'error_message' => $failed ? $failures[array_rand($failures)] : null,
                     'started_at' => $at,
-                    'completed_at' => $at->copy()->addSeconds(random_int(2, 90)),
+                    'completed_at' => $at->copy()->addSeconds(mt_rand(2, 90)),
                 ]);
 
                 $this->backdate($job, $at, $job->completed_at);
@@ -5833,7 +5855,7 @@ class DemoSeeder extends Seeder
                     'bytes' => Storage::disk('public')->size($art),
                     'model' => $model,
                     'provider' => $engine === 'gd' ? null : $engine,
-                    'is_favorite' => random_int(1, 9) === 1,
+                    'is_favorite' => mt_rand(1, 9) === 1,
                 ]);
 
                 $this->backdate($asset, $at, $at);
@@ -6416,25 +6438,25 @@ class DemoSeeder extends Seeder
         // Today, every couple of hours, plus one inside the current hour so the 1D
         // chart's "is_current" bucket is never the empty one.
         for ($hour = 0; $hour <= now()->hour; $hour += 2) {
-            $clickTimes->push(now()->startOfDay()->addHours($hour)->addMinutes(random_int(0, 59)));
+            $clickTimes->push(now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
         }
         // Anchored to the start of the current hour, not now()->subMinutes(...) — subtracting
         // minutes falls into the previous hour early in the hour, which is exactly the bucket
         // the 1D chart highlights as current.
-        $clickTimes->push(now()->startOfHour()->addMinutes(random_int(0, (int) now()->minute)));
+        $clickTimes->push(now()->startOfHour()->addMinutes(mt_rand(0, (int) now()->minute)));
 
         // The rest of the month, day by day.
         for ($day = 1; $day <= 29; $day++) {
-            foreach (range(1, random_int(1, 3)) as $ignored) {
-                $clickTimes->push(now()->subDays($day)->setTime(random_int(7, 22), random_int(0, 59)));
+            foreach (range(1, mt_rand(1, 3)) as $ignored) {
+                $clickTimes->push(now()->subDays($day)->setTime(mt_rand(7, 22), mt_rand(0, 59)));
             }
         }
 
         // Months 2-11 back — the 30-day loop already covers this month and last.
         for ($monthsAgo = 2; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            foreach (range(1, random_int(4, 8)) as $ignored) {
-                $clickTimes->push($monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(7, 22), random_int(0, 59)));
+            foreach (range(1, mt_rand(4, 8)) as $ignored) {
+                $clickTimes->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(7, 22), mt_rand(0, 59)));
             }
         }
 
@@ -6445,7 +6467,7 @@ class DemoSeeder extends Seeder
                 'referrer_id' => $user->id,
                 'referred_id' => null,
                 'referral_code' => $user->referral_code,
-                'ip_address' => '198.51.100.' . random_int(30, 250),
+                'ip_address' => '198.51.100.' . mt_rand(30, 250),
                 'landed_at' => $landedAt,
                 'converted_at' => null,
             ])->forceFill(['created_at' => $landedAt, 'updated_at' => $landedAt])->save();
@@ -6454,13 +6476,13 @@ class DemoSeeder extends Seeder
         // ── Registrations + conversions ─────────────────────────────────────────
         // One today, one on each of the last six days, then thinning out across the rest
         // of the month and one a month for the rest of the year.
-        $signupTimes = collect([now()->subHours(random_int(3, 6))])
-            ->merge(collect(range(1, 6))->map(fn (int $day) => now()->subDays($day)->setTime(random_int(8, 21), random_int(0, 59))))
-            ->merge(collect([8, 11, 14, 17, 20, 23, 26, 29])->map(fn (int $day) => now()->subDays($day)->setTime(random_int(8, 21), random_int(0, 59))));
+        $signupTimes = collect([now()->subHours(mt_rand(3, 6))])
+            ->merge(collect(range(1, 6))->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))))
+            ->merge(collect([8, 11, 14, 17, 20, 23, 26, 29])->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))));
 
         for ($monthsAgo = 2; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            $signupTimes->push($monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(8, 21), random_int(0, 59)));
+            $signupTimes->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
         }
 
         $referredNames = ['Amara Cole', 'Brett Okafor', 'Cleo Ramirez', 'Dario Fenn', 'Elin Novak',
@@ -6471,7 +6493,7 @@ class DemoSeeder extends Seeder
 
         foreach ($signupTimes->values() as $index => $signupAt) {
             $name = $referredNames[$index % count($referredNames)];
-            $landedAt = $signupAt->copy()->subMinutes(random_int(20, 90));
+            $landedAt = $signupAt->copy()->subMinutes(mt_rand(20, 90));
             $convertedAt = $signupAt->copy();
 
             $referredUser = User::updateOrCreate(
@@ -6479,10 +6501,10 @@ class DemoSeeder extends Seeder
                 [
                     'name' => $name,
                     'password' => $password,
-                    'credits' => random_int(40, 900),
+                    'credits' => mt_rand(40, 900),
                     'plan_id' => $plan?->id,
                     'subscription_status' => $plan ? 'active' : 'none',
-                    'subscription_ends_at' => $plan ? now()->addMonths(random_int(1, 11)) : null,
+                    'subscription_ends_at' => $plan ? now()->addMonths(mt_rand(1, 11)) : null,
                     'referred_by' => $user->id,
                     'avatar' => $this->demoAvatar($name, 'avatars/demo-referred-' . ($index + 1) . '.svg'),
                     'is_active' => true,
@@ -6499,12 +6521,12 @@ class DemoSeeder extends Seeder
                 'referrer_id' => $user->id,
                 'referred_id' => $referredUser->id,
                 'referral_code' => $user->referral_code,
-                'ip_address' => '198.51.100.' . random_int(30, 250),
+                'ip_address' => '198.51.100.' . mt_rand(30, 250),
                 'landed_at' => $landedAt,
                 'converted_at' => $convertedAt,
             ])->forceFill(['created_at' => $landedAt, 'updated_at' => $landedAt])->save();
 
-            $orderAmount = round(random_int(39, 299) + 0.99, 2);
+            $orderAmount = round(mt_rand(39, 299) + 0.99, 2);
             $payment = Payment::updateOrCreate(
                 ['gateway_payment_id' => 'demo-aff-tl-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT)],
                 [
@@ -6546,7 +6568,7 @@ class DemoSeeder extends Seeder
                 'status' => $status,
                 // Only approved/paid were ever approved; rejected and cancelled never were.
                 'approved_at' => in_array($status, ['approved', 'paid'], true) ? $convertedAt->copy()->addHours(2) : null,
-                'paid_at' => $status === 'paid' ? $convertedAt->copy()->addDays(random_int(15, 25)) : null,
+                'paid_at' => $status === 'paid' ? $convertedAt->copy()->addDays(mt_rand(15, 25)) : null,
             ])->forceFill(['created_at' => $convertedAt, 'updated_at' => $convertedAt])->save();
         }
     }
@@ -6650,7 +6672,7 @@ class DemoSeeder extends Seeder
         // occasional trip.
         $sessions = collect([$user->last_login_at ?? now()->subMinutes(18)])
             ->merge(collect([1, 2, 3, 5, 8, 12, 17, 23, 31, 44, 60, 82])
-                ->map(fn (int $daysAgo) => now()->subDays($daysAgo)->setTime(random_int(8, 21), random_int(0, 59))));
+                ->map(fn (int $daysAgo) => now()->subDays($daysAgo)->setTime(mt_rand(8, 21), mt_rand(0, 59))));
 
         foreach ($sessions as $index => $signedInAt) {
             // The most recent sign-in must agree with the profile's last_login_ip.
@@ -6781,7 +6803,7 @@ class DemoSeeder extends Seeder
 
             // A "today" slot scheduled for later this evening would be dated in the future.
             if ($startedAt->isFuture()) {
-                $startedAt = now()->subMinutes(random_int(10, 120));
+                $startedAt = now()->subMinutes(mt_rand(10, 120));
             }
 
             $model = $thread['model'];
@@ -6831,7 +6853,7 @@ class DemoSeeder extends Seeder
             $messages = [];
 
             foreach ($turns as $turnIndex => $turn) {
-                $askedAt = $startedAt->copy()->addMinutes($turnIndex * random_int(3, 7));
+                $askedAt = $startedAt->copy()->addMinutes($turnIndex * mt_rand(3, 7));
 
                 // Input grows with the thread: the whole history is re-sent every turn.
                 $inputTokens = (int) ceil(mb_strlen($turn['q']) / 4) + 90 + ($turnIndex * 260);
@@ -6850,7 +6872,7 @@ class DemoSeeder extends Seeder
                 $question->forceFill(['created_at' => $askedAt])->save();
                 $messages[] = $question;
 
-                $answeredAt = $askedAt->copy()->addSeconds(random_int(25, 95));
+                $answeredAt = $askedAt->copy()->addSeconds(mt_rand(25, 95));
 
                 // Usage sits on the assistant row only, the way ChatController writes it —
                 // which is also what the per-message token/credit line reads.
@@ -6880,7 +6902,7 @@ class DemoSeeder extends Seeder
                         'comment' => $turn['comment'] ?? null,
                     ]);
 
-                    $this->backdate($feedback, $answeredAt->copy()->addMinutes(random_int(1, 9)));
+                    $this->backdate($feedback, $answeredAt->copy()->addMinutes(mt_rand(1, 9)));
                 }
             }
 
@@ -7376,28 +7398,28 @@ class DemoSeeder extends Seeder
         // Today, a few hours apart, plus one inside the current hour so the 1D chart's
         // current bucket is never the empty one.
         for ($hour = 8; $hour <= now()->hour; $hour += 2) {
-            foreach (range(1, random_int(1, 2)) as $ignored) {
-                $moments->push(now()->startOfDay()->addHours($hour)->addMinutes(random_int(0, 59)));
+            foreach (range(1, mt_rand(1, 2)) as $ignored) {
+                $moments->push(now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
             }
         }
-        $moments->push(now()->startOfHour()->addMinutes(random_int(0, (int) now()->minute)));
+        $moments->push(now()->startOfHour()->addMinutes(mt_rand(0, (int) now()->minute)));
 
         // Every day back to 90, which is the widest daily range anything asks for (the user
         // dashboard's own credit chart offers 7d / this month / 90d). Volume tapers with age
         // so the account reads as one that has been getting busier.
         for ($day = 1; $day <= 89; $day++) {
-            $perDay = $day <= 29 ? random_int(2, 5) : random_int(1, 3);
+            $perDay = $day <= 29 ? mt_rand(2, 5) : mt_rand(1, 3);
 
             foreach (range(1, $perDay) as $ignored) {
-                $moments->push(now()->subDays($day)->setTime(random_int(8, 21), random_int(0, 59)));
+                $moments->push(now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
         }
 
         // Months 3-11 back — the 90-day loop already covers everything nearer than that.
         for ($monthsAgo = 3; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
-            foreach (range(1, random_int(6, 12)) as $ignored) {
-                $moments->push($monthStart->copy()->addDays(random_int(0, $monthStart->daysInMonth - 1))->setTime(random_int(8, 21), random_int(0, 59)));
+            foreach (range(1, mt_rand(6, 12)) as $ignored) {
+                $moments->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
         }
 
@@ -7417,11 +7439,11 @@ class DemoSeeder extends Seeder
         foreach ($moments as $index => $createdAt) {
             $engine = $engines[$index % count($engines)];
             $toolSlug = $weightedSlugs[array_rand($weightedSlugs)];
-            $inputTokens = random_int(320, 2600);
-            $outputTokens = random_int(180, 1500);
+            $inputTokens = mt_rand(320, 2600);
+            $outputTokens = mt_rand(180, 1500);
             // Kept small enough that a year of generations stays plausible against the
             // credit ledger seeded in seedShowcaseCreditTimeline().
-            $credits = random_int(8, 45);
+            $credits = mt_rand(8, 45);
 
             $this->backdate(AiUsageLog::create([
                 'user_id' => $user->id,
@@ -7433,10 +7455,10 @@ class DemoSeeder extends Seeder
                 'output_tokens' => $outputTokens,
                 'cost_usd' => round(($inputTokens * 0.00001) + ($outputTokens * 0.00002), 6),
                 'credits_used' => $credits,
-                'response_time_ms' => random_int(900, 6500),
+                'response_time_ms' => mt_rand(900, 6500),
                 // One in ~25 fails, so the account has a realistic error or two rather than a
                 // spotless record.
-                'status' => random_int(1, 25) === 1 ? 'failed' : 'completed',
+                'status' => mt_rand(1, 25) === 1 ? 'failed' : 'completed',
                 'metadata' => ['demo_showcase' => true],
             ]), $createdAt);
 
@@ -7720,7 +7742,7 @@ class DemoSeeder extends Seeder
             }
 
             $startedAt = now()->subHours($row['hours']);
-            $completedAt = $startedAt->copy()->addSeconds(random_int(25, 90));
+            $completedAt = $startedAt->copy()->addSeconds(mt_rand(25, 90));
 
             // Fill each step record with the tool it actually ran, straight off the chain.
             $stepOutputs = [];

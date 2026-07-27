@@ -63,6 +63,25 @@ class DashboardController extends Controller
         return $data;
     }
 
+    /**
+     * Start of the "30d" chart bucket.
+     *
+     * A real install gets month-to-date, which is what the finance-facing cards are
+     * understood to mean — changing that would silently restate live revenue figures.
+     *
+     * The demo gets a true rolling 30 days. Month-to-date collapses to a single bar on the
+     * 1st and stays visibly thin for the first week of every month, so the showcase looked
+     * broken on those dates no matter how good the seeded data was — the one thing a demo
+     * cannot afford, since a buyer cannot tell "start of the month" from "this product has
+     * no data". Guarded by config('demo.enabled').
+     */
+    private function thirtyDayStart(\Illuminate\Support\Carbon $now): \Illuminate\Support\Carbon
+    {
+        return config('demo.enabled')
+            ? $now->copy()->subDays(29)->startOfDay()
+            : $now->copy()->startOfMonth();
+    }
+
     private function buildDashboardData(string $period): array
     {
         $now = now();
@@ -82,13 +101,16 @@ class DashboardController extends Controller
         $cardComparisonPeriods = [
             'today' => 1,
             '7d' => 7,
-            '30d' => $now->daysInMonth,
+            '30d' => config('demo.enabled') ? 30 : $now->daysInMonth,
             '90d' => 90,
         ];
 
         $cardComparisons = [];
         foreach ($cardComparisonPeriods as $period => $days) {
-            if ($period === '30d') {
+            // In demo mode the 30d series is a rolling window (see thirtyDayStart), so the
+            // comparison has to roll with it or the card's trend would describe a different
+            // period than the chart above it.
+            if ($period === '30d' && ! config('demo.enabled')) {
                 // The 30d card value sums a month-to-date series (startOfMonth → now),
                 // so its trend must compare month-to-date against the SAME elapsed slice
                 // of last month — not a rolling 30-day window.
@@ -874,7 +896,7 @@ class DashboardController extends Controller
         $ranges = [
             'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
             '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
-            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $this->thirtyDayStart($now), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
@@ -974,7 +996,7 @@ class DashboardController extends Controller
         $ranges = [
             'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
             '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
-            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $this->thirtyDayStart($now), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
@@ -1045,7 +1067,7 @@ class DashboardController extends Controller
         $ranges = [
             'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
             '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
-            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $this->thirtyDayStart($now), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
@@ -1121,7 +1143,7 @@ class DashboardController extends Controller
         $ranges = [
             'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
             '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
-            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $this->thirtyDayStart($now), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
@@ -1223,7 +1245,7 @@ class DashboardController extends Controller
         $ranges = [
             'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
             '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
-            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $this->thirtyDayStart($now), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
             'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];

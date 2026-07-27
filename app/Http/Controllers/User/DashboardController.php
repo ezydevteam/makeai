@@ -74,11 +74,14 @@ class DashboardController extends Controller
 
     private function usageChart(User $user, string $period = '7d'): array
     {
+        // Month-to-date on a real account, so "this month" means what the user expects.
+        // In demo mode it becomes a rolling 30 days: on the 1st, month-to-date renders a
+        // single bar, and a one-bar chart reads as a broken product rather than a new month.
         $days = ($period === 'month')
-            ? max(1, (int) now()->day)
+            ? (config('demo.enabled') ? 30 : max(1, (int) now()->day))
             : ($period === '90d' ? 90 : 7);
 
-        return collect(range($days - 1, 0))->map(function ($daysAgo) use ($user) {
+        $points = collect(range($days - 1, 0))->map(function ($daysAgo) use ($user) {
             $date = now()->subDays($daysAgo)->toDateString();
 
             return [
@@ -89,6 +92,37 @@ class DashboardController extends Controller
                     ->sum(DB::raw('ABS(amount)')),
             ];
         })->values()->all();
+
+        if (config('demo.enabled') && ! collect($points)->contains(fn (array $p) => $p['credits'] > 0.0)) {
+            $points = $this->demoFillUsage($points, $user->id.$period);
+        }
+
+        return $points;
+    }
+
+    /**
+     * Demo-only floor for the usage chart — the user-side twin of the admin dashboard's
+     * applyDemoDashboardFloor.
+     *
+     * The seeded demo account has usage history, but a run of quiet days (or the hours
+     * between midnight and the next demo:reset) still empties the visible window, and the
+     * chart then renders as a flat line that reads as "this product does nothing". Only
+     * replaces an entirely empty series, so genuine seeded usage is never overwritten.
+     *
+     * Deterministic on the seed key, so it survives the page being reloaded or re-cached
+     * without the numbers dancing — the whole point of the demo being reproducible.
+     */
+    private function demoFillUsage(array $points, string $seedKey): array
+    {
+        $seed = crc32($seedKey);
+        $n = max(1, count($points));
+
+        foreach ($points as $i => $point) {
+            $wave = 7 + 5 * sin(($i / $n) * 6.2832 + ($seed % 7));
+            $points[$i]['credits'] = round(max(1.0, $wave + ($seed % 4)), 2);
+        }
+
+        return $points;
     }
 
     private function recentTransactions(User $user): array
