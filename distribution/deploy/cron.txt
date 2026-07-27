@@ -1,8 +1,12 @@
 MakeAI — Scheduled Tasks (cron)
 ================================
 
-MakeAI needs ONE cron entry. It drives scheduled reports, subscription renewals,
-usage resets, cleanup jobs and queued email.
+MakeAI needs TWO cron entries on shared hosting: the scheduler (below) and a queue
+worker (further down). The scheduler drives scheduled reports, subscription renewals,
+usage resets and cleanup jobs. The queue worker delivers everything the app defers —
+sign-in OTP emails, all other email, generation history, media and webhooks.
+
+Both are required. Setting up only the scheduler leaves OTP emails undelivered.
 
 SHARED HOSTING (cPanel > Cron Jobs)
 -----------------------------------
@@ -23,12 +27,41 @@ Run `crontab -e` as the web server user (usually www-data) and add:
 
     * * * * * cd /var/www/your-site/core && php artisan schedule:run >> /dev/null 2>&1
 
-QUEUE WORKER (recommended)
---------------------------
-Without a queue worker, AI generation and email run inside the web request and
-feel slow. On a VPS, use the supervisor config shipped alongside this file.
+QUEUE WORKER (REQUIRED unless QUEUE_CONNECTION=sync)
+----------------------------------------------------
+What happens without one depends on QUEUE_CONNECTION in your .env:
+
+  sync                  Jobs run inside the web request. Nothing is lost, but pages
+                        that send email or record history feel slow, and a failing
+                        job can surface as an error on an otherwise successful action.
+  database / redis      Jobs are stored and NEVER run. This is silent: generation
+                        succeeds, the page looks fine, and the OTP email simply never
+                        arrives. Do not skip this entry on these drivers.
+
+On a VPS, use the supervisor config shipped alongside this file.
 
 On shared hosting, supervisor is usually unavailable — add a second cron entry
-instead, which processes the queue for 55 seconds each minute:
+instead, which processes the queues for 55 seconds each minute:
 
-    * * * * * /usr/local/bin/php /home/USERNAME/public_html/core/artisan queue:work --stop-when-empty --max-time=55 >/dev/null 2>&1
+    * * * * * /usr/local/bin/php /home/USERNAME/public_html/core/artisan queue:work --queue=otp,emails,mail,default,webhooks,ai,media,embeddings,social,low --stop-when-empty --max-time=55 >/dev/null 2>&1
+
+The --queue list is NOT optional and its order is the priority order. `queue:work`
+with no --queue processes ONLY the queue named "default", and MakeAI dispatches to
+ten named queues — so omitting it leaves nine of them, including otp and emails,
+permanently unprocessed while everything appears to work.
+
+Keep this list in step with config/horizon.php: every queue named there must appear
+here too, or that feature is silently dead on shared hosting.
+
+CHECKING IT WORKS
+-----------------
+The scheduler reports itself in the admin panel under System > Cron Jobs.
+
+The queue worker has no such indicator, so check it directly — after using a feature
+that sends email or generates text:
+
+    cd /home/USERNAME/public_html/core
+    php artisan queue:work --queue=ai --stop-when-empty --max-time=30
+
+If work is processed when you run that by hand, the application is fine and the cron
+entry above is what is missing or wrong.
