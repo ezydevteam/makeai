@@ -63,7 +63,7 @@ const submitProof = () => {
                     <p class="text-sm font-bold uppercase tracking-widest text-primary-600">{{ t('Manual Payment') }}</p>
                     <h1 class="mt-2 text-3xl font-black text-gray-900">{{ t('Bank transfer details') }}</h1>
                 </div>
-                <Link href="/pricing" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600">
+                <Link href="/pricing" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600">
                     {{ t('Back to pricing') }}
                 </Link>
             </div>
@@ -71,7 +71,7 @@ const submitProof = () => {
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <h2 class="mb-4 text-lg font-black text-gray-900">{{ t('Payment instructions') }}</h2>
-                    <div class="whitespace-pre-line rounded-xl border border-primary-100 bg-primary-50 p-5 text-sm font-medium leading-7 text-gray-700">
+                    <div class="whitespace-pre-line rounded-xl border border-primary-100 bg-primary-50 p-5 text-sm font-medium leading-7 text-gray-700 dark:border-primary-900/40 dark:bg-primary-900/30">
                         {{ instructions || t('Bank transfer instructions are not configured yet. Please contact support before sending payment.') }}
                     </div>
 
@@ -84,7 +84,7 @@ const submitProof = () => {
 
                         <label class="block">
                             <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Upload payment proof') }}</span>
-                            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-primary-700" @change="onFileChange" />
+                            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-400 dark:file:border-primary-900/40" @change="onFileChange" />
                             <p class="mt-1 text-xs font-medium text-gray-400">{{ fileName || t('JPG, PNG, WebP, or PDF up to 5 MB') }}</p>
                             <p v-if="form.errors.proof" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.proof }}</p>
                         </label>
@@ -133,12 +133,12 @@ const submitProof = () => {
                             <span class="text-right font-mono text-xs font-bold text-gray-900">{{ payment.ulid }}</span>
                         </div>
                     </div>
-                    <div class="my-5 border-t border-gray-100"></div>
+                    <div class="my-5 border-t border-gray-100 dark:border-gray-800"></div>
                     <div class="flex items-end justify-between gap-4">
                         <span class="text-sm font-bold text-gray-500">{{ t('Payment total') }}</span>
                         <span class="text-3xl font-black text-gray-900">{{ payment.formatted_amount }}</span>
                     </div>
-                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
                         {{ t('Your plan will be activated after admin verifies this payment.') }}
                     </p>
                 </aside>

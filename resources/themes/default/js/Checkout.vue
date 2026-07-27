@@ -238,42 +238,42 @@ const applyCoupon = async () => {
             <div class="mx-auto max-w-7xl px-4 sm:px-6">
             <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h1 class="mt-2 text-3xl font-black text-gray-900">{{ t('Complete your payment') }}</h1>
+                    <h1 class="mt-2 text-3xl font-black text-gray-900 dark:text-white">{{ t('Complete your payment') }}</h1>
                 </div>
-                <Link href="/pricing" class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600">
+                <Link href="/pricing" class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-500/40 dark:hover:text-primary-400">
                     {{ t('Back to pricing') }}
                 </Link>
             </div>
 
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
+                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-surface-800">
                         <div>
-                            <h2 class="text-2xl font-black text-gray-900">{{ plan.name }}</h2>
-                            <p v-if="plan.description" class="mt-1 text-sm font-medium text-gray-500">{{ plan.description }}</p>
+                            <h2 class="text-2xl font-black text-gray-900 dark:text-white">{{ plan.name }}</h2>
+                            <p v-if="plan.description" class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ plan.description }}</p>
                         </div>
-                        <span class="rounded-full bg-primary-50 px-4 py-2 text-sm font-bold text-primary-700 dark:!bg-primary-900/20">{{ billingLabel }}</span>
+                        <span class="rounded-full bg-primary-50 px-4 py-2 text-sm font-bold text-primary-700 dark:!bg-primary-900/20 dark:text-primary-300">{{ billingLabel }}</span>
                     </div>
 
                     <div class="mb-6">
-                        <h3 class="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">{{ t('Payment method') }}</h3>
+                        <h3 class="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Payment method') }}</h3>
                         <div v-if="gateways.length" class="grid gap-3 md:grid-cols-2">
                             <button
                                 v-for="gateway in gateways"
                                 :key="gateway.id"
                                 type="button"
                                 @click="selectedGatewaySlug = gateway.slug"
-                                :class="selectedGatewaySlug === gateway.slug ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-700 hover:border-primary-200 hover:bg-gray-50'"
+                                :class="selectedGatewaySlug === gateway.slug ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-500/40 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 text-gray-700 hover:border-primary-200 hover:bg-gray-50 dark:border-surface-800 dark:text-gray-300 dark:hover:border-primary-500/30 dark:hover:bg-surface-800'"
                                 class="rounded-xl border p-4 text-left transition"
                             >
                                 <span class="flex items-center justify-between gap-3">
                                     <span class="text-base font-black">{{ gateway.name }}</span>
-                                    <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                                    <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                         {{ t('Test') }}
                                     </span>
                                 </span>
-                                <span v-if="gateway.description" class="mt-1 block text-sm font-medium text-gray-500">{{ gateway.description }}</span>
-                                <span v-if="gateway.fee_amount > 0" class="mt-3 block text-xs font-semibold text-gray-500">
+                                <span v-if="gateway.description" class="mt-1 block text-sm font-medium text-gray-500 dark:text-gray-400">{{ gateway.description }}</span>
+                                <span v-if="gateway.fee_amount > 0" class="mt-3 block text-xs font-semibold text-gray-500 dark:text-gray-400">
                                     {{ t('Processing fee') }}: {{ gateway.fee_formatted }}
                                 </span>
                             </button>
@@ -283,76 +283,76 @@ const applyCoupon = async () => {
                         </div>
                     </div>
 
-                    <ul v-if="featureList.length" class="grid gap-3 border-t border-gray-100 pt-6 md:grid-cols-2">
-                        <li v-for="feature in featureList" :key="feature" class="flex items-start gap-3 text-sm font-medium text-gray-600">
+                    <ul v-if="featureList.length" class="grid gap-3 border-t border-gray-100 pt-6 md:grid-cols-2 dark:border-surface-800">
+                        <li v-for="feature in featureList" :key="feature" class="flex items-start gap-3 text-sm font-medium text-gray-600 dark:text-gray-300">
                             <svg class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                             {{ feature }}
                         </li>
                     </ul>
                 </section>
 
-                <aside class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 class="mb-5 text-lg font-black text-gray-900">{{ t('Order summary') }}</h2>
+                <aside class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <h2 class="mb-5 text-lg font-black text-gray-900 dark:text-white">{{ t('Order summary') }}</h2>
 
-                    <div class="space-y-4 text-sm font-medium text-gray-600">
+                    <div class="space-y-4 text-sm font-medium text-gray-600 dark:text-gray-300">
                         <div class="flex justify-between gap-4">
                             <span>{{ t('Plan') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ plan.name }}</span>
+                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ plan.name }}</span>
                         </div>
                         <div class="flex justify-between gap-4">
                             <span>{{ t('Billing') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ billingLabel }}</span>
+                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ billingLabel }}</span>
                         </div>
                         <div class="flex justify-between gap-4">
                             <span>{{ t('Plan price') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ pricing.cycle.subtotal_formatted }}</span>
+                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ pricing.cycle.subtotal_formatted }}</span>
                         </div>
                         <div v-if="couponsEnabled" class="block">
-                            <button v-if="!showCouponInput" type="button" class="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline transition" @click="showCouponInput = true">
+                            <button v-if="!showCouponInput" type="button" class="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline transition dark:text-primary-400 dark:hover:text-primary-300" @click="showCouponInput = true">
                                 {{ t('Have coupon? Apply it') }}
                             </button>
                             <label v-else class="block">
-                                <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Coupon code') }}</span>
+                                <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Coupon code') }}</span>
                                 <div class="flex gap-2">
-                                    <input v-model="coupon" type="text" class="min-w-0 flex-1 !rounded-lg border border-gray-200 px-3 py-1.5 text-xs uppercase focus:border-primary-400 focus:ring-primary-100" :placeholder="t('Optional')" @input="couponPreview = null; couponError = ''" />
+                                    <input v-model="coupon" type="text" class="min-w-0 flex-1 !rounded-lg border border-gray-200 px-3 py-1.5 text-xs uppercase focus:border-primary-400 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-500/50 dark:focus:ring-primary-900/30" :placeholder="t('Optional')" @input="couponPreview = null; couponError = ''" />
                                     <button type="button" :disabled="applyingCoupon" class="rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-bold text-white dark:bg-gray-800/80 transition disabled:opacity-60" @click="applyCoupon">
                                         {{ applyingCoupon ? t('Applying...') : t('Apply') }}
                                     </button>
                                 </div>
-                                <span v-if="couponPreview?.coupon" class="mt-1 block text-xs font-bold text-primary-600">{{ t('Applied') }}: {{ couponPreview.coupon.code }} (-{{ couponPreview.coupon.discount_formatted }})</span>
-                                <span v-else-if="couponError" class="mt-1 block text-xs font-bold text-red-600">{{ couponError }}</span>
+                                <span v-if="couponPreview?.coupon" class="mt-1 block text-xs font-bold text-primary-600 dark:text-primary-400">{{ t('Applied') }}: {{ couponPreview.coupon.code }} (-{{ couponPreview.coupon.discount_formatted }})</span>
+                                <span v-else-if="couponError" class="mt-1 block text-xs font-bold text-red-600 dark:text-red-400">{{ couponError }}</span>
                             </label>
                         </div>
                         <div v-if="summary.discount_amount > 0" class="flex justify-between gap-4">
                             <span>{{ t('Coupon discount') }}</span>
-                            <span class="text-right text-green-600 font-bold">-{{ summary.discount_formatted }}</span>
+                            <span class="text-right text-green-600 font-bold dark:text-green-400">-{{ summary.discount_formatted }}</span>
                         </div>
                         <div v-if="(summary.proration_credit ?? 0) > 0" class="flex justify-between gap-4">
                             <span>{{ proration?.from_plan ? t('Plan credit (unused :plan)', { plan: proration.from_plan }) : t('Plan credit (unused)') }}</span>
-                            <span class="text-right font-bold text-green-600">-{{ summary.proration_formatted }}</span>
+                            <span class="text-right font-bold text-green-600 dark:text-green-400">-{{ summary.proration_formatted }}</span>
                         </div>
                         <div v-if="summary.vat_amount > 0" class="flex justify-between gap-4">
                             <span>{{ t('VAT') }} ({{ pricing.cycle.vat_percentage }}%)</span>
-                            <span class="text-right font-bold text-gray-900">{{ summary.vat_formatted }}</span>
+                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ summary.vat_formatted }}</span>
                         </div>
                         <div v-if="selectedGatewayTotals && selectedGatewayTotals.fee_amount > 0" class="flex justify-between gap-4">
                             <span>{{ t('Processing fee') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ selectedGatewayTotals.fee_formatted }}</span>
+                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ selectedGatewayTotals.fee_formatted }}</span>
                         </div>
                     </div>
 
-                    <div class="my-5 border-t border-gray-100"></div>
+                    <div class="my-5 border-t border-gray-100 dark:border-surface-800"></div>
 
                     <div class="flex items-end justify-between gap-4">
-                        <span class="text-sm font-bold text-gray-500">{{ t('Payment total') }}</span>
-                        <span class="text-3xl font-black text-gray-900">{{ selectedGatewayTotals?.total_formatted ?? summary.plan_total_formatted }}</span>
+                        <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ t('Payment total') }}</span>
+                        <span class="text-3xl font-black text-gray-900 dark:text-white">{{ selectedGatewayTotals?.total_formatted ?? summary.plan_total_formatted }}</span>
                     </div>
 
-                    <p v-if="pricing?.is_localized && pricing.cycle?.display_formatted" class="mt-1 text-right text-[11px] font-semibold text-gray-400">
+                    <p v-if="pricing?.is_localized && pricing.cycle?.display_formatted" class="mt-1 text-right text-[11px] font-semibold text-gray-400 dark:text-gray-500">
                         {{ t('≈ :localized in your local currency', { localized: pricing.cycle.display_formatted }) }}
                     </p>
 
-                    <p v-if="pricing.cycle.is_trial" class="mt-3 rounded-lg bg-primary-50 p-3 text-xs font-semibold text-primary-700">
+                    <p v-if="pricing.cycle.is_trial" class="mt-3 rounded-lg bg-primary-50 p-3 text-xs font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
                         {{ t(':days days trial starts now. Renewal uses the selected billing cycle.', { days: String(pricing.cycle.trial_days ?? 0) }) }}
                     </p>
 
@@ -360,8 +360,8 @@ const applyCoupon = async () => {
                         {{ submitting ? t('Creating session...') : selectedGateway ? t('Continue with :gateway', { gateway: selectedGateway.name }) : t('No gateway available') }}
                     </button>
 
-                    <div class="mt-4 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-gray-500">
-                        <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <div class="mt-4 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-gray-500 dark:text-gray-400">
+                        <svg class="h-4 w-4 text-emerald-500 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                         <span>{{ t('SSL Secure Checkout') }}</span>

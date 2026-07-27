@@ -69,3 +69,6 @@ storage/app/exports/
 
 # Distribution build output
 /dist/
+
+# Playwright MCP browser console logs (tooling artefact, not project state)
+/.playwright-mcp/
