@@ -19,6 +19,28 @@
  *   --allow-placeholder-key
  *                 Build even though the license public key is still the placeholder.
  *                 For test builds only; the result cannot activate on any buyer's install.
+ *   --demo        Build the seller's public demo site instead of the buyer package.
+ *                 See the DEMO BUILD note below — the two products differ deliberately.
+ *
+ * ─── DEMO BUILD ──────────────────────────────────────────────────────────────
+ *
+ * `--demo` produces makeai-demo-vX.Y.Z.zip, which is NOT a buyer package and must never
+ * be uploaded to the marketplace. Three deliberate inversions of the rules above:
+ *
+ *   1. database/seeders and database/factories SHIP. The demo bootstraps by running
+ *      `demo:reset` (migrate:refresh + DatabaseSeeder + DemoSeeder) on a six-hourly
+ *      schedule, so the seeders are its data source — data.sql is the buyer path and is
+ *      irrelevant here.
+ *   2. The addons in DEMO_ADDONS are BUNDLED, so the demo showcases the full product.
+ *      The buyer package ships an empty addons/ because addons are sold separately.
+ *   3. .env.example ships with DEMO_ENABLED=true pre-set.
+ *
+ * The demo's own DemoReset command marks the license valid so the bundled addons can
+ * activate (AddonService::activate() refuses on an unverified license). That makes this
+ * package an unlicensed install in the narrow technical sense, which is why it carries
+ * demo mode: every write verb is blocked, the login credentials are published on the
+ * sign-in page, and the database is wiped every six hours. Do not hand it to anyone as
+ * a substitute for a purchase.
  */
 
 // ─── Package layout ──────────────────────────────────────────────────────────
@@ -87,6 +109,26 @@ const DENY_SUBPATHS = [
 const STUB_FILES = [
     'database/seeders/DatabaseSeeder.php' => 'distribution/stubs/database/seeders/DatabaseSeeder.php',
     'database/factories/UserFactory.php'  => 'distribution/stubs/database/factories/UserFactory.php',
+];
+
+/**
+ * Addons bundled into a --demo build, by directory name under addons/.
+ *
+ * An explicit allowlist for the same reason ALLOW_DIRS is one: a half-finished addon
+ * appearing in addons/ must not reach the demo until someone puts it here. This is the
+ * set that is active on the seller's own install and that DemoSeeder writes data for —
+ * DemoSeeder imports these five namespaces directly, so dropping one from this list
+ * without touching the seeder leaves the demo with empty screens for it.
+ *
+ * Deliberately absent: ai-image-editor (superseded by ai-image-pro), and the unfinished
+ * ai-repurposer / ai-video-creator / ai-voiceover / social-scheduler.
+ */
+const DEMO_ADDONS = [
+    'ai-assistant',
+    'ai-chatbot',
+    'ai-image-pro',
+    'ai-knowledge-base',
+    'faker-ai',
 ];
 
 /** Directory names pruned wherever they appear inside the copied tree. */
@@ -159,7 +201,7 @@ $args    = array_values(array_filter(array_slice($argv, 1), fn ($a) => ! str_sta
 $version = $args[0] ?? null;
 
 if (! $version) {
-    fwrite(STDERR, "Usage: php scripts/build-release.php <version> [--skip-deps] [--no-slim] [--keep-build] [--allow-placeholder-key]\n");
+    fwrite(STDERR, "Usage: php scripts/build-release.php <version> [--skip-deps] [--no-slim] [--keep-build] [--allow-placeholder-key] [--demo]\n");
     exit(1);
 }
 
@@ -172,13 +214,22 @@ $skipDeps  = in_array('--skip-deps', $options, true);
 $noSlim    = in_array('--no-slim', $options, true);
 $keepBuild = in_array('--keep-build', $options, true);
 $allowPlaceholderKey = in_array('--allow-placeholder-key', $options, true);
+$demo      = in_array('--demo', $options, true);
+
+/**
+ * The seeders and factories are the demo's only data source (see the DEMO BUILD note),
+ * so the deny list is relaxed for it. Everything else about the two builds is identical.
+ */
+$denySubpaths = $demo
+    ? array_values(array_diff(DENY_SUBPATHS, ['database/seeders', 'database/factories']))
+    : DENY_SUBPATHS;
 
 $srcDir = dirname(__DIR__);
 
 // Staging lives outside the repo so a botched build can never dirty the source
 // tree, and so composer runs against a copy — never the developer's vendor/.
 $stageRoot = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'makeai-release-build';
-$pkgName   = "makeai-v{$version}";
+$pkgName   = $demo ? "makeai-demo-v{$version}" : "makeai-v{$version}";
 $wrapper   = $stageRoot . DIRECTORY_SEPARATOR . $pkgName;  // becomes the zip root
 // Staged as a directory, but shipped as script.zip nested inside the outer archive (see
 // section 8). The buyer extracts THAT into their document root, so its contents sit at the
@@ -416,7 +467,7 @@ if (! is_dir($srcDir . '/public/build')) {
 
 step('Copying application source into ' . APP_DIR . '/');
 
-$denyPaths = array_map(fn ($p) => str_replace('/', DIRECTORY_SEPARATOR, $p), DENY_SUBPATHS);
+$denyPaths = array_map(fn ($p) => str_replace('/', DIRECTORY_SEPARATOR, $p), $denySubpaths);
 $skip = function (string $relative) use ($denyPaths): bool {
     $normalised = str_replace('/', DIRECTORY_SEPARATOR, $relative);
 
@@ -455,9 +506,11 @@ foreach (ALLOW_FILES as $file) {
 info(sprintf('%-12s %d files', 'root files', count(ALLOW_FILES)));
 
 // The real seeders and factories are denied above; put the reference stubs back
-// so database/seeders and database/factories exist and are usable.
-step('Placing reference stubs');
-foreach (STUB_FILES as $target => $source) {
+// so database/seeders and database/factories exist and are usable. A demo build ships
+// the real ones, so the stubs would overwrite DatabaseSeeder with a reference copy that
+// calls none of the seeders demo:reset depends on.
+step($demo ? 'Skipping reference stubs (demo ships the real seeders)' : 'Placing reference stubs');
+foreach ($demo ? [] : STUB_FILES as $target => $source) {
     $sourcePath = $srcDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $source);
     if (! is_file($sourcePath)) {
         fail("stub is missing from the repo: {$source}");
@@ -614,10 +667,73 @@ ensureDir($webroot . '/storage');
 touch($webroot . '/storage/.gitkeep');
 
 // Addons ship separately, but the directory has to exist and be writable so the
-// admin "upload addon" flow has somewhere to extract to.
+// admin "upload addon" flow has somewhere to extract to. A demo build fills it: the
+// point of the demo is to show the whole product, and demo:reset activates whatever
+// it finds here.
 ensureDir($appRoot . '/addons');
 touch($appRoot . '/addons/.gitkeep');
-info('empty addons/ directory created (addons distributed separately)');
+
+if (! $demo) {
+    info('empty addons/ directory created (addons distributed separately)');
+} else {
+    $addonFiles = 0;
+
+    foreach (DEMO_ADDONS as $slug) {
+        $source = $srcDir . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . $slug;
+
+        if (! is_dir($source)) {
+            fail("addon listed in DEMO_ADDONS is missing from the repo: {$slug}");
+        }
+
+        // No manifest means AddonService::getAddonConfig() returns null and activate()
+        // bails, which would surface on the demo as a silently missing feature.
+        if (! is_file($source . DIRECTORY_SEPARATOR . 'addon.json')) {
+            fail("addon '{$slug}' has no addon.json — it cannot be activated");
+        }
+
+        // $skip carries the same DENY_DIR_NAMES/DENY_FILE_PATTERNS pruning as the core
+        // copy (node_modules, tests, .git), so a bundled addon is no fatter than it must be.
+        $n = copyTree($source, $appRoot . '/addons/' . $slug, null, "addons/{$slug}");
+        $addonFiles += $n;
+        info(sprintf('%-22s %d files', $slug . '/', $n));
+    }
+
+    info(sprintf('%d addons bundled, %d files', count(DEMO_ADDONS), $addonFiles));
+}
+
+// The shipped .env.example keeps the whole demo block commented out so a buyer cannot
+// enable a data-destroying reset by accident. The demo host needs the opposite default,
+// and asking the operator to hand-edit it is exactly the step that gets skipped.
+if ($demo) {
+    step('Enabling demo mode in .env.example');
+
+    $envPath = $appRoot . DIRECTORY_SEPARATOR . '.env.example';
+    $env     = file_get_contents($envPath);
+
+    if ($env === false) {
+        fail('could not read the staged .env.example');
+    }
+
+    // Uncomment the DEMO_* block in place rather than appending a second copy — a
+    // duplicate key later in the file would silently win over the one above it.
+    $env = preg_replace('/^# (DEMO_[A-Z_]+=)/m', '$1', $env, -1, $uncommented);
+
+    if ($uncommented === 0) {
+        fail('no commented DEMO_* keys found in .env.example — the demo preset cannot be applied');
+    }
+
+    $env = str_replace('DEMO_ENABLED=false', 'DEMO_ENABLED=true', $env, $flipped);
+
+    if ($flipped === 0) {
+        fail('DEMO_ENABLED=false not found in .env.example — the demo preset cannot be applied');
+    }
+
+    if (file_put_contents($envPath, $env) === false) {
+        fail('could not write the demo .env.example');
+    }
+
+    info("{$uncommented} DEMO_* keys uncommented, DEMO_ENABLED=true");
+}
 
 step('Creating writable directory skeleton');
 foreach (STORAGE_SKELETON as $dir) {
@@ -733,7 +849,12 @@ foreach ($oversized as $file) {
 // the buyer's installation dies after the database has already been migrated.
 $checksRun++;
 
-if (! is_file($appRoot . '/database/data/data.sql')) {
+if ($demo) {
+    // The demo bootstraps from the seeders it ships, so data.sql is not load-bearing here
+    // and the addon-table check below would fail by design: the dev export legitimately
+    // contains tables that the bundled addons' own migrations create.
+    info('data.sql checks skipped (demo bootstraps from seeders)');
+} elseif (! is_file($appRoot . '/database/data/data.sql')) {
     $failures[] = 'database/data/data.sql is missing — it is the only data source left now that '
         . 'database/seeders is excluded. Generate it with: php artisan installer:export-data';
 } else {
@@ -781,9 +902,35 @@ if (! is_file($appRoot . '/database/data/data.sql')) {
 // The product's own seeders and factories must genuinely be gone: each directory
 // may contain nothing beyond its reference stub. A leaked AiToolSeeder would
 // also mask the check above, since finalize() would find a usable seeder.
+//
+// Inverted for the demo, which ships them on purpose: assert instead that the two
+// classes demo:reset actually invokes are present, so a copy that silently dropped
+// them fails here rather than on the demo host at 3am when the reset cron fires.
 $expectedStubs = [];
 foreach (array_keys(STUB_FILES) as $stub) {
     $expectedStubs[dirname($stub)][] = basename($stub);
+}
+
+if ($demo) {
+    foreach (['database/seeders/DatabaseSeeder.php', 'database/seeders/DemoSeeder.php'] as $required) {
+        $checksRun++;
+
+        if (! is_file($appRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required))) {
+            $failures[] = "{$required} is missing — demo:reset cannot seed the demo without it";
+        }
+    }
+
+    // Each bundled addon must have arrived whole. A truncated copy activates and then
+    // 500s on its first route, which is worse than not shipping it at all.
+    foreach (DEMO_ADDONS as $slug) {
+        $checksRun++;
+
+        if (! is_file($appRoot . "/addons/{$slug}/addon.json")) {
+            $failures[] = "bundled addon '{$slug}' is missing its addon.json in the package";
+        }
+    }
+
+    $expectedStubs = [];
 }
 
 foreach ($expectedStubs as $dir => $allowed) {

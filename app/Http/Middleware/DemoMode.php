@@ -134,10 +134,10 @@ class DemoMode
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => translate('Destructive actions are disabled in demo mode.')], 403);
+            return response()->json(['message' => translate('This action is disabled in demo mode.')], 403);
         }
 
-        return back()->with('error', translate('Destructive actions are disabled in demo mode.'));
+        return back()->with('error', translate('This action is disabled in demo mode.'));
     }
 
     /**
