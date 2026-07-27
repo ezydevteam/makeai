@@ -60,7 +60,13 @@ return [
          */
         'public' => [
             'driver' => 'local',
-            'root' => env('PUBLIC_DISK_ROOT', public_path('storage')),
+            // `?:` not env()'s second argument: the default only applies when the key is
+            // ABSENT, and .env.example ships `PUBLIC_DISK_ROOT=` with no value. A .env
+            // copied from it therefore resolved the root to '' — every write then aimed at
+            // the filesystem root and died with "Unable to create a directory at .",
+            // which is opaque enough that the fallback documented above may as well not
+            // have existed. An empty value now means "unset", same as a missing key.
+            'root' => env('PUBLIC_DISK_ROOT') ?: public_path('storage'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
@@ -72,7 +78,13 @@ return [
         // this one never is, so storage migration can always reach local files.
         'local_public_media' => [
             'driver' => 'local',
-            'root' => env('PUBLIC_DISK_ROOT', public_path('storage')),
+            // `?:` not env()'s second argument: the default only applies when the key is
+            // ABSENT, and .env.example ships `PUBLIC_DISK_ROOT=` with no value. A .env
+            // copied from it therefore resolved the root to '' — every write then aimed at
+            // the filesystem root and died with "Unable to create a directory at .",
+            // which is opaque enough that the fallback documented above may as well not
+            // have existed. An empty value now means "unset", same as a missing key.
+            'root' => env('PUBLIC_DISK_ROOT') ?: public_path('storage'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
