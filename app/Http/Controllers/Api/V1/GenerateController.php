@@ -226,26 +226,19 @@ class GenerateController extends Controller
                     flush();
                 }
 
-                $document = ($completed && ! $isGuestPublic && $user && $content !== '')
-                    ? $this->saveGeneratedDocument($template, $user, $content)
-                    : null;
-
-                if ($document && $user) {
-                    RecordGenerationHistoryJob::dispatch($user, [
-                        'tool_slug' => $template->slug,
-                        'document_id' => $document->id,
-                        'prompt_system' => $completion->systemPrompt,
-                        'prompt_user' => $completion->userMessage,
-                        'field_values' => $fields,
-                        'model' => $completion->model,
-                        'provider' => $completion->provider ?? 'openai',
-                        'temperature' => $completion->temperature,
-                        'max_tokens' => $completion->maxTokens,
-                        'output_preview' => Str::limit($content, 500),
-                        'tokens_input' => $usageStats['input_tokens'] ?? 0,
-                        'tokens_output' => $usageStats['output_tokens'] ?? 0,
-                    ])->onQueue('ai');
-                }
+                $document = $this->persistGeneration($template, $user, $content, $completed && ! $isGuestPublic, [
+                    'tool_slug' => $template->slug,
+                    'prompt_system' => $completion->systemPrompt,
+                    'prompt_user' => $completion->userMessage,
+                    'field_values' => $fields,
+                    'model' => $completion->model,
+                    'provider' => $completion->provider ?? 'openai',
+                    'temperature' => $completion->temperature,
+                    'max_tokens' => $completion->maxTokens,
+                    'output_preview' => Str::limit($content, 500),
+                    'tokens_input' => $usageStats['input_tokens'] ?? 0,
+                    'tokens_output' => $usageStats['output_tokens'] ?? 0,
+                ]);
 
                 if ($document) {
                     echo 'data: '.json_encode([
@@ -359,26 +352,19 @@ class GenerateController extends Controller
                             flush();
                         }
 
-                        $document = ($completed && ! $isGuestPublic && $user && $content !== '')
-                            ? $this->saveGeneratedDocument($template, $user, $content)
-                            : null;
-
-                        if ($document && $user) {
-                            RecordGenerationHistoryJob::dispatch($user, [
-                                'tool_slug' => $template->slug,
-                                'document_id' => $document->id,
-                                'prompt_system' => $completion->systemPrompt,
-                                'prompt_user' => $completion->userMessage,
-                                'field_values' => $fields,
-                                'model' => $fallback['model'],
-                                'provider' => $fallback['provider'],
-                                'temperature' => $completion->temperature,
-                                'max_tokens' => $completion->maxTokens,
-                                'output_preview' => Str::limit($content, 500),
-                                'tokens_input' => $usageStats['input_tokens'] ?? 0,
-                                'tokens_output' => $usageStats['output_tokens'] ?? 0,
-                            ])->onQueue('ai');
-                        }
+                        $document = $this->persistGeneration($template, $user, $content, $completed && ! $isGuestPublic, [
+                            'tool_slug' => $template->slug,
+                            'prompt_system' => $completion->systemPrompt,
+                            'prompt_user' => $completion->userMessage,
+                            'field_values' => $fields,
+                            'model' => $fallback['model'],
+                            'provider' => $fallback['provider'],
+                            'temperature' => $completion->temperature,
+                            'max_tokens' => $completion->maxTokens,
+                            'output_preview' => Str::limit($content, 500),
+                            'tokens_input' => $usageStats['input_tokens'] ?? 0,
+                            'tokens_output' => $usageStats['output_tokens'] ?? 0,
+                        ]);
 
                         if ($document) {
                             echo 'data: '.json_encode([
@@ -534,26 +520,19 @@ class GenerateController extends Controller
                     ."\n\n---\n".translate('Public preview limited. Sign in to generate the full output.');
             }
 
-            $document = (! $isGuestPublic && $user)
-                ? $this->saveGeneratedDocument($template, $user, $content)
-                : null;
-
-            if ($document && $user) {
-                RecordGenerationHistoryJob::dispatch($user, [
-                    'tool_slug' => $template->slug,
-                    'document_id' => $document->id,
-                    'prompt_system' => $completion->systemPrompt,
-                    'prompt_user' => $completion->userMessage,
-                    'field_values' => $validated['fields'],
-                    'model' => $completion->model,
-                    'provider' => $completion->provider ?? 'openai',
-                    'temperature' => $completion->temperature,
-                    'max_tokens' => $completion->maxTokens,
-                    'output_preview' => Str::limit($content, 500),
-                    'tokens_input' => $result['input_tokens'],
-                    'tokens_output' => $result['output_tokens'],
-                ])->onQueue('ai');
-            }
+            $document = $this->persistGeneration($template, $user, $content, ! $isGuestPublic, [
+                'tool_slug' => $template->slug,
+                'prompt_system' => $completion->systemPrompt,
+                'prompt_user' => $completion->userMessage,
+                'field_values' => $validated['fields'],
+                'model' => $completion->model,
+                'provider' => $completion->provider ?? 'openai',
+                'temperature' => $completion->temperature,
+                'max_tokens' => $completion->maxTokens,
+                'output_preview' => Str::limit($content, 500),
+                'tokens_input' => $result['input_tokens'],
+                'tokens_output' => $result['output_tokens'],
+            ]);
 
             $payload = [
                 'success' => true,
@@ -618,26 +597,19 @@ class GenerateController extends Controller
                             ."\n\n---\n".translate('Public preview limited. Sign in to generate the full output.');
                     }
 
-                    $document = (! $isGuestPublic && $user)
-                        ? $this->saveGeneratedDocument($template, $user, $content)
-                        : null;
-
-                    if ($document && $user) {
-                        RecordGenerationHistoryJob::dispatch($user, [
-                            'tool_slug' => $template->slug,
-                            'document_id' => $document->id,
-                            'prompt_system' => $completion->systemPrompt,
-                            'prompt_user' => $completion->userMessage,
-                            'field_values' => $validated['fields'],
-                            'model' => $fallback['model'],
-                            'provider' => $fallback['provider'],
-                            'temperature' => $completion->temperature,
-                            'max_tokens' => $completion->maxTokens,
-                            'output_preview' => Str::limit($content, 500),
-                            'tokens_input' => $result['input_tokens'],
-                            'tokens_output' => $result['output_tokens'],
-                        ])->onQueue('ai');
-                    }
+                    $document = $this->persistGeneration($template, $user, $content, ! $isGuestPublic, [
+                        'tool_slug' => $template->slug,
+                        'prompt_system' => $completion->systemPrompt,
+                        'prompt_user' => $completion->userMessage,
+                        'field_values' => $validated['fields'],
+                        'model' => $fallback['model'],
+                        'provider' => $fallback['provider'],
+                        'temperature' => $completion->temperature,
+                        'max_tokens' => $completion->maxTokens,
+                        'output_preview' => Str::limit($content, 500),
+                        'tokens_input' => $result['input_tokens'],
+                        'tokens_output' => $result['output_tokens'],
+                    ]);
 
                     $payload = [
                         'success' => true,
@@ -782,7 +754,7 @@ class GenerateController extends Controller
         $template->incrementUsage();
 
         $document = $markdown !== ''
-            ? $this->saveGeneratedDocument($template, $user, $markdown)
+            ? $this->trySaveGeneratedDocument($template, $user, $markdown)
             : null;
 
         $payload = [
@@ -840,7 +812,7 @@ class GenerateController extends Controller
                 $template->incrementUsage();
 
                 if ($markdown !== '') {
-                    $this->saveGeneratedDocument($template, $user, $markdown);
+                    $this->trySaveGeneratedDocument($template, $user, $markdown);
                 }
             }
 
@@ -854,6 +826,85 @@ class GenerateController extends Controller
             'Cache-Control' => 'no-cache',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Save the generated document and queue its history row — never throwing.
+     *
+     * Bookkeeping must not be able to destroy a generation the user has already been
+     * charged for. Both steps used to run bare inside the caller's try block, so any
+     * failure was caught by the generation handler, flattened by AiErrors::sanitize()
+     * into "Something went wrong. Please try again or contact support." and the finished
+     * output was discarded — after the model had produced it and the credits were spent.
+     *
+     * Async installs never saw this: with a real queue driver the dispatch just writes a
+     * row and any job failure surfaces later in failed_jobs, far from the request. Under
+     * QUEUE_CONNECTION=sync — a legitimate choice on shared hosting with no worker — the
+     * job executes INLINE inside the streaming request, so its exception propagated
+     * straight into the user's response. That asymmetry is why this survived: it is
+     * invisible in development and fatal in production.
+     *
+     * Failures are logged and swallowed. A missing history row is a reporting gap; a lost
+     * generation is the user's paid-for work.
+     *
+     * @param  bool  $eligible  Caller's own precondition (completed, not a guest preview, …)
+     * @param  array  $history  History payload; document_id is filled in here.
+     */
+    private function persistGeneration(
+        AiTool $template,
+        ?User $user,
+        string $content,
+        bool $eligible,
+        array $history
+    ): ?Document {
+        if (! $eligible || ! $user || $content === '') {
+            return null;
+        }
+
+        // No document means no history either — the row is keyed on it.
+        $document = $this->trySaveGeneratedDocument($template, $user, $content);
+
+        if (! $document) {
+            return null;
+        }
+
+        try {
+            RecordGenerationHistoryJob::dispatch($user, [
+                ...$history,
+                'document_id' => $document->id,
+            ])->onQueue('ai');
+        } catch (\Throwable $e) {
+            Log::error('Generation history could not be recorded; output is unaffected', [
+                'tool_slug' => $template->slug,
+                'user_id' => $user->id,
+                'document_id' => $document->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $document;
+    }
+
+    /**
+     * saveGeneratedDocument() that logs and returns null instead of throwing.
+     *
+     * Used everywhere the document is a by-product of work the user has already paid
+     * for and received: losing the saved copy is a degradation, losing the response is
+     * a failed generation they get charged for twice.
+     */
+    private function trySaveGeneratedDocument(AiTool $template, User $user, string $content): ?Document
+    {
+        try {
+            return $this->saveGeneratedDocument($template, $user, $content);
+        } catch (\Throwable $e) {
+            Log::error('Generated document could not be saved; returning output anyway', [
+                'tool_slug' => $template->slug,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     private function saveGeneratedDocument(AiTool $template, User $user, string $content): Document
