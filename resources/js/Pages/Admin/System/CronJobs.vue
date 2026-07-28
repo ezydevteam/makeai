@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
 defineOptions({ layout: AdminLayout })
 
@@ -46,6 +47,9 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+// Timestamps arrive as ISO instants; this rebases them into the site's timezone so
+// the panel does not report UTC to an admin sitting somewhere else.
+const { formatDateTime } = useDateFormat()
 const cronCopied = ref(false)
 const cronRunForm = useForm({ task: '' })
 
@@ -132,7 +136,7 @@ const runCronTask = (taskKey: string) => {
                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
                     <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last scheduler run') }}</div>
                     <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ cron.last_run_human || t('Never detected') }}</div>
-                    <div v-if="cron.last_run_at" class="mt-1 font-mono text-xs text-gray-500">{{ cron.last_run_at }}</div>
+                    <div v-if="cron.last_run_at" class="mt-1 font-mono text-xs text-gray-500">{{ formatDateTime(cron.last_run_at) }}</div>
                 </div>
                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
                     <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Project path') }}</div>
@@ -210,7 +214,7 @@ const runCronTask = (taskKey: string) => {
                     </div>
                     <div class="col-span-6 lg:col-span-2">
                         <div class="lg:hidden text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last Run') }}</div>
-                        <div class="text-sm text-gray-700 dark:text-gray-300">{{ task.last_run_at || t('Not run manually') }}</div>
+                        <div class="text-sm text-gray-700 dark:text-gray-300">{{ task.last_run_at ? formatDateTime(task.last_run_at) : t('Not run manually') }}</div>
                     </div>
                     <div class="col-span-12 flex items-center justify-end md:col-span-4 lg:col-span-2">
                         <button type="button" :disabled="cronRunForm.processing" class="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:opacity-60 dark:border-primary-900/50 dark:bg-primary-900/20 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/40 dark:text-primary-200" @click="runCronTask(task.key)">

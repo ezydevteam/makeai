@@ -453,7 +453,9 @@ class SystemController extends Controller
             // Never-run and stopped are different faults with different fixes, and rendering
             // both as "Setup Required" sent buyers hunting for a cron entry that already exists.
             'has_ever_run' => $lastRun !== null,
-            'last_run_at' => $lastRun?->toDateTimeString(),
+            // ISO, not toDateTimeString(): the browser reads a zone-less "Y-m-d H:i:s" as
+            // its own local time, so a UTC wall clock reached the screen unconverted.
+            'last_run_at' => $lastRun?->toIso8601String(),
             'last_run_human' => $lastRun?->diffForHumans(),
             'required_entry' => '* * * * * cd '.base_path().' && '.$php.' artisan schedule:run >> /dev/null 2>&1',
             'project_path' => base_path(),
@@ -474,7 +476,7 @@ class SystemController extends Controller
 
                 return [
                     ...$task,
-                    'last_run_at' => $lastRun,
+                    'last_run_at' => $this->asInstant($lastRun),
                     'next_run' => $this->nextRunLabel($task['frequency_key'] ?? $task['frequency']),
                 ];
             })->values()->all(),
@@ -902,10 +904,38 @@ class SystemController extends Controller
             // present that number as a real release it can install.
             'test_mode' => \App\Support\PurchaseCode::testModeActive(),
             'changelog' => settings('update_changelog'),
-            'last_checked' => settings('update_last_checked'),
+            'last_checked' => $this->asInstant(settings('update_last_checked')),
             'rollback_available' => $rollbackAvailable,
-            'rollback_time' => $rollbackTime,
+            'rollback_time' => $this->asInstant($rollbackTime),
         ];
+    }
+
+    /**
+     * Render a stored timestamp as an unambiguous instant for the browser.
+     *
+     * These are written with now()->toDateTimeString() — "2026-07-28 15:39:00", no zone
+     * marker. JavaScript's new Date() reads a string in that shape as BROWSER-local, so
+     * the UTC wall clock was displayed verbatim: a site six hours ahead of UTC showed
+     * 3:39 PM for something that happened at 9:39 PM. useDateFormat then rebased an
+     * instant that was already wrong, so the timezone plumbing could not save it.
+     *
+     * ISO 8601 carries the offset, so the browser parses the correct instant and the
+     * site-zone rebasing lands where it should. Converted on read rather than at the
+     * write site, so installs already holding a zone-less value are fixed too.
+     */
+    private function asInstant(?string $stored): ?string
+    {
+        if (blank($stored)) {
+            return null;
+        }
+
+        try {
+            // Stored wall clock is UTC (config('app.timezone')); an already-ISO value
+            // keeps its own offset, since the second argument is only a fallback.
+            return Carbon::parse($stored, config('app.timezone', 'UTC'))->toIso8601String();
+        } catch (\Throwable) {
+            return $stored;
+        }
     }
 
     private function getInstallationUptime(): string
