@@ -469,9 +469,22 @@ class CheckoutController extends Controller
             ->with('success', translate('Payment proof uploaded. Your transaction is pending review.'));
     }
 
-    public function pending(Payment $payment): Response
+    public function pending(Payment $payment): Response|RedirectResponse
     {
         abort_unless($payment->user_id === auth()->id(), 404);
+
+        // A completed payment has nothing to wait for. Most gateways point their
+        // success_url straight at this route and let a webhook finish the payment, so
+        // whenever that webhook wins the race the buyer landed on a page headed "Payment
+        // is waiting for confirmation" with a status of "completed" underneath — the page
+        // contradicting itself about whether their money went through.
+        //
+        // Checked here rather than in each gateway's return handler because only PayPal
+        // has one; every other gateway arrives at this URL directly.
+        if ($payment->status === 'completed') {
+            return redirect()->route('user.dashboard.billing')
+                ->with('success', translate('Payment confirmed successfully.'));
+        }
 
         return Inertia::render('Checkout/Pending', [
             // Last screen of the payment flow, so it keeps the same stripped chrome as the
@@ -486,8 +499,10 @@ class CheckoutController extends Controller
     {
         abort_unless($payment->user_id === $request->user()->id && $payment->gateway === 'paypal', 404);
 
+        // Already settled — usually the webhook beat the browser back.
         if ($payment->status === 'completed') {
-            return redirect()->route('checkout.pending', $payment);
+            return redirect()->route('user.dashboard.billing')
+                ->with('success', translate('Payment confirmed successfully.'));
         }
 
         $gateway = PaymentGateway::where('slug', 'paypal')->where('is_enabled', true)->firstOrFail();
@@ -509,7 +524,8 @@ class CheckoutController extends Controller
             if ($subscription->successful() && in_array($subscription->json('status'), ['ACTIVE', 'APPROVED'], true)) {
                 $activation->activateFromPayment($payment, $subscriptionId, $subscriptionId);
 
-                return redirect()->route('checkout.pending', $payment)
+                // Activated, not pending. Send them to the plan they just bought.
+                return redirect()->route('user.dashboard.billing')
                     ->with('success', translate('Subscription activated successfully.'));
             }
 
@@ -528,9 +544,25 @@ class CheckoutController extends Controller
         }
 
         $captureId = data_get($response->json(), 'purchase_units.0.payments.captures.0.id', $payment->gateway_payment_id);
-        $activation->activateFromPayment($payment, $captureId);
 
-        return redirect()->route('checkout.pending', $payment)
+        // Credit top-ups come back through THIS handler too — CreditTopupController points
+        // its PayPal return_url at this same route — so activation has to branch on what
+        // was actually bought. Sending a top-up through activateFromPayment() tried to open
+        // a billing_subscriptions row with the payment's plan_id, which is null for a
+        // top-up: "Column 'plan_id' cannot be null", a 500 shown to the buyer *after*
+        // PayPal had already taken the money.
+        //
+        // ProcessPaymentWebhookJob::activatePayment() has always branched this way; this
+        // path simply never did, so it only broke for buyers who returned to the browser
+        // before the webhook landed.
+        if ($payment->type === 'credit_topup') {
+            $activation->activateCreditTopup($payment, $captureId);
+        } else {
+            $activation->activateFromPayment($payment, $captureId);
+        }
+
+        // Captured and activated — this is the success path, not a pending one.
+        return redirect()->route('user.dashboard.billing')
             ->with('success', translate('Payment confirmed successfully.'));
     }
 

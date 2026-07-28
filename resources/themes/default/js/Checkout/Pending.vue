@@ -40,10 +40,58 @@ const logoLight = computed(() => String(branding.value.site_logo_light || ''))
 const logoDark = computed(() => String(branding.value.site_logo_dark || logoLight.value))
 
 const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()))
+
+/**
+ * Icon, heading and copy for the payment's actual state.
+ *
+ * This screen used to say "Payment is waiting for confirmation" under an amber clock no
+ * matter what the payment had done — so a failed charge announced itself as pending, and
+ * a completed one contradicted the "completed" status printed in the card below it.
+ *
+ * CheckoutController redirects completed payments to billing, so that branch is a
+ * fallback rather than the usual path; the failed branch is the one that renders in
+ * practice, because a failure has to stay on a page that says so rather than being swept
+ * to billing under a green success flash.
+ */
+const statusView = computed(() => {
+    const status = (props.payment.status || '').toLowerCase()
+
+    if (status === 'completed') {
+        return {
+            tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+            statusTone: 'text-emerald-700 dark:text-emerald-400',
+            icon: 'M9 12.75l2.25 2.25 4.5-4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            title: t('Payment confirmed'),
+            body: t('Your payment went through and your account has been updated. A receipt is in your billing history.'),
+        }
+    }
+
+    if (['failed', 'cancelled', 'canceled', 'expired', 'refunded'].includes(status)) {
+        return {
+            tone: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+            statusTone: 'text-red-700 dark:text-red-400',
+            icon: 'M12 9v3.75m0 3.75h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            title: t('Payment did not go through'),
+            body: t('No charge was completed. You can try again from the pricing page, or contact support with the payment ID below.'),
+        }
+    }
+
+    return {
+        tone: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+        statusTone: 'text-amber-700 dark:text-amber-400',
+        icon: 'M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z',
+        title: t('Payment is waiting for confirmation'),
+        body: props.payment.proof_uploaded
+            ? t('Your payment proof has been submitted. Admin will review it and activate your plan after verification.')
+            : t('Your payment session was created and is waiting for gateway confirmation.'),
+    }
+})
 </script>
 
 <template>
-    <Head :title="t('Payment Pending')" />
+    <!-- The tab title tracks the state too; "Payment Pending" on a confirmed payment is
+         the same contradiction, just in the browser tab. -->
+    <Head :title="statusView.title" />
 
     <Layout>
         <!-- Soft primary wash down both edges, matching the rest of the payment flow. -->
@@ -69,13 +117,13 @@ const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').rep
             <div class="flex justify-center px-4 sm:px-6">
                 <div class="w-full max-w-xl">
                     <div class="flex flex-col items-center text-center">
-                        <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" /></svg>
+                        <div :class="statusView.tone" class="mb-5 flex h-16 w-16 items-center justify-center rounded-full">
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" :d="statusView.icon" /></svg>
                         </div>
 
-                        <h1 class="text-3xl font-black text-gray-900 dark:text-white">{{ t('Payment is waiting for confirmation') }}</h1>
+                        <h1 class="text-3xl font-black text-gray-900 dark:text-white">{{ statusView.title }}</h1>
                         <p class="mt-3 text-sm font-medium leading-6 text-gray-500 dark:text-gray-400">
-                            {{ payment.proof_uploaded ? t('Your payment proof has been submitted. Admin will review it and activate your plan after verification.') : t('Your payment session was created and is waiting for gateway confirmation.') }}
+                            {{ statusView.body }}
                         </p>
                     </div>
 
@@ -112,7 +160,9 @@ const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').rep
                             </div>
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Status') }}</p>
-                                <p class="mt-1 font-bold capitalize text-amber-700 dark:text-amber-400">{{ payment.status }}</p>
+                                <!-- Matches the heading's tone: an amber "completed" beside a green
+                                     tick was the same contradiction in miniature. -->
+                                <p :class="statusView.statusTone" class="mt-1 font-bold capitalize">{{ payment.status }}</p>
                             </div>
                         </div>
                     </section>
