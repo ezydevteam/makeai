@@ -72,6 +72,24 @@ const planStatusClass = computed(() => {
     if (props.plan.subscription_status === 'trialing') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
     return 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'
 })
+/**
+ * Is there actually a paid plan to manage?
+ *
+ * `plan` is null for an account that has never subscribed, and free-tier users carry a
+ * plan row with is_free set — neither has anything to manage. The action below used to
+ * read "Manage Plan" for all three cases, which promises a subscription screen to someone
+ * who does not have a subscription. It points at pricing either way, so the fix is the
+ * label, not the link: hiding it would leave the billing page with no route to a plan at
+ * all, which is the one thing these users are here to do.
+ */
+const hasManageablePlan = computed(() => {
+    const plan = props.plan
+
+    if (!plan || plan.is_free) return false
+
+    return ['active', 'trialing', 'past_due', 'cancelled'].includes(plan.subscription_status)
+})
+
 const planFeatures = computed(() => props.plan?.features ?? [])
 const planTrialEndsAt = computed(() => props.plan?.trial_ends_at ?? props.subscription.trial_ends_at)
 const planEndsAt = computed(() => props.plan?.subscription_ends_at ?? props.subscription.ends_at)
@@ -247,7 +265,30 @@ const cancelScheduledChange = () => {
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!--
+            Nothing to report yet. Both cards below describe a subscription — its features,
+            its status, its cancel and resume actions — so for an account without one they
+            were two boxes of "No active plan" and "No features details available", which
+            reads as something failing to load rather than as a state. One card that says so
+            plainly, with the only action that applies.
+        -->
+        <div v-if="!hasManageablePlan" class="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                <i class="ti ti-sparkles text-2xl"></i>
+            </div>
+
+            <h2 class="font-heading text-xl font-extrabold text-gray-900 dark:text-white">{{ t('You are not on a plan yet') }}</h2>
+            <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                {{ t('Choose a plan to unlock more credits and features. Your payment history stays here either way.') }}
+            </p>
+
+            <Link :href="route('pricing')" class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl btn-primary px-6 shadow-lg shadow-primary-600/20 transition">
+                <i class="ti ti-sparkles text-base"></i>
+                {{ t('View Plans') }}
+            </Link>
+        </div>
+
+        <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <!-- Left Column: Current Plan, Features, Actions, History (span 2) -->
             <div class="lg:col-span-2 space-y-6">
                 <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
@@ -312,8 +353,8 @@ const cancelScheduledChange = () => {
                     <div class="pt-4 mt-6 border-t border-gray-100 dark:border-surface-800 bg-gray-50/40 dark:bg-surface-950/20">
                         <div class="flex flex-wrap items-center gap-3">
                             <Link :href="route('pricing')" class="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:!text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300">
-                                <i class="ti ti-arrow-up text-base"></i>
-                                {{ t('Manage Plan') }}
+                                <i :class="hasManageablePlan ? 'ti ti-arrow-up' : 'ti ti-sparkles'" class="text-base"></i>
+                                {{ hasManageablePlan ? t('Manage Plan') : t('View Plans') }}
                             </Link>
 
                             <a
