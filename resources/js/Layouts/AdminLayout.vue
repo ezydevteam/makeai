@@ -52,6 +52,8 @@ const envatoUrl = computed(() => (page.props as any).app?.envato_url ?? 'https:/
 const branding = computed<Branding>(() => (page.props.branding as Branding | undefined) ?? {})
 const siteName = computed(() => String(branding.value.site_name || page.props.appName || t('MakeAI')))
 const currentYear = new Date().getFullYear()
+// The installed build, straight from the app_version setting the updater stamps.
+const appVersion = computed(() => String((page.props.admin as any)?.version || '1.0.0'))
 const adminFooterLinks = computed<Array<{ label: string; href: string; icon?: string }>>(() => [
     {
         label: t('Docs'),
@@ -442,6 +444,7 @@ onUnmounted(() => {
                     <p class="min-w-0">
                         {{ t('© :year :site_name', { year: currentYear, site_name: siteName }) }}
                         <span class="mx-1 text-gray-300 dark:text-gray-600">•</span>
+                        {{ t('MakeAI v:version', { version: appVersion }) }} -
                         {{ t('Developed by') }} <a href="https://ezydev.net" target="_blank" rel="noopener noreferrer" class="transition hover:text-primary-600 dark:hover:text-primary-300">EzyDev</a>
                     </p>
 

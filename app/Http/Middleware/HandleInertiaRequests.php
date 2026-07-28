@@ -801,6 +801,9 @@ class HandleInertiaRequests extends Middleware
             'role' => $admin->role?->name,
             'coreUpdate' => $this->getCoreUpdateStatus($admin),
             'securityAlert' => $this->getSecurityAlert(),
+            // Shown in the admin footer. Kept to the admin props because it is the
+            // operator's build number, not something a visitor has any use for.
+            'version' => (string) settings('app_version', '1.0.0'),
             'pendingCommentsCount' => Comment::where('status', 'pending')->count(),
             'sidebarCounts' => [
                 'premium' => [
