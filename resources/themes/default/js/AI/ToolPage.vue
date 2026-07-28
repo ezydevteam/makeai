@@ -207,16 +207,26 @@ allStreams.forEach((s) => {
         if (val) reviewUnlocked.value = true
     })
 
-    // The stream ending cleanly is the backstop, for any path that finishes without
-    // an SSE usage frame. It asks the server rather than assuming, so the gate stays
-    // authoritative — and it only spends the request when the form is still locked,
-    // which is at most once per user per tool.
+    // A stream that ended with output and no error IS the unlock. No SSE frame to
+    // wait on, no request to make, nothing the network can withhold.
+    //
+    // Earlier attempts asked the server to confirm first — via the usage frame, then
+    // an Inertia partial reload, then a JSON endpoint. All three worked locally and
+    // none survived production, because each depends on something a real host can
+    // interfere with: output buffering in front of PHP, page caches on an HTML-ish
+    // GET, and a route table that a freshly added route is missing from until
+    // route:cache is rebuilt.
+    //
+    // Optimism is safe here because the client is not the authority. The server gate
+    // in ToolReviewController::store() is, and it is unchanged. The worst case is a
+    // form that opens for someone whose generation was not billed, and whose submit
+    // then returns a clear "you can review this tool after using it at least once" —
+    // strictly better than a form that never opens for anyone.
     watch(s.isStreaming, (streaming, wasStreaming) => {
         if (streaming || !wasStreaming) return
         if (s.error.value || !s.output.value.trim()) return
-        if (reviewUnlocked.value) return
 
-        router.reload({ only: ['canReview'] })
+        reviewUnlocked.value = true
     })
 })
 
