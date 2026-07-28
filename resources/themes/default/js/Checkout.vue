@@ -272,7 +272,7 @@ const applyCoupon = async () => {
                             <span class="text-right text-green-600 font-bold dark:text-green-400">-{{ summary.discount_formatted }}</span>
                         </div>
                         <div v-if="(summary.proration_credit ?? 0) > 0" class="flex justify-between gap-4">
-                            <span>{{ proration?.from_plan ? t('Plan credit (unused :plan)', { plan: proration.from_plan }) : t('Plan credit (unused)') }}</span>
+                            <span>{{ proration?.from_plan ? t('Plan credit (Unused from :plan)', { plan: proration.from_plan }) : t('Plan credit (Unused)') }}</span>
                             <span class="text-right font-bold text-green-600 dark:text-green-400">-{{ summary.proration_formatted }}</span>
                         </div>
                         <div v-if="summary.vat_amount > 0" class="flex justify-between gap-4">
