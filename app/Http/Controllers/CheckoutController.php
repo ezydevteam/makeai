@@ -62,6 +62,12 @@ class CheckoutController extends Controller
         $netAmount = max(0, round($amount - $prorationCredit, 2));
 
         return Inertia::render('Checkout', [
+            // Strip the site chrome. A checkout competes with every link you give it —
+            // navigation, footer, newsletter — so this page keeps only the logo. Set as
+            // page props rather than by dropping AppLayout, which would also take the
+            // flash toasts and the GDPR banner with it.
+            'hide_header' => true,
+            'hide_footer' => true,
             'plan' => [
                 'id' => $plan->id,
                 'name' => $plan->name,
@@ -427,6 +433,10 @@ class CheckoutController extends Controller
         $gateway = PaymentGateway::where('slug', 'bank_transfer')->where('is_enabled', true)->firstOrFail();
 
         return Inertia::render('Checkout/BankTransfer', [
+            // Same reasoning as the checkout page: this is still a payment step, so it
+            // keeps the logo and drops the rest of the site chrome.
+            'hide_header' => true,
+            'hide_footer' => true,
             'payment' => $this->paymentPayload($payment),
             'instructions' => $gateway->getCredential('instructions', settings('bank_transfer_instructions', '')),
         ]);
@@ -464,6 +474,10 @@ class CheckoutController extends Controller
         abort_unless($payment->user_id === auth()->id(), 404);
 
         return Inertia::render('Checkout/Pending', [
+            // Last screen of the payment flow, so it keeps the same stripped chrome as the
+            // two before it rather than dropping the buyer back into the full site mid-flow.
+            'hide_header' => true,
+            'hide_footer' => true,
             'payment' => $this->paymentPayload($payment),
         ]);
     }

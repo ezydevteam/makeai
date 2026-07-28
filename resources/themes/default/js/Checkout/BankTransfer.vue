@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import Layout from '@themes/default/js/Layouts/AppLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -29,6 +29,15 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const page = usePage()
+
+// The site header is hidden here (hide_header from CheckoutController), so the logo is
+// rendered in the page — this is still a payment step, and a page asking for money with
+// no branding on it is exactly what a phishing page looks like.
+const branding = computed(() => (page.props.branding as { site_name?: string; site_logo_light?: string; site_logo_dark?: string }) ?? {})
+const logoLight = computed(() => String(branding.value.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value.site_logo_dark || logoLight.value))
+
 const fileName = ref('')
 const form = useForm({
     proof: null as File | null,
@@ -56,94 +65,105 @@ const submitProof = () => {
     <Head :title="t('Bank Transfer')" />
 
     <Layout>
-        <div class="w-full pt-6 md:pt-10 pb-12">
-            <div class="mx-auto max-w-5xl px-4 sm:px-6">
-            <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <p class="text-sm font-bold uppercase tracking-widest text-primary-600">{{ t('Manual Payment') }}</p>
-                    <h1 class="mt-2 text-3xl font-black text-gray-900">{{ t('Bank transfer details') }}</h1>
-                </div>
-                <Link href="/pricing" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600">
-                    {{ t('Back to pricing') }}
+        <!-- Soft primary wash down both edges. Fixed so it covers the viewport however far
+             the instructions scroll, and pointer-events-none so it never eats a click. -->
+        <div class="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+            <div class="absolute inset-y-0 left-0 w-1/3 max-w-md bg-gradient-to-r from-primary-500/10 via-primary-500/5 to-transparent dark:from-primary-500/15 dark:via-primary-500/5"></div>
+            <div class="absolute inset-y-0 right-0 w-1/3 max-w-md bg-gradient-to-l from-primary-500/10 via-primary-500/5 to-transparent dark:from-primary-500/15 dark:via-primary-500/5"></div>
+        </div>
+
+        <!--
+            Centred with flex, never `mx-auto`: app.ts injects
+            `main .mx-auto { max-width: var(--page-width) !important }` on every non-admin
+            page, which silently overrides any max-w-* set here.
+        -->
+        <div class="relative z-10 w-full pt-8 md:pt-12 pb-12">
+            <div class="mb-8 flex justify-center px-4">
+                <Link href="/" class="inline-flex items-center">
+                    <img v-if="logoLight" :src="logoLight" :alt="branding.site_name || 'Logo'" class="h-9 w-auto dark:hidden" />
+                    <img v-if="logoDark" :src="logoDark" :alt="branding.site_name || 'Logo'" class="hidden h-9 w-auto dark:block" />
+                    <span v-if="!logoLight && !logoDark" class="text-xl font-black text-gray-900 dark:text-white">{{ branding.site_name }}</span>
                 </Link>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 class="mb-4 text-lg font-black text-gray-900">{{ t('Payment instructions') }}</h2>
-                    <div class="whitespace-pre-line rounded-xl border border-primary-100 bg-primary-50 p-5 text-sm font-medium leading-7 text-gray-700 dark:border-primary-900/40 dark:bg-primary-900/30">
-                        {{ instructions || t('Bank transfer instructions are not configured yet. Please contact support before sending payment.') }}
+            <div class="flex justify-center px-4 sm:px-6">
+                <div class="w-full max-w-xl space-y-5">
+                    <div class="text-center">
+                        <h1 class="mt-2 text-3xl font-black text-gray-900 dark:text-white">{{ t('Bank transfer details') }}</h1>
                     </div>
 
-                    <form class="mt-6 space-y-4" @submit.prevent="submitProof">
-                        <label class="block">
-                            <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Transaction reference') }}</span>
-                            <input v-model="form.reference" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-primary-100" :placeholder="t('Bank transaction ID or sender account')" />
-                            <p v-if="form.errors.reference" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.reference }}</p>
-                        </label>
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <h2 class="mb-4 text-lg font-black text-gray-900 dark:text-white">{{ t('Payment instructions') }}</h2>
 
-                        <label class="block">
-                            <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Upload payment proof') }}</span>
-                            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-400 dark:file:border-primary-900/40" @change="onFileChange" />
-                            <p class="mt-1 text-xs font-medium text-gray-400">{{ fileName || t('JPG, PNG, WebP, or PDF up to 5 MB') }}</p>
-                            <p v-if="form.errors.proof" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.proof }}</p>
-                        </label>
+                        <!--
+                            The only two figures that survive from the old order summary, and the
+                            only two the buyer has to carry into their banking app: what to send,
+                            and the reference that lets an admin match it back to this order. The
+                            plan breakdown was priced and agreed on the previous screen — repeating
+                            it here just buries these two.
+                        -->
+                        <div class="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
+                            <div class="flex items-end justify-between gap-4">
+                                <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ t('Amount to transfer') }}</span>
+                                <span class="text-2xl font-black text-gray-900 dark:text-white">{{ payment.formatted_amount }}</span>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3 dark:border-surface-700">
+                                <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ t('Payment ID') }}</span>
+                                <span class="text-right font-mono text-xs font-bold text-gray-900 dark:text-white">{{ payment.ulid }}</span>
+                            </div>
+                        </div>
 
-                        <label class="block">
-                            <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Note') }}</span>
-                            <textarea v-model="form.note" rows="4" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-primary-100" :placeholder="t('Optional details for admin review')" />
-                            <p v-if="form.errors.note" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.note }}</p>
-                        </label>
+                        <div class="whitespace-pre-line rounded-xl border border-primary-100 bg-primary-50 p-5 text-sm font-medium leading-7 text-gray-700 dark:border-primary-900/40 dark:bg-primary-900/30 dark:text-gray-200">
+                            {{ instructions || t('Bank transfer instructions are not configured yet. Please contact support before sending payment.') }}
+                        </div>
 
-                        <button :disabled="form.processing" type="submit" class="w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:bg-gray-300 disabled:shadow-none">
-                            {{ form.processing ? t('Uploading...') : t('Submit proof') }}
-                        </button>
-                    </form>
-                </section>
+                        <form class="mt-6 space-y-4" @submit.prevent="submitProof">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Transaction reference') }}</span>
+                                <input v-model="form.reference" type="text" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder-gray-500" :placeholder="t('Bank transaction ID or sender account')" />
+                                <p v-if="form.errors.reference" class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ form.errors.reference }}</p>
+                            </label>
 
-                <aside class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 class="mb-5 text-lg font-black text-gray-900">{{ t('Order summary') }}</h2>
-                    <div class="space-y-4 text-sm font-medium text-gray-600">
-                        <div class="flex justify-between gap-4">
-                            <span>{{ t('Plan') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.plan.name }}</span>
-                        </div>
-                        <div class="flex justify-between gap-4">
-                            <span>{{ t('Billing') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.billing_cycle }}</span>
-                        </div>
-                        <div class="flex justify-between gap-4">
-                            <span>{{ t('Subtotal') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.subtotal_formatted }}</span>
-                        </div>
-                        <div v-if="payment.vat_amount > 0" class="flex justify-between gap-4">
-                            <span>{{ t('Plan VAT') }} ({{ payment.vat_percentage }}%)</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.vat_formatted }}</span>
-                        </div>
-                        <div class="flex justify-between gap-4">
-                            <span>{{ t('Plan total') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.plan_total_formatted }}</span>
-                        </div>
-                        <div v-if="payment.processing_fee_amount > 0" class="flex justify-between gap-4">
-                            <span>{{ t('Processing fee') }}</span>
-                            <span class="text-right font-bold text-gray-900">{{ payment.processing_fee_formatted }}</span>
-                        </div>
-                        <div class="flex justify-between gap-4">
-                            <span>{{ t('Payment ID') }}</span>
-                            <span class="text-right font-mono text-xs font-bold text-gray-900">{{ payment.ulid }}</span>
-                        </div>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Upload payment proof') }}</span>
+                                <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-xl border border-gray-200 px-2 py-1 text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-sm file:font-bold file:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:file:border-primary-900/40 dark:file:bg-primary-900/30 dark:file:text-primary-400" @change="onFileChange" />
+                                <p class="mt-1 text-xs font-medium text-gray-400 dark:text-gray-500">{{ fileName || t('JPG, PNG, WebP, or PDF up to 5 MB') }}</p>
+                                <p v-if="form.errors.proof" class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ form.errors.proof }}</p>
+                            </label>
+
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Note') }}</span>
+                                <textarea v-model="form.note" rows="4" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder-gray-500" :placeholder="t('Optional details for admin review')" />
+                                <p v-if="form.errors.note" class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ form.errors.note }}</p>
+                            </label>
+
+                            <!-- Kept from the removed summary card: manual activation is not obvious,
+                             and someone who transfers and then waits with no explanation opens a
+                             support ticket. -->
+                            <p class="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
+                                {{ t('Your plan will be activated after admin verifies this payment.') }}
+                            </p>
+
+                            <button :disabled="form.processing" type="submit" class="w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none">
+                                <span v-if="form.processing">
+                                    <i class="ti ti-loader animate-spin"></i>
+                                    {{ t('Submitting...') }}
+                                </span>
+                                <span v-else>
+                                    {{ t('Submit Proof') }}
+                                </span>
+                            </button>
+                        </form>
+                    </section>
+
+                    <div class="text-center">
+                        <Link href="/pricing" class="text-sm font-medium text-gray-300 underline-offset-4 transition hover:text-primary-600 hover:underline dark:text-gray-400 dark:hover:text-primary-400">
+                            <i class="ti ti-arrow-left"></i>
+                            {{ t('Back to pricing') }}
+                        </Link>
                     </div>
-                    <div class="my-5 border-t border-gray-100 dark:border-gray-800"></div>
-                    <div class="flex items-end justify-between gap-4">
-                        <span class="text-sm font-bold text-gray-500">{{ t('Payment total') }}</span>
-                        <span class="text-3xl font-black text-gray-900">{{ payment.formatted_amount }}</span>
-                    </div>
-                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
-                        {{ t('Your plan will be activated after admin verifies this payment.') }}
-                    </p>
-                </aside>
+                </div>
             </div>
         </div>
-    </div>
-</Layout>
+    </Layout>
 </template>

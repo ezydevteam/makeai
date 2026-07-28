@@ -118,6 +118,13 @@ const summary = computed(() => couponPreview.value?.summary ?? {
     plan_total_formatted: hasProration.value ? (props.proration?.net_formatted ?? props.pricing.cycle.formatted) : props.pricing.cycle.formatted,
 })
 
+// The header is hidden on this page (hide_header from CheckoutController), so the logo
+// is rendered here instead — the one piece of chrome worth keeping, because a payment
+// page with no branding at all is exactly what a phishing page looks like.
+const branding = computed(() => (page.props.branding as { site_name?: string; site_logo_light?: string; site_logo_dark?: string }) ?? {})
+const logoLight = computed(() => String(branding.value.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value.site_logo_dark || logoLight.value))
+
 const billingLabel = computed(() => {
     if (props.billing === 'yearly') return t('Yearly')
     if (props.billing === 'lifetime') return t('Lifetime')
@@ -125,34 +132,10 @@ const billingLabel = computed(() => {
     return t('Monthly')
 })
 
-// Spreading a string would iterate it character by character, so never assume an array here:
-// a legacy double-encoded plan row arrives as a JSON string.
-const normalizeFeatures = (value: unknown): string[] => {
-    let parsed: unknown = value
-
-    for (let i = 0; i < 2 && typeof parsed === 'string'; i++) {
-        try {
-            parsed = JSON.parse(parsed)
-        } catch {
-            return []
-        }
-    }
-
-    return Array.isArray(parsed)
-        ? parsed.filter((feature): feature is string => typeof feature === 'string' && feature.trim() !== '')
-        : []
-}
-
-const featureList = computed(() => {
-    const features = normalizeFeatures(props.plan.features)
-
-    if (Number(props.plan.credits) > 0) {
-        features.push(t(':count credits', { count: Number(props.plan.credits).toLocaleString() }))
-    }
-
-    return features
-})
-
+// Checkout no longer re-sells the plan: the feature list, description and credit count
+// left with the plan-details column. Someone who reached this page has already chosen —
+// repeating the pitch here only competes with the one action the page exists for. The
+// plan name links back to pricing for anyone who wants to compare again.
 const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? ''
 
 // Gateway sessions redirect to an EXTERNAL provider (PayPal/Stripe/…). An Inertia
@@ -234,70 +217,41 @@ const applyCoupon = async () => {
     <Head :title="t('Checkout')" />
 
     <Layout>
-        <div class="w-full pt-6 md:pt-10 pb-12">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6">
-            <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h1 class="mt-2 text-3xl font-black text-gray-900 dark:text-white">{{ t('Complete your payment') }}</h1>
-                </div>
-                <Link href="/pricing" class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-600 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-500/40 dark:hover:text-primary-400">
-                    {{ t('Back to pricing') }}
+        <div class="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+            <div class="absolute inset-y-0 left-0 w-1/3 max-w-md bg-gradient-to-r from-primary-500/10 via-primary-500/5 to-transparent dark:from-primary-500/15 dark:via-primary-500/5"></div>
+            <div class="absolute inset-y-0 right-0 w-1/3 max-w-md bg-gradient-to-l from-primary-500/10 via-primary-500/5 to-transparent dark:from-primary-500/15 dark:via-primary-500/5"></div>
+        </div>
+
+        <div class="relative z-10 w-full pt-8 md:pt-12 pb-12">
+            <div class="mb-8 flex justify-center px-4">
+                <Link href="/" class="inline-flex items-center">
+                    <img v-if="logoLight" :src="logoLight" :alt="branding.site_name || 'Logo'" class="h-9 w-auto dark:hidden" />
+                    <img v-if="logoDark" :src="logoDark" :alt="branding.site_name || 'Logo'" class="hidden h-9 w-auto dark:block" />
+                    <span v-if="!logoLight && !logoDark" class="text-xl font-black text-gray-900 dark:text-white">{{ branding.site_name }}</span>
                 </Link>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div class="flex justify-center px-4 sm:px-6">
+                <div class="w-full max-w-lg">
+                <h1 class="mb-6 text-center text-3xl font-black text-gray-900 dark:text-white">{{ t('Complete your payment') }}</h1>
+
                 <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-surface-800">
-                        <div>
-                            <h2 class="text-2xl font-black text-gray-900 dark:text-white">{{ plan.name }}</h2>
-                            <p v-if="plan.description" class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ plan.description }}</p>
-                        </div>
-                        <span class="rounded-full bg-primary-50 px-4 py-2 text-sm font-bold text-primary-700 dark:!bg-primary-900/20 dark:text-primary-300">{{ billingLabel }}</span>
-                    </div>
-
-                    <div class="mb-6">
-                        <h3 class="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Payment method') }}</h3>
-                        <div v-if="gateways.length" class="grid gap-3 md:grid-cols-2">
-                            <button
-                                v-for="gateway in gateways"
-                                :key="gateway.id"
-                                type="button"
-                                @click="selectedGatewaySlug = gateway.slug"
-                                :class="selectedGatewaySlug === gateway.slug ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-500/40 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 text-gray-700 hover:border-primary-200 hover:bg-gray-50 dark:border-surface-800 dark:text-gray-300 dark:hover:border-primary-500/30 dark:hover:bg-surface-800'"
-                                class="rounded-xl border p-4 text-left transition"
-                            >
-                                <span class="flex items-center justify-between gap-3">
-                                    <span class="text-base font-black">{{ gateway.name }}</span>
-                                    <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                        {{ t('Test') }}
-                                    </span>
-                                </span>
-                                <span v-if="gateway.description" class="mt-1 block text-sm font-medium text-gray-500 dark:text-gray-400">{{ gateway.description }}</span>
-                                <span v-if="gateway.fee_amount > 0" class="mt-3 block text-xs font-semibold text-gray-500 dark:text-gray-400">
-                                    {{ t('Processing fee') }}: {{ gateway.fee_formatted }}
-                                </span>
-                            </button>
-                        </div>
-                        <div v-else class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-500">
-                            {{ t('No payment gateway is enabled yet. Please contact support or enable a gateway from admin.') }}
-                        </div>
-                    </div>
-
-                    <ul v-if="featureList.length" class="grid gap-3 border-t border-gray-100 pt-6 md:grid-cols-2 dark:border-surface-800">
-                        <li v-for="feature in featureList" :key="feature" class="flex items-start gap-3 text-sm font-medium text-gray-600 dark:text-gray-300">
-                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                            {{ feature }}
-                        </li>
-                    </ul>
-                </section>
-
-                <aside class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <h2 class="mb-5 text-lg font-black text-gray-900 dark:text-white">{{ t('Order summary') }}</h2>
 
                     <div class="space-y-4 text-sm font-medium text-gray-600 dark:text-gray-300">
                         <div class="flex justify-between gap-4">
                             <span>{{ t('Plan') }}</span>
-                            <span class="text-right font-bold text-gray-900 dark:text-white">{{ plan.name }}</span>
+                            <!--
+                                Opens in a new tab on purpose: this is a live checkout, and a
+                                same-tab navigation to go and re-read the plans would throw away
+                                an applied coupon and any selection made here.
+                            -->
+                            <a
+                                href="/pricing"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-right font-bold text-primary-600 underline decoration-primary-300 underline-offset-2 transition hover:text-primary-700 dark:text-primary-400 dark:decoration-primary-500/40 dark:hover:text-primary-300"
+                            >{{ plan.name }}</a>
                         </div>
                         <div class="flex justify-between gap-4">
                             <span>{{ t('Billing') }}</span>
@@ -307,22 +261,12 @@ const applyCoupon = async () => {
                             <span>{{ t('Plan price') }}</span>
                             <span class="text-right font-bold text-gray-900 dark:text-white">{{ pricing.cycle.subtotal_formatted }}</span>
                         </div>
-                        <div v-if="couponsEnabled" class="block">
-                            <button v-if="!showCouponInput" type="button" class="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline transition dark:text-primary-400 dark:hover:text-primary-300" @click="showCouponInput = true">
-                                {{ t('Have coupon? Apply it') }}
-                            </button>
-                            <label v-else class="block">
-                                <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Coupon code') }}</span>
-                                <div class="flex gap-2">
-                                    <input v-model="coupon" type="text" class="min-w-0 flex-1 !rounded-lg border border-gray-200 px-3 py-1.5 text-xs uppercase focus:border-primary-400 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-500/50 dark:focus:ring-primary-900/30" :placeholder="t('Optional')" @input="couponPreview = null; couponError = ''" />
-                                    <button type="button" :disabled="applyingCoupon" class="rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-bold text-white dark:bg-gray-800/80 transition disabled:opacity-60" @click="applyCoupon">
-                                        {{ applyingCoupon ? t('Applying...') : t('Apply') }}
-                                    </button>
-                                </div>
-                                <span v-if="couponPreview?.coupon" class="mt-1 block text-xs font-bold text-primary-600 dark:text-primary-400">{{ t('Applied') }}: {{ couponPreview.coupon.code }} (-{{ couponPreview.coupon.discount_formatted }})</span>
-                                <span v-else-if="couponError" class="mt-1 block text-xs font-bold text-red-600 dark:text-red-400">{{ couponError }}</span>
-                            </label>
-                        </div>
+                        <!--
+                            The coupon FIELD lives down by the Continue button; only the
+                            resulting discount belongs in the figures. Applying a code is an
+                            action, not a line item, and it read as one more thing to fill in
+                            before the total made sense.
+                        -->
                         <div v-if="summary.discount_amount > 0" class="flex justify-between gap-4">
                             <span>{{ t('Coupon discount') }}</span>
                             <span class="text-right text-green-600 font-bold dark:text-green-400">-{{ summary.discount_formatted }}</span>
@@ -356,7 +300,65 @@ const applyCoupon = async () => {
                         {{ t(':days days trial starts now. Renewal uses the selected billing cycle.', { days: String(pricing.cycle.trial_days ?? 0) }) }}
                     </p>
 
-                    <button type="button" :disabled="!selectedGateway || submitting" @click="createCheckoutSession" class="mt-6 w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none">
+                    <!--
+                        Only shown when there is a choice to make. With one gateway enabled a
+                        selector is a control with a single option — the button already names
+                        it ("Continue with Stripe"), which says the same thing in one place.
+                        Per-gateway processing fees are not repeated here: the fee line in the
+                        summary above already tracks the selection.
+                    -->
+                    <fieldset v-if="gateways.length > 1" class="mt-6 border-t border-gray-100 pt-5 dark:border-surface-800">
+                        <legend class="mb-1 text-sm font-bold text-gray-500 dark:text-gray-400">{{ t('Payment method') }}</legend>
+                        <div class="space-y-1">
+                            <label
+                                v-for="gateway in gateways"
+                                :key="gateway.id"
+                                class="flex cursor-pointer items-center gap-3 rounded-full px-2 py-2 transition hover:bg-gray-50 dark:hover:bg-surface-800"
+                            >
+                                <input
+                                    v-model="selectedGatewaySlug"
+                                    type="radio"
+                                    name="gateway"
+                                    :value="gateway.slug"
+                                    class="h-4 w-4 shrink-0 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-surface-600 dark:bg-surface-800"
+                                />
+                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ gateway.name }}</span>
+                                <!-- Only ever visible on a gateway in test mode, where mistaking it for a live one costs a real order. -->
+                                <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                    {{ t('Test') }}
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div v-else-if="!gateways.length" class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-500">
+                        {{ t('No payment gateway is enabled yet. Please contact support or enable a gateway from admin.') }}
+                    </div>
+
+                    <!--
+                        Last thing before committing. Collapsed to a single line by default so
+                        the empty field is not an unanswered question sitting between the buyer
+                        and the button — the discount it produces still appears up in the
+                        figures, where the total can be checked against it.
+                    -->
+                    <div v-if="couponsEnabled" class="mt-5">
+                        <button v-if="!showCouponInput" type="button" class="text-xs font-bold text-primary-600 transition hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300" @click="showCouponInput = true">
+                            {{ t('Have a coupon? Apply it') }}
+                        </button>
+                        <label v-else class="block">
+                            <span class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Coupon code') }}</span>
+                            <div class="flex gap-2">
+                                <input v-model="coupon" type="text" class="min-w-0 flex-1 !rounded-full border border-gray-200 px-3 py-1.5 text-xs uppercase focus:border-primary-400 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-500/50 dark:focus:ring-primary-900/30" :placeholder="t('Optional')" @input="couponPreview = null; couponError = ''" />
+                                <button type="button" :disabled="applyingCoupon" class="rounded-full bg-gray-900 px-4 py-1.5 text-xs font-bold text-white transition disabled:opacity-60 dark:bg-gray-800/80" @click="applyCoupon">
+                                    {{ applyingCoupon ? t('Applying...') : t('Apply') }}
+                                </button>
+                            </div>
+                            <span v-if="couponPreview?.coupon" class="mt-1 block text-xs font-bold text-primary-600 dark:text-primary-400">{{ t('Applied') }}: {{ couponPreview.coupon.code }} (-{{ couponPreview.coupon.discount_formatted }})</span>
+                            <span v-else-if="couponError" class="mt-1 block text-xs font-bold text-red-600 dark:text-red-400">{{ couponError }}</span>
+                        </label>
+                    </div>
+
+                    <button type="button" :disabled="!selectedGateway || submitting" @click="createCheckoutSession" class="mt-4 w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none">
                         {{ submitting ? t('Creating session...') : selectedGateway ? t('Continue with :gateway', { gateway: selectedGateway.name }) : t('No gateway available') }}
                     </button>
 
@@ -366,9 +368,16 @@ const applyCoupon = async () => {
                         </svg>
                         <span>{{ t('SSL Secure Checkout') }}</span>
                     </div>
-                </aside>
+                </section>
+
+                <div class="mt-5 text-center">
+                    <Link href="/pricing" class="text-sm font-medium text-gray-300 underline-offset-4 transition hover:text-primary-600 hover:underline dark:text-gray-400 dark:hover:text-primary-400">
+                        <i class="ti ti-arrow-left"></i>
+                        {{ t('Back to pricing') }}
+                    </Link>
+                </div>
+                </div>
             </div>
         </div>
-    </div>
-</Layout>
+    </Layout>
 </template>
