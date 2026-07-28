@@ -19,9 +19,19 @@ type CronTask = {
     next_run: string
 }
 
+type QueueStatus = {
+    status: 'pass' | 'warn' | 'fail'
+    detail: string
+    suggestion: string | null
+    required_entry: string
+    driver: string
+    queues: string[]
+}
+
 type CronStatus = {
     is_configured: boolean
     has_ever_run: boolean
+    queue: QueueStatus
     last_run_at: string | null
     last_run_human: string | null
     required_entry: string
@@ -58,6 +68,26 @@ const copyCronEntry = async () => {
     cronCopied.value = true
     window.setTimeout(() => { cronCopied.value = false }, 1600)
 }
+
+const queueCopied = ref(false)
+
+const copyQueueEntry = async () => {
+    await navigator.clipboard.writeText(props.cron.queue.required_entry)
+    queueCopied.value = true
+    window.setTimeout(() => { queueCopied.value = false }, 1600)
+}
+
+const queueTone = computed(() => ({
+    pass: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
+    warn: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    fail: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+}[props.cron.queue.status]))
+
+const queueLabel = computed(() => ({
+    pass: t('Running'),
+    warn: t('Unverified'),
+    fail: t('Not running'),
+}[props.cron.queue.status]))
 
 const runCronTask = (taskKey: string) => {
     cronRunForm.task = taskKey
@@ -125,6 +155,29 @@ const runCronTask = (taskKey: string) => {
                     </button>
                 </div>
                 <code class="block overflow-x-auto whitespace-pre rounded-lg bg-black/40 p-3 font-mono text-xs text-primary-100">{{ cron.required_entry }}</code>
+            </div>
+
+            <div class="mt-5 rounded-xl border border-gray-200 bg-gray-950 p-4 text-white shadow-sm dark:border-surface-700">
+                <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-sm font-semibold">{{ t('Queue Worker Entry') }}</h3>
+                            <span :class="queueTone" class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">{{ queueLabel }}</span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">{{ cron.queue.detail }}</p>
+                    </div>
+                    <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary-admin transition-colors" @click="copyQueueEntry">
+                        {{ queueCopied ? t('Copied') : t('Copy Command') }}
+                    </button>
+                </div>
+                <code class="block overflow-x-auto whitespace-pre rounded-lg bg-black/40 p-3 font-mono text-xs text-primary-100">{{ cron.queue.required_entry }}</code>
+                <p class="mt-3 text-xs leading-relaxed text-gray-400">
+                    {{ t('This is a SECOND cron entry, separate from the one above. The scheduler does not process queued work.') }}
+                    <template v-if="cron.queue.driver !== 'sync'">
+                        {{ t('With QUEUE_CONNECTION=:driver, anything deferred — sign-in codes, all other email, generation history, media, webhooks — is stored and never runs until a worker processes it.', { driver: cron.queue.driver }) }}
+                    </template>
+                    {{ t('The --queue list is not optional: queue:work without it processes only the queue named "default", leaving the other nine unprocessed.') }}
+                </p>
             </div>
 
             <div v-if="cron.cpanel_detected" class="mt-5 rounded-xl border border-gray-200 bg-secondary-50 p-4 text-secondary-900 dark:border-secondary-900/40 dark:bg-secondary-900/20 dark:text-secondary-100">

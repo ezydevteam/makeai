@@ -106,6 +106,21 @@ class QueueCoverageTest extends TestCase
             .'. Redis installs run Horizon, so those queues would never run there.');
     }
 
+    public function test_the_admin_panels_queue_list_covers_every_queue(): void
+    {
+        // This constant builds the copy-paste cron entry shown to admins and decides
+        // which Redis lists are counted when looking for waiting work. If it drifts, the
+        // panel hands out a command that silently skips queues — the original bug, moved
+        // from a text file into the product.
+        $missing = array_diff(
+            $this->dispatchedQueues(),
+            \App\Http\Controllers\Admin\System\SystemController::WORKER_QUEUES
+        );
+
+        $this->assertSame([], array_values($missing),
+            'SystemController::WORKER_QUEUES does not include: '.implode(', ', $missing));
+    }
+
     public function test_the_queue_list_is_discovered_and_not_empty(): void
     {
         // Guards the three tests above: if the source scan silently returned nothing,

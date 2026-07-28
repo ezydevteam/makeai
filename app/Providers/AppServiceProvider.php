@@ -51,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\View::composer('app', \App\View\Composers\AppHeadComposer::class);
 
         $this->configureHttps();
+        $this->recordQueueWorkerHeartbeat();
         $this->configureInfrastructureFallbacks();
         $this->configureStripeFromAdminPanel();
         $this->configureCloudStorage();
@@ -87,6 +88,45 @@ class AppServiceProvider extends ServiceProvider
      * behind Cloudflare/an LB otherwise get mixed-content and broken asset loads.
      * A no-op for local http development.
      */
+    /**
+     * Stamp a heartbeat every time a queued job finishes, so the admin panel can tell
+     * whether a worker is alive rather than guessing from how much work is waiting.
+     *
+     * The health check used to infer liveness from `jobs` table depth, which reported a
+     * green "Active" in exactly the situations that most needed a warning: that table is
+     * only used by the database driver, so on Redis it is always empty and the check passed
+     * unconditionally while nothing was running at all. Depth is also the wrong signal —
+     * a healthy worker keeping up has an empty queue, and a momentary backlog on a
+     * perfectly good one looks like an outage.
+     *
+     * A job completing is direct proof that a worker exists and is consuming, on any
+     * driver, with no per-driver introspection. Mirrors last_scheduler_run.
+     */
+    private function recordQueueWorkerHeartbeat(): void
+    {
+        \Illuminate\Support\Facades\Queue::after(function (\Illuminate\Queue\Events\JobProcessed $event): void {
+            try {
+                $now = now();
+
+                // Cache is the hot path and is what the freshness check reads first.
+                \Illuminate\Support\Facades\Cache::put('last_queue_worker_run', $now->toDateTimeString(), $now->copy()->addMinutes(30));
+
+                // The settings row is the durable fallback for when the cache is cleared
+                // or is an array store. Throttled to once a minute: a busy worker would
+                // otherwise write a row per job for a value with one-minute resolution.
+                $stampedAt = \Illuminate\Support\Facades\Cache::get('last_queue_worker_run_persisted');
+
+                if (! $stampedAt || $now->diffInSeconds(\Illuminate\Support\Carbon::parse($stampedAt)) >= 60) {
+                    settings_set('last_queue_worker_run', $now->toDateTimeString(), 'string', 'system');
+                    \Illuminate\Support\Facades\Cache::put('last_queue_worker_run_persisted', $now->toDateTimeString(), $now->copy()->addMinutes(30));
+                }
+            } catch (\Throwable $e) {
+                // A heartbeat must never be able to fail the job that produced it.
+                Log::debug('Queue worker heartbeat could not be recorded: '.$e->getMessage());
+            }
+        });
+    }
+
     private function configureHttps(): void
     {
         $appUrl = strtolower((string) config('app.url'));

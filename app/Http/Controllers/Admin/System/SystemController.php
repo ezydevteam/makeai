@@ -22,6 +22,22 @@ use Illuminate\Support\Facades\Log;
 
 class SystemController extends Controller
 {
+    /**
+     * Every queue the application dispatches to, in the order a worker should drain them.
+     *
+     * `queue:work` with no --queue processes ONLY the queue named "default". Shipping that
+     * bare command in the shared-hosting docs left nine of these permanently unprocessed
+     * on those installs — including otp, which carries sign-in codes — with no visible
+     * failure anywhere. This list is the one shown to admins and the one counted when
+     * looking for waiting work.
+     *
+     * QueueCoverageTest asserts this stays in step with every onQueue() call in the
+     * codebase, and with deploy/cron.txt, supervisor.conf.example and config/horizon.php.
+     */
+    public const WORKER_QUEUES = [
+        'otp', 'emails', 'mail', 'default', 'webhooks', 'ai', 'media', 'embeddings', 'social', 'low',
+    ];
+
     public function health()
     {
         $this->authorizeSystem();
@@ -279,10 +295,110 @@ class SystemController extends Controller
         return round($usage / 1024 / 1024, 2).' MB';
     }
 
-    protected function isQueueRunning()
+    /**
+     * Queue worker health, as {status, detail, suggestion}.
+     *
+     * Replaces a boolean that could only be wrong in the dangerous direction:
+     * `DB::table('jobs')->count() === 0 || Cache::has('horizon:status')`. The jobs table
+     * belongs to the database driver alone, so on Redis it is permanently empty and that
+     * check reported "Active" forever while nothing consumed anything. Even on database
+     * it measured backlog rather than liveness — a worker keeping up has an empty queue,
+     * and a brief spike on a healthy one read as an outage.
+     *
+     * Liveness now comes from the heartbeat AppServiceProvider stamps after each processed
+     * job, which is driver-agnostic. The one rule here: never report a pass that has not
+     * been observed. A queue that cannot be verified says so, because a false green is
+     * what let a site run for days with every OTP email undelivered.
+     */
+    protected function queueHealth(): array
     {
-        // Simple check for Horizon or default queue
-        return DB::table('jobs')->count() === 0 || Cache::has('horizon:status');
+        $driver = (string) config('queue.default');
+
+        // Nothing to run: sync executes jobs inside the request that dispatched them.
+        if ($driver === 'sync') {
+            return [
+                'status' => 'pass',
+                'detail' => translate('Not required (QUEUE_CONNECTION=sync runs jobs immediately)'),
+                'suggestion' => null,
+            ];
+        }
+
+        $lastRun = $this->lastQueueWorkerRun();
+
+        // A worker that finished a job in the last 15 minutes is unambiguously alive.
+        // The window is wide because a healthy but idle queue produces no heartbeats.
+        if ($lastRun && $lastRun->greaterThan(now()->subMinutes(15))) {
+            return [
+                'status' => 'pass',
+                'detail' => translate('Active').' — '.translate('last job :time', ['time' => $lastRun->diffForHumans()]),
+                'suggestion' => null,
+            ];
+        }
+
+        $pending = $this->pendingJobCount();
+
+        // Work is waiting and no worker has reported in: the one case we can call broken.
+        if ($pending > 0) {
+            return [
+                'status' => 'fail',
+                'detail' => translate(':count job(s) waiting with no worker running', ['count' => (string) $pending]),
+                'suggestion' => $this->queueWorkerCommand(),
+            ];
+        }
+
+        // Nothing queued and no heartbeat. Could be a healthy idle queue or no worker at
+        // all, and there is no way to tell them apart — so say that rather than guess.
+        return [
+            'status' => 'warn',
+            'detail' => $lastRun
+                ? translate('No job processed since :time', ['time' => $lastRun->diffForHumans()])
+                : translate('Cannot verify — no job has been processed yet'),
+            'suggestion' => $this->queueWorkerCommand(),
+        ];
+    }
+
+    private function lastQueueWorkerRun(): ?Carbon
+    {
+        $lastRun = Cache::get('last_queue_worker_run') ?: settings('last_queue_worker_run');
+
+        if (! $lastRun) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($lastRun);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Jobs waiting to be picked up, or null when the driver cannot be inspected.
+     */
+    private function pendingJobCount(): int
+    {
+        $driver = (string) config('queue.default');
+
+        try {
+            if ($driver === 'database') {
+                return (int) DB::table(config('queue.connections.database.table', 'jobs'))->count();
+            }
+
+            if ($driver === 'redis') {
+                $total = 0;
+
+                foreach (self::WORKER_QUEUES as $queue) {
+                    $total += (int) \Illuminate\Support\Facades\Redis::llen("queues:{$queue}");
+                }
+
+                return $total;
+            }
+        } catch (\Throwable) {
+            // Redis down, table missing — unknown, not zero.
+            return 0;
+        }
+
+        return 0;
     }
 
     protected function isSchedulerRunning()
@@ -342,6 +458,16 @@ class SystemController extends Controller
             'project_path' => base_path(),
             'php_binary' => $php,
             'cpanel_detected' => $this->isCpanelDetected(),
+            // The scheduler is only half the setup, and this page used to show only that
+            // half — an admin who configured what it asked for still had no worker, and
+            // nothing here said so. Everything deferred (sign-in OTP emails, all other
+            // mail, generation history, media, webhooks) needs the second entry.
+            'queue' => [
+                ...$this->queueHealth(),
+                'required_entry' => $this->queueWorkerEntry(),
+                'driver' => (string) config('queue.default'),
+                'queues' => self::WORKER_QUEUES,
+            ],
             'tasks' => collect($this->scheduledTasks())->map(function (array $task): array {
                 $lastRun = settings('cron_task_last_run_'.$task['key']);
 
@@ -531,6 +657,25 @@ class SystemController extends Controller
         // Nothing verifiable — bare `php` at least works on hosts with a sane PATH, and
         // the operator can compare it against their host's documented binary.
         return 'php';
+    }
+
+    /**
+     * The queue-worker cron entry, ready to paste, with this server's own paths.
+     *
+     * --stop-when-empty so each run exits instead of stacking workers a minute apart,
+     * and --max-time so a run can never outlive its own cron slot.
+     */
+    private function queueWorkerEntry(): string
+    {
+        return '* * * * * cd '.base_path().' && '.$this->cliPhpBinary()
+            .' artisan queue:work --queue='.implode(',', self::WORKER_QUEUES)
+            .' --stop-when-empty --max-time=55 >/dev/null 2>&1';
+    }
+
+    /** The same worker invocation without the cron wrapper, for running by hand. */
+    private function queueWorkerCommand(): string
+    {
+        return translate('Start a queue worker:').' php artisan queue:work --queue='.implode(',', self::WORKER_QUEUES);
     }
 
     private function isCpanelDetected(): bool
@@ -926,13 +1071,10 @@ class SystemController extends Controller
             ],
             $this->publicMediaCheck(),
             [
-                'status' => $this->isQueueRunning() ? 'pass' : 'warn',
+                // Evaluated once: the old code called isQueueRunning() three times, so a
+                // queue draining mid-render could report a different status than detail.
+                ...$this->queueHealth(),
                 'label' => translate('Queue worker'),
-                'detail' => $this->isQueueRunning() ? translate('Active') : translate('May be offline'),
-                // A bare `queue:work` only processes the "default" queue, so OTP,
-                // email and other jobs on named queues would never send. List every
-                // queue explicitly (or run Horizon when using Redis).
-                'suggestion' => $this->isQueueRunning() ? null : translate('Start queue worker: php artisan queue:work --queue=otp,emails,mail,default,webhooks,ai,media,embeddings,social,low'),
             ],
             [
                 'status' => $this->isSchedulerRunning() ? 'pass' : 'fail',
