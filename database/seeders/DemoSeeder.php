@@ -89,7 +89,7 @@ class DemoSeeder extends Seeder
      * Rows are still anchored to now(), so the data keeps moving with the calendar while
      * the numbers stay put. Change this constant only to deliberately reshuffle the demo.
      */
-    private const RANDOM_SEED = 20260727;
+    private const RANDOM_SEED = 20260726;
 
     public function run(): void
     {
