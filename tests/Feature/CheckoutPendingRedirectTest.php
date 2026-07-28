@@ -5,10 +5,11 @@ namespace Tests\Feature;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 /**
- * A completed payment must never land on the pending screen.
+ * The end of the payment flow: one screen, every gateway, honest about what happened.
  *
  * Most gateways point their success_url straight at /checkout/pending/{ulid} and let a
  * webhook finish the payment, so whenever that webhook won the race the buyer arrived at
@@ -29,6 +30,11 @@ class CheckoutPendingRedirectTest extends TestCase
         // on a non-Extended licence — so without this every assertion below tests the
         // licence gate rather than the redirect.
         settings_set('license_type', '2', 'integer', 'license');
+
+        // Theme pages live in resources/themes/default/js and are resolved by a custom
+        // branch in app.ts; Inertia's on-disk existence check only knows the default
+        // location, so it fails a component that resolves correctly in the browser.
+        config(['inertia.testing.ensure_pages_exist' => false]);
     }
 
     private function payment(string $status): Payment
@@ -50,13 +56,48 @@ class CheckoutPendingRedirectTest extends TestCase
         return $payment;
     }
 
-    public function test_a_completed_payment_goes_to_billing_not_the_pending_screen(): void
+    /**
+     * A completed payment now RENDERS the confirmation rather than redirecting past it.
+     *
+     * The redirect existed only because the page used to insist it was "waiting for
+     * confirmation" whatever the status. Now that it is status-aware, a buyer who has
+     * just parted with money gets a moment that says so — and the page forwards them on
+     * itself, on a visible countdown they can cancel.
+     */
+    public function test_a_completed_payment_renders_the_confirmation_with_a_forward_target(): void
     {
         $payment = $this->payment('completed');
 
         $this->get(route('checkout.pending', $payment))
-            ->assertRedirect(route('user.dashboard.billing'))
-            ->assertSessionHas('success');
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Checkout/Pending')
+                ->where('payment.status', 'completed')
+                ->where('continueUrl', route('user.dashboard.billing'))
+            );
+    }
+
+    /** A top-up buyer wants the credits they bought, not the billing page. */
+    public function test_a_completed_topup_forwards_to_usage_instead_of_billing(): void
+    {
+        $user = User::factory()->create(['is_active' => true, 'email_verified_at' => now()]);
+
+        $payment = Payment::create([
+            'user_id' => $user->id,
+            'gateway' => 'stripe',
+            'gateway_payment_id' => 'demo-topup-'.uniqid(),
+            'amount' => 5,
+            'currency' => 'USD',
+            'status' => 'completed',
+            'type' => 'credit_topup',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('checkout.pending', $payment))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('continueUrl', route('user.dashboard.usage.index'))
+            );
     }
 
     /** The screen still exists for payments that genuinely have not settled. */

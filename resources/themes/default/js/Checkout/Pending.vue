@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Head, Link, usePage } from '@inertiajs/vue3'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import Layout from '@themes/default/js/Layouts/AppLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -27,6 +27,8 @@ interface PaymentPayload {
 
 const props = defineProps<{
     payment: PaymentPayload
+    continueUrl: string
+    continueLabel: string
 }>()
 
 const { t } = useTranslate()
@@ -86,6 +88,64 @@ const statusView = computed(() => {
             : t('Your payment session was created and is waiting for gateway confirmation.'),
     }
 })
+
+/**
+ * On a confirmed payment, move the buyer along on their own — but never against them.
+ *
+ * A bare timer would be worse than no timer: it takes the page away at exactly the moment
+ * someone might be reading the payment ID or screenshotting the amount, and it fires
+ * blind if they have switched tabs to tell somebody. So the countdown is visible, there
+ * is a button for anyone who does not want to wait, and ANY sign of engagement cancels
+ * it — scroll, click, key, touch. Someone who is clearly reading is not interrupted.
+ */
+const AUTO_CONTINUE_SECONDS = 5
+
+const isConfirmed = computed(() => (props.payment.status || '').toLowerCase() === 'completed')
+const countdown = ref(AUTO_CONTINUE_SECONDS)
+const autoContinueCancelled = ref(false)
+
+let timer: ReturnType<typeof setInterval> | null = null
+
+const stopCountdown = () => {
+    if (timer) {
+        clearInterval(timer)
+        timer = null
+    }
+}
+
+const cancelAutoContinue = () => {
+    if (autoContinueCancelled.value) return
+
+    autoContinueCancelled.value = true
+    stopCountdown()
+}
+
+const goNow = () => {
+    stopCountdown()
+    router.visit(props.continueUrl)
+}
+
+const interactionEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+
+onMounted(() => {
+    if (!isConfirmed.value) return
+
+    interactionEvents.forEach((event) => window.addEventListener(event, cancelAutoContinue, { passive: true }))
+
+    timer = setInterval(() => {
+        countdown.value -= 1
+
+        if (countdown.value <= 0) {
+            stopCountdown()
+            router.visit(props.continueUrl)
+        }
+    }, 1000)
+})
+
+onBeforeUnmount(() => {
+    stopCountdown()
+    interactionEvents.forEach((event) => window.removeEventListener(event, cancelAutoContinue))
+})
 </script>
 
 <template>
@@ -117,8 +177,14 @@ const statusView = computed(() => {
             <div class="flex justify-center px-4 sm:px-6">
                 <div class="w-full max-w-xl">
                     <div class="flex flex-col items-center text-center">
-                        <div :class="statusView.tone" class="mb-5 flex h-16 w-16 items-center justify-center rounded-full">
-                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" :d="statusView.icon" /></svg>
+                        <!-- On a confirmation the ring pulses once and the tick draws itself,
+                             so the outcome registers before the words are read. Both are
+                             one-shot: nothing keeps moving while someone is reading. -->
+                        <div :class="[statusView.tone, isConfirmed ? 'confirm-badge' : '']" class="relative mb-5 flex h-16 w-16 items-center justify-center rounded-full">
+                            <span v-if="isConfirmed" class="confirm-ring absolute inset-0 rounded-full" :class="statusView.tone" aria-hidden="true"></span>
+                            <svg class="relative h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path :class="isConfirmed ? 'confirm-tick' : ''" stroke-linecap="round" stroke-linejoin="round" :d="statusView.icon" />
+                            </svg>
                         </div>
 
                         <h1 class="text-3xl font-black text-gray-900 dark:text-white">{{ statusView.title }}</h1>
@@ -167,10 +233,26 @@ const statusView = computed(() => {
                         </div>
                     </section>
 
-                    <Link href="/user/dashboard/billing" class="mt-6 block w-full rounded-xl btn-primary text-center shadow-lg shadow-primary-600/20 transition">
-                        {{ t('Go to dashboard') }}
+                    <button
+                        v-if="isConfirmed"
+                        type="button"
+                        class="mt-6 block w-full rounded-xl btn-primary text-center shadow-lg shadow-primary-600/20 transition"
+                        @click="goNow"
+                    >
+                        {{ continueLabel }}
+                        <i class="ti ti-arrow-up-right"></i>
+                    </button>
+
+                    <Link v-else :href="continueUrl" class="mt-6 block w-full rounded-xl btn-primary text-center shadow-lg shadow-primary-600/20 transition">
+                        {{ continueLabel }}
                         <i class="ti ti-arrow-up-right"></i>
                     </Link>
+
+                    <!-- Says what is about to happen before it happens, and stops saying it the
+                         moment the buyer shows any sign of wanting to stay. -->
+                    <p v-if="isConfirmed && !autoContinueCancelled" class="mt-3 text-center text-xs font-medium text-gray-400 dark:text-gray-500">
+                        {{ t('Taking you there in :seconds…', { seconds: String(countdown) }) }}
+                    </p>
 
                     <div class="mt-5 text-center">
                         <Link href="/pricing" class="text-sm font-medium text-gray-300 underline-offset-4 transition hover:text-primary-600 hover:underline dark:text-gray-400 dark:hover:text-primary-400">
@@ -183,3 +265,43 @@ const statusView = computed(() => {
         </div>
     </Layout>
 </template>
+
+<style scoped>
+/*
+ * One-shot on mount, both of them. A looping animation on a page someone is reading —
+ * possibly copying a payment ID off — is a distraction, and the point here is only to
+ * make the outcome register before the words do.
+ */
+.confirm-tick {
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: confirm-draw 0.5s ease-out 0.1s forwards;
+}
+
+.confirm-ring {
+    opacity: 0.45;
+    animation: confirm-pulse 0.9s ease-out 1;
+}
+
+@keyframes confirm-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes confirm-pulse {
+    0% { transform: scale(1); opacity: 0.45; }
+    100% { transform: scale(1.7); opacity: 0; }
+}
+
+/* Anyone who has asked not to see motion gets the end state immediately. */
+@media (prefers-reduced-motion: reduce) {
+    .confirm-tick {
+        stroke-dashoffset: 0;
+        animation: none;
+    }
+
+    .confirm-ring {
+        animation: none;
+        opacity: 0;
+    }
+}
+</style>
