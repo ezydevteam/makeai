@@ -137,7 +137,14 @@ class SubscriptionLifecycleService
             // whatever was already in it. Someone with 23 credits buying a 10,000-credit
             // plan ended on 10,000 rather than 10,023.
             if ($plan = Plan::find($payment->plan_id)) {
-                $payment->user->grantPurchasedPlanCredits((float) $plan->credits, "Plan credits: {$plan->name}");
+                if ($isPlanChange) {
+                    // Switching plans replaces the allowance rather than buying a second
+                    // one: the unused part of the old plan was already credited back in the
+                    // proration discount on the price.
+                    $payment->user->resetPlanAllowance((float) $plan->credits, "Plan changed to {$plan->name}");
+                } else {
+                    $payment->user->grantPurchasedPlanCredits((float) $plan->credits, "Plan credits: {$plan->name}");
+                }
             }
 
             // Any new checkout (plan change, billing-cycle switch, or one-time
@@ -359,9 +366,18 @@ class SubscriptionLifecycleService
                 'subscription_ends_at' => $periodEnd,
             ]);
 
-            // Refresh the plan's credit allowance for the renewed period.
+            // A renewal is a fresh period, so the allowance is SET to the plan's figure
+            // rather than topped up to it. This is also the only place a downgrade takes
+            // effect on the wallet: applyScheduledChanges() swaps the plan at period end
+            // but grants nothing, because no money changes hands there and a one-time plan
+            // never reaches this path at all. Without the reset, someone who dropped 50k →
+            // 10k kept the 50k indefinitely — every renewal saw a balance already above
+            // the new allowance and did nothing.
+            //
+            // Purchased credits are untouched: resetPlanAllowance() targets
+            // plan credits + topup_credits.
             if (($renewUser = $subscription->user) && ($renewPlan = Plan::find($subscription->plan_id))) {
-                $renewUser->grantPlanAllowance((float) $renewPlan->credits, "Plan renewal credits: {$renewPlan->name}");
+                $renewUser->resetPlanAllowance((float) $renewPlan->credits, "Plan renewal credits: {$renewPlan->name}");
             }
 
             return $renewalPayment;
@@ -563,6 +579,13 @@ class SubscriptionLifecycleService
                         'subscription_ends_at' => $periodEnd,
                     ]);
 
+                    // No credit grant here, deliberately. A downgrade applies at period end
+                    // and nothing is charged at that moment — a one-time plan is never
+                    // billed again at all, so granting here would hand out an allowance
+                    // nobody paid for. The wallet follows the plan on the next SUCCESSFUL
+                    // recurring payment, where recordRenewal() resets it to the new plan's
+                    // figure (plus any purchased top-ups).
+
                     // Email confirmation already went out when the downgrade was
                     // scheduled — only an in-app note here.
                     app(NotificationEventService::class)->subscriptionDowngradeApplied($subscription, $oldPlan);
@@ -728,7 +751,7 @@ class SubscriptionLifecycleService
             'current_period_end' => now(),
         ]);
 
-        $this->downgradeUserIfNoOtherAccess($subscription);
+        $this->downgradeUserIfNoOtherAccess($subscription, 'Subscription ended: plan allowance revoked');
 
         app(NotificationEventService::class)->subscriptionExpired($subscription);
     }
@@ -825,7 +848,7 @@ class SubscriptionLifecycleService
                 'current_period_end' => now(),
             ]);
 
-            $this->downgradeUserIfNoOtherAccess($subscription);
+            $this->downgradeUserIfNoOtherAccess($subscription, 'Payment refunded: plan allowance revoked');
         }
     }
 
@@ -876,7 +899,19 @@ class SubscriptionLifecycleService
      * Remove the user's plan unless another still-valid subscription grants access
      * (e.g. the user re-subscribed to a different plan before the old one lapsed).
      */
-    protected function downgradeUserIfNoOtherAccess(GatewaySubscription $subscription): void
+    /**
+     * Revoke plan access — and with it, the plan's credit allowance.
+     *
+     * Called from all three "the paid period is over" events: expiry, refund and immediate
+     * termination. Access was already being revoked; the wallet was not, so a one-time 50k
+     * buyer whose period ended kept all 50k indefinitely with no plan and no further
+     * payments, and a refunded subscriber kept the credits their money had been returned
+     * for. The allowance belongs to the period that paid for it.
+     *
+     * Purchased credits survive: resetPlanAllowance(0) targets 0 + topup_credits, so a
+     * buyer is left holding exactly what they bought separately and nothing else.
+     */
+    protected function downgradeUserIfNoOtherAccess(GatewaySubscription $subscription, string $reason = 'Plan ended: allowance revoked'): void
     {
         $user = $subscription->user;
 
@@ -904,6 +939,10 @@ class SubscriptionLifecycleService
             'subscription_status' => 'none',
             'subscription_ends_at' => now(),
         ]);
+
+        // Only reached when the user has no other live subscription (checked above), so
+        // this cannot strip credits from someone who still holds a paid plan elsewhere.
+        $user->resetPlanAllowance(0, $reason);
     }
 
     public function expirePastDue(): int
@@ -929,7 +968,7 @@ class SubscriptionLifecycleService
 
                     $subscription->update(['status' => 'expired']);
 
-                    $this->downgradeUserIfNoOtherAccess($subscription);
+                    $this->downgradeUserIfNoOtherAccess($subscription, 'Plan period ended: allowance revoked');
 
                     if ($wasTrialing) {
                         app(NotificationEventService::class)->trialEnded($subscription);

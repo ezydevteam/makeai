@@ -789,6 +789,59 @@ class User extends Authenticatable implements MustVerifyEmail
      * The anniversary refresh keeps the top-up-to semantics, which is what stops a
      * monthly allowance compounding.
      */
+    /**
+     * Swap the plan allowance for a different one — an upgrade or a downgrade.
+     *
+     * A plan change replaces an allowance, it does not add a second one. Going 10k → 50k
+     * used to ADD the new plan on top of whatever was left of the old, so a wallet holding
+     * 10k + a 3.5k top-up landed on 63.5k rather than 53.5k: the old plan's unused credits
+     * were paid for twice, once in the proration discount and again in the wallet. Repeated
+     * up/down changes stacked an allowance every time. A downgrade did the opposite and
+     * granted nothing at all, so 50k → 10k kept the whole 50k for the cheaper plan.
+     *
+     * Unlike grantPlanAllowance() this can move the balance DOWN, because that is what
+     * "your allowance is now the smaller plan's" means. Purchased credits are never part
+     * of it — topup_credits sits on top of the new allowance exactly as before.
+     */
+    public function resetPlanAllowance(float $planCredits, string $reason): void
+    {
+        $fresh = $this->fresh();
+        $protected = (float) $fresh->topup_credits;
+        $target = round(max(0, $planCredits) + $protected, 4);
+        $current = (float) $fresh->credits;
+        $delta = round($target - $current, 4);
+
+        // Nothing to record when the wallet is already where it should be.
+        if (abs($delta) < 0.0001) {
+            return;
+        }
+
+        static::whereKey($this->id)->update(['credits' => $target]);
+        $this->forceFill(['credits' => $target]);
+
+        $this->creditTransactions()->create([
+            'amount' => $delta,
+            'balance_after' => $target,
+            // The enum has no 'plan_change'; admin_adjust is the closest honest fit for a
+            // reduction, and 'refund' would be a lie — no money goes back.
+            'type' => $delta > 0 ? 'purchase' : 'admin_adjust',
+            'description' => $reason,
+            'meta' => [
+                'plan_credits' => $planCredits,
+                'protected_topup_credits' => $protected,
+                'plan_change' => true,
+            ],
+        ]);
+
+        if ($delta > 0) {
+            try {
+                app(NotificationEventService::class)->creditsAdded($this->fresh(), $delta, $reason);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+    }
+
     public function grantPurchasedPlanCredits(float $planCredits, string $reason): void
     {
         if ($planCredits <= 0) {
