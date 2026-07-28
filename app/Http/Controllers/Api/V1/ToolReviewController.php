@@ -87,10 +87,14 @@ class ToolReviewController extends Controller
             ], 403);
         }
 
+        // Read the dedicated tool_slug column, the same source the canReview gate in
+        // AiToolController uses. The old metadata->template_slug JSON lookup disagreed
+        // with that gate: TokenGuard::chargeExternalTool() fills only the column, so an
+        // integration-backed tool showed the review form and then rejected the submit.
         $hasUsedTool = AiUsageLog::where('user_id', $user->id)
             ->where('type', 'tool')
             ->where('status', 'completed')
-            ->where('metadata->template_slug', $slug)
+            ->where('tool_slug', $slug)
             ->exists();
 
         if (! $hasUsedTool) {

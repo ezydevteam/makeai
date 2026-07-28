@@ -112,6 +112,13 @@ const hoverRating = ref(0)
 const reviewComment = ref('')
 const reviewMessage = ref('')
 const reviewSubmitting = ref(false)
+// Local mirror of the `canReview` prop so a generation completing in this page
+// session can open the review form without a reload. Never latches back to false:
+// the gate is "has used at least once", which no client-side event can undo.
+const reviewUnlocked = ref(props.canReview)
+watch(() => props.canReview, (val) => {
+    if (val) reviewUnlocked.value = true
+})
 const reviewSort = ref('helpful')
 const sortOptions = computed(() => [
     { value: 'helpful', label: t('Most Helpful') },
@@ -187,6 +194,29 @@ const allStreams = [mainStream, ...variationStreams]
 allStreams.forEach((s) => {
     watch(s.error, (val) => {
         if (val) toast.error(val)
+    })
+    // The `canReview` prop is evaluated once at page render, so a user's first
+    // generation left the review form locked until a full reload. Two signals open
+    // it in place instead, and both land strictly after TokenGuard has written the
+    // completed AiUsageLog row that the review gate queries — neither can unlock
+    // a form the server would then reject.
+    //
+    // `usage` is the fast path: GenerateController echoes it immediately after the
+    // TokenGuard::after() call that writes the row.
+    watch(s.usage, (val) => {
+        if (val) reviewUnlocked.value = true
+    })
+
+    // The stream ending cleanly is the backstop, for any path that finishes without
+    // an SSE usage frame. It asks the server rather than assuming, so the gate stays
+    // authoritative — and it only spends the request when the form is still locked,
+    // which is at most once per user per tool.
+    watch(s.isStreaming, (streaming, wasStreaming) => {
+        if (streaming || !wasStreaming) return
+        if (s.error.value || !s.output.value.trim()) return
+        if (reviewUnlocked.value) return
+
+        router.reload({ only: ['canReview'] })
     })
 })
 
@@ -1443,7 +1473,7 @@ const copyToolLink = () => {
                                             <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
                                         </div>
                                     </div>
-                                    <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                                    <form v-if="authUser && reviewUnlocked" class="space-y-3" @submit.prevent="submitReview">
                                         <div class="flex items-center gap-1.5 mb-2">
                                             <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
                                             <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
@@ -1768,7 +1798,7 @@ const copyToolLink = () => {
                                         <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
                                     </div>
                                 </div>
-                                <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                                <form v-if="authUser && reviewUnlocked" class="space-y-3" @submit.prevent="submitReview">
                                     <div class="flex items-center gap-1.5 mb-2">
                                         <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
                                         <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
@@ -2000,7 +2030,7 @@ const copyToolLink = () => {
                                 <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
                             </div>
                         </div>
-                        <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                        <form v-if="authUser && reviewUnlocked" class="space-y-3" @submit.prevent="submitReview">
                             <div class="flex items-center gap-1.5 mb-2">
                                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
                                 <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
