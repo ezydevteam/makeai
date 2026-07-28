@@ -149,7 +149,7 @@ const appliedMobileSidebarOverlayStyle = computed(() => (isDesktopViewport.value
 const navItems = computed<NavItem[]>(() => {
     const is = (name: string) => route().current(name)
     const items: NavItem[] = [
-        { label: t('Dashboard'), routeName: 'user.dashboard', active: is('user.dashboard'), icon: 'ti ti-dashboard' },
+        { label: t('Dashboard'), routeName: 'user.dashboard', active: is('user.dashboard'), icon: 'ti ti-layout-dashboard' },
         ...((playgroundEnabled.value || chainsEnabled.value || toolEmbedsEnabled.value) ? [{
             label: t('Workspace'),
             icon: 'ti ti-building-factory',
