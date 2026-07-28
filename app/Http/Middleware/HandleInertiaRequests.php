@@ -829,11 +829,58 @@ class HandleInertiaRequests extends Middleware
      * admins who can actually manage the system. `available` drives the badge;
      * `show_banner` also respects the snooze (24h) / dismiss (this version) state.
      */
+    /**
+     * Ask the License Server again when the answer has gone stale.
+     *
+     * update_available only ever moved in two places: the "Check for updates" button, and
+     * the updates:check command scheduled daily at 03:00. That schedule is the whole
+     * mechanism, so on any install where cron is not actually running — routine on shared
+     * hosting, and the reason the Scheduler health check exists — the header banner and
+     * the sidebar dot never appeared at all. The operator had to already suspect there was
+     * an update in order to find out there was one.
+     *
+     * Runs after the response is flushed, so no admin page waits on an outbound HTTP call,
+     * and takes a short cache lock so concurrent requests cannot each start their own.
+     */
+    private function refreshUpdateFlagIfStale(): void
+    {
+        $lastChecked = settings('update_last_checked');
+
+        try {
+            $stale = blank($lastChecked) || Carbon::parse($lastChecked)->lt(now()->subHours(6));
+        } catch (\Throwable) {
+            $stale = true;
+        }
+
+        if (! $stale) {
+            return;
+        }
+
+        // add() is atomic: the first request through claims it, the rest return.
+        if (! Cache::add('core_update_check_lock', true, now()->addMinutes(10))) {
+            return;
+        }
+
+        dispatch(function () {
+            try {
+                app(\App\Services\UpdateService::class)->checkForUpdate();
+            } catch (\Throwable) {
+                // No license yet, server unreachable, key unconfigured — all transient and
+                // none of them the admin's problem right now. Stamp the attempt anyway, or
+                // a License Server having a bad afternoon means every single admin request
+                // starts another check.
+                settings_set('update_last_checked', now()->toDateTimeString(), 'string', 'system');
+            }
+        })->afterResponse();
+    }
+
     private function getCoreUpdateStatus($admin): array
     {
         if (! $admin->hasPermission('settings.manage')) {
             return ['available' => false, 'show_banner' => false];
         }
+
+        $this->refreshUpdateFlagIfStale();
 
         $available = (bool) settings('update_available', false);
         $version = settings('update_version');
