@@ -6,6 +6,7 @@ use App\Support\PurchaseCode;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -379,17 +380,152 @@ class UpdateService
                 escapeshellarg($dumpFile)
             );
 
-            putenv('MYSQL_PWD=' . $password);
-            exec($command, $output, $returnVar);
-            putenv('MYSQL_PWD');
+            $output = [];
+            $returnVar = 1;
 
-            if ($returnVar !== 0) {
-                Log::warning('mysqldump failed, falling back to schema dump', ['output' => implode("\n", $output)]);
-                Artisan::call('schema:dump');
-                if (File::exists(database_path('schema/mysql-schema.dump'))) {
-                    File::copy(database_path('schema/mysql-schema.dump'), "{$backupDir}/database_{$timestamp}.sql");
-                }
+            // exec() is frequently listed in disable_functions on shared hosting. Calling
+            // it there emits a warning and leaves $returnVar untouched, so it is seeded
+            // above and the call is guarded rather than relied upon.
+            if ($this->canExec()) {
+                putenv('MYSQL_PWD=' . $password);
+                exec($command, $output, $returnVar);
+                putenv('MYSQL_PWD');
             }
+
+            if ($returnVar === 0 && File::exists($dumpFile) && File::size($dumpFile) > 0) {
+                return;
+            }
+
+            // No usable mysqldump. This is the NORMAL case on shared hosting, which is
+            // most of the buyer base — exec() is often disabled outright and the MySQL
+            // client tools are rarely installed.
+            //
+            // The old fallback here called `schema:dump`, which runs mysqldump itself
+            // (Illuminate\Database\Schema\MySqlSchemaState), so it threw the very error it
+            // was meant to absorb — and because backupDatabase() runs at step 1, before any
+            // file is touched, that exception aborted the whole update. The product could
+            // not self-update on the hosting it is most often installed on.
+            Log::warning('mysqldump unavailable or failed; writing a PHP-native backup instead', [
+                'exit_code' => $returnVar,
+                'output' => implode("\n", array_slice($output, 0, 5)),
+            ]);
+
+            // A partial file from the failed attempt would otherwise be mistaken for a backup.
+            File::delete($dumpFile);
+
+            $this->dumpDatabaseWithPdo($dumpFile);
+        }
+    }
+
+    /**
+     * Render one column value as a SQL literal for the dump.
+     *
+     * Everything non-numeric goes through PDO::quote rather than string concatenation:
+     * settings values, prompts and blog bodies routinely contain apostrophes and
+     * backslashes, and one unescaped quote would terminate the statement and leave a
+     * backup that looks fine on disk and fails halfway through a restore.
+     */
+    private function dumpValue(mixed $value, \PDO $pdo): string
+    {
+        return match (true) {
+            $value === null => 'NULL',
+            is_bool($value) => $value ? '1' : '0',
+            is_int($value), is_float($value) => (string) $value,
+            default => $pdo->quote((string) $value),
+        };
+    }
+
+    /**
+     * Whether exec() is actually callable, rather than merely defined. Hosts disable it
+     * via disable_functions, where the function still exists but is a no-op that warns.
+     */
+    private function canExec(): bool
+    {
+        if (! function_exists('exec')) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        return ! in_array('exec', $disabled, true);
+    }
+
+    /**
+     * Write a restorable .sql dump using only PDO — no mysqldump, no exec(), nothing that
+     * shared hosting can withhold.
+     *
+     * Rows stream through a cursor and are flushed in batches so a large table cannot
+     * exhaust the PHP memory limit, which on the hosts this exists for is often 128M.
+     */
+    private function dumpDatabaseWithPdo(string $dumpFile): void
+    {
+        $pdo = DB::connection()->getPdo();
+        $database = (string) config('database.connections.mysql.database');
+
+        $handle = fopen($dumpFile, 'w');
+
+        if ($handle === false) {
+            throw new \RuntimeException('Could not open the backup file for writing: ' . $dumpFile);
+        }
+
+        try {
+            fwrite($handle, "-- makeai database backup\n");
+            fwrite($handle, '-- Generated ' . now()->toDateTimeString() . " without mysqldump\n\n");
+            fwrite($handle, "SET NAMES utf8mb4;\n");
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n\n");
+
+            foreach (DB::select('SHOW FULL TABLES WHERE Table_type = ?', ['BASE TABLE']) as $row) {
+                $table = (string) array_values((array) $row)[0];
+
+                $create = (array) DB::select('SHOW CREATE TABLE `' . str_replace('`', '``', $table) . '`')[0];
+                $createSql = $create['Create Table'] ?? null;
+
+                if (! $createSql) {
+                    continue;
+                }
+
+                fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n{$createSql};\n\n");
+
+                // Generated columns are rejected by INSERT, so the column list is taken
+                // from information_schema rather than from the row keys.
+                $columns = collect(DB::select(
+                    'SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+                       AND (EXTRA IS NULL OR EXTRA NOT LIKE ?)
+                     ORDER BY ORDINAL_POSITION',
+                    [$database, $table, '%GENERATED%']
+                ))->map(fn ($column) => (string) array_values((array) $column)[0]);
+
+                if ($columns->isEmpty()) {
+                    continue;
+                }
+
+                $columnList = $columns->map(fn (string $c) => '`' . $c . '`')->implode(', ');
+                $batch = [];
+
+                foreach (DB::table($table)->cursor() as $record) {
+                    $record = (array) $record;
+
+                    $batch[] = '(' . $columns
+                        ->map(fn (string $column) => $this->dumpValue($record[$column] ?? null, $pdo))
+                        ->implode(', ') . ')';
+
+                    if (count($batch) >= 200) {
+                        fwrite($handle, "INSERT INTO `{$table}` ({$columnList}) VALUES\n" . implode(",\n", $batch) . ";\n");
+                        $batch = [];
+                    }
+                }
+
+                if ($batch !== []) {
+                    fwrite($handle, "INSERT INTO `{$table}` ({$columnList}) VALUES\n" . implode(",\n", $batch) . ";\n");
+                }
+
+                fwrite($handle, "\n");
+            }
+
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+        } finally {
+            fclose($handle);
         }
     }
 
