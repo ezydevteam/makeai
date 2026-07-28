@@ -256,6 +256,11 @@ Schedule::call(function (): void {
 // Demo-only: keep the Horizon dashboard active. The command self-gates on demo mode and a
 // Redis queue, so on a real install (or without Redis) it simply no-ops. Every five minutes
 // stays ahead of Horizon's recent-job trimming so the dashboard never goes quiet.
+// Only where it can actually do something. Horizon watches Redis queues, so on a
+// database-queue demo the command correctly refuses — but a refusal is still a non-zero
+// exit, and the scheduler logs every one of those as an ERROR. Five minutes apart, that
+// buried the real errors under thousands of lines a day.
 Schedule::command('demo:horizon-activity')
     ->everyFiveMinutes()
+    ->when(fn () => config('demo.enabled') && config('queue.default') === 'redis')
     ->withoutOverlapping();

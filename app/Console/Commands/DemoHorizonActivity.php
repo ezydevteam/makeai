@@ -46,13 +46,18 @@ class DemoHorizonActivity extends Command
         }
 
         // Horizon watches Redis queues; on the DB/sync driver these jobs would never appear
-        // on the dashboard, so bail with an actionable message rather than silently doing
-        // nothing useful.
+        // on the dashboard, so say so rather than silently doing nothing useful.
+        //
+        // SUCCESS, not FAILURE: a host that does not run Redis is a fact about the
+        // environment, not a fault. Returning non-zero made the scheduler log an ERROR
+        // every five minutes on exactly the hosting this product is most often installed
+        // on. The schedule now skips it outright (routes/console.php); this keeps a manual
+        // run from looking like a crash.
         if (config('queue.default') !== 'redis') {
-            $this->warn('Queue connection is "'.config('queue.default').'", not "redis".');
+            $this->warn('Queue connection is "'.config('queue.default').'", not "redis" — nothing dispatched.');
             $this->line('Horizon only monitors Redis queues. Set QUEUE_CONNECTION=redis and run `php artisan horizon` for these to appear.');
 
-            return self::FAILURE;
+            return self::SUCCESS;
         }
 
         $count = max(1, (int) $this->option('count'));
