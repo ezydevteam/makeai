@@ -805,6 +805,19 @@ class DemoSeeder extends Seeder
             ])->save();
         }
 
+        // Subscription volume for the dashboard's Subscription Health and Free vs Premium
+        // Conversion charts.
+        //
+        // The block above issues one billing row per existing paid demo user — about 25
+        // rows spread over six months, or roughly one point a week. At 7d and 30d that
+        // draws a nearly empty chart, and with three cancellations in the entire dataset
+        // the churn series had almost nothing to plot against the new-subscription line.
+        // A demo has to look like a business that has customers.
+        //
+        // Given its own cohort of accounts so the curated demo users keep their profiles,
+        // and so each of them still maps to exactly one billing row.
+        $this->seedSubscriberCohort($professionalPlan, $subGateways, $subCycles, $subAmounts, $userPassword);
+
         // A broad country list so "Usage by Countries" shows a real map of markets. The
         // weighted index list front-loads the top markets (US/UK/India appear more often),
         // giving a realistic head-and-tail distribution rather than a flat line.
@@ -6058,6 +6071,128 @@ class DemoSeeder extends Seeder
     private function recentBiasedDaysAgo(int $max): int
     {
         return min(mt_rand(0, $max), mt_rand(0, $max));
+    }
+
+    /**
+     * A book of subscribers large enough for the subscription charts to have a line.
+     *
+     * Each account gets one billing row and the payment that opened it, so the subscriber
+     * count, the churn series and the revenue line describe the same business rather than
+     * three unrelated numbers.
+     *
+     * Volume follows the same recency ramp as every other series, and cancellations are
+     * dated forward from each signup — a cancellation that has not happened yet simply has
+     * not happened. That is what keeps churn coming from the older, smaller cohorts, so it
+     * never outruns new signups on the chart.
+     */
+    private function seedSubscriberCohort(Plan $plan, array $gateways, array $cycles, array $amounts, string $password): void
+    {
+        $firstNames = ['Adela', 'Boris', 'Camila', 'Dmitri', 'Esme', 'Felix', 'Gisela', 'Hakim',
+            'Ilona', 'Janek', 'Kamila', 'Lorenz', 'Marisol', 'Nadim', 'Orla', 'Pavel',
+            'Rania', 'Stefan', 'Tamsin', 'Ugo', 'Valeria', 'Wojtek', 'Xenia', 'Yusuf', 'Zofia'];
+        $lastNames = ['Adeyemi', 'Brennan', 'Costa', 'Dvorak', 'Eriksen', 'Ferrara', 'Gundersen',
+            'Halloran', 'Ibrahim', 'Jankovic', 'Karlsson', 'Lindholm', 'Moreau', 'Nakamura',
+            'Oyelaran', 'Pashkov', 'Quiroga', 'Rasmussen', 'Sandoval', 'Tikhonov'];
+
+        $hashedPassword = Hash::make($password);
+        $seq = 0;
+
+        // Oldest first, so sequential ids read chronologically in the admin lists.
+        for ($day = 179; $day >= 0; $day--) {
+            foreach ($this->spreadOverDay($day, $this->dailyVolume($day, 0.45), 8, 21) as $joinedAt) {
+                $seq++;
+
+                $cycle = $cycles[$seq % count($cycles)];
+                $gateway = $gateways[$seq % count($gateways)];
+                $amount = $amounts[$cycle];
+
+                // Roughly one in four eventually cancels, 20-75 days after signing up.
+                // One in six left visible gaps in the churn line at 7d; this keeps it
+                // continuous while staying far below the new-signup line.
+                // The wide offset window matters as much as the rate: a narrow one bunches
+                // cancellations onto the same few dates, which draws a spiky churn line
+                // with holes in it rather than a low continuous one.
+                $cancelledAt = $seq % 4 === 0
+                    ? $joinedAt->copy()->addDays(mt_rand(14, 95))
+                    : null;
+
+                if ($cancelledAt && $cancelledAt->isFuture()) {
+                    $cancelledAt = null;
+                }
+
+                $status = match (true) {
+                    $cancelledAt !== null => 'cancelled',
+                    $seq % 11 === 0 && $day <= 12 => 'trialing',
+                    default => 'active',
+                };
+
+                // A live subscription showing a period that ended weeks ago is exactly the
+                // detail that makes a demo look fake, so active plans roll forward to the
+                // next boundary that has not passed.
+                $periodEnd = $cancelledAt ? $cancelledAt->copy() : $joinedAt->copy();
+
+                while (! $cancelledAt && $periodEnd->isPast()) {
+                    $cycle === 'yearly' ? $periodEnd->addYear() : $periodEnd->addMonth();
+                }
+
+                $trialEndsAt = $status === 'trialing' ? now()->addDays(mt_rand(3, 12)) : null;
+
+                $user = User::updateOrCreate(
+                    ['email' => 'member'.$seq.'@demo.com'],
+                    [
+                        'name' => $firstNames[$seq % count($firstNames)].' '.$lastNames[$seq % count($lastNames)],
+                        'password' => $hashedPassword,
+                        'credits' => mt_rand(120, 4200),
+                        'plan_id' => $plan->id,
+                        'subscription_status' => $status,
+                        'subscription_ends_at' => $cancelledAt ?? $periodEnd,
+                        'trial_ends_at' => $trialEndsAt,
+                        'is_active' => true,
+                        'email_verified_at' => $joinedAt,
+                        'last_login_at' => now()->subHours(min(mt_rand(1, 168), mt_rand(1, 168))),
+                    ]
+                );
+
+                $this->backdate($user, $joinedAt);
+
+                $subscription = \App\Models\GatewaySubscription::updateOrCreate(
+                    ['gateway_subscription_id' => 'demo-member-sub-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT)],
+                    [
+                        'user_id' => $user->id,
+                        'plan_id' => $plan->id,
+                        'billing_cycle' => $cycle,
+                        'status' => $status,
+                        'gateway' => $gateway,
+                        'amount' => $amount,
+                        'currency' => 'USD',
+                        'trial_ends_at' => $trialEndsAt,
+                        'current_period_start' => $joinedAt,
+                        'current_period_end' => $periodEnd,
+                        'cancelled_at' => $cancelledAt,
+                    ]
+                );
+
+                $this->backdate($subscription, $joinedAt, $cancelledAt ?? $joinedAt);
+
+                // The payment that opened the subscription, so the revenue line and the
+                // subscriber count cannot contradict each other.
+                $payment = Payment::updateOrCreate(
+                    ['gateway_payment_id' => 'demo-member-pay-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT)],
+                    [
+                        'user_id' => $user->id,
+                        'plan_id' => $plan->id,
+                        'gateway' => $gateway,
+                        'amount' => $amount,
+                        'currency' => 'USD',
+                        'status' => 'completed',
+                        'type' => 'subscription',
+                        'metadata' => ['demo' => true, 'cohort' => 'subscriber'],
+                    ]
+                );
+
+                $this->backdate($payment, $joinedAt);
+            }
+        }
     }
 
     /**
