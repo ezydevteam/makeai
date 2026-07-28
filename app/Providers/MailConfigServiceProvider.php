@@ -74,6 +74,26 @@ class MailConfigServiceProvider extends ServiceProvider
         ]));
     }
 
+    /**
+     * Whether the selected driver is missing the one credential it cannot work without.
+     *
+     * Deliberately narrow: only the setting whose absence guarantees a thrown exception
+     * on the first send. Username and password are omitted on purpose — plenty of relay
+     * setups authenticate by IP — and anything that merely *might* be wrong is left to
+     * fail visibly rather than being silently downgraded.
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    protected function driverIsUnconfigured(array $settings): bool
+    {
+        return match ($settings['mail_driver']) {
+            'smtp' => blank($settings['mail_host'] ?? null),
+            'sendgrid' => blank($settings['sendgrid_api_key'] ?? null),
+            'ses' => blank($settings['ses_key'] ?? null) || blank($settings['ses_secret'] ?? null),
+            default => false,
+        };
+    }
+
     protected function applyMailConfig(): void
     {
         try {
@@ -93,6 +113,22 @@ class MailConfigServiceProvider extends ServiceProvider
             ];
 
             if (empty($settings['mail_driver'])) {
+                return;
+            }
+
+            // A driver that is selected but not actually configured is worse than no
+            // driver at all: every send throws instead of failing quietly. An empty host
+            // with a port left at some dev default produces
+            // "Connection could not be established with host \":1025\"" on every queued
+            // mail — thousands of log lines a day on the demo, and enough noise to bury
+            // real errors.
+            //
+            // Falling back to the log mailer keeps mail visible (an admin can read what
+            // would have been sent) without pretending it was delivered, and it is the
+            // same default config/mail.php already ships.
+            if ($this->driverIsUnconfigured($settings)) {
+                Config::set('mail.default', 'log');
+
                 return;
             }
 
