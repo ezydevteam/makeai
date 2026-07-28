@@ -110,6 +110,7 @@ const shellInsetClass = 'px-8 sm:px-11 lg:px-11 xl:px-14 2xl:px-16'
 
 const coreUpdate = computed(() => (page.props.admin as any)?.coreUpdate as { available?: boolean; version?: string; changelog?: string | null; show_banner?: boolean; updates_url?: string } | undefined)
 const showUpdateBanner = computed(() => Boolean(coreUpdate.value?.show_banner))
+const securityAlert = computed(() => (page.props.admin as any)?.securityAlert as { level: string; title: string; body: string; action: string; href: string } | null | undefined)
 const updateBannerBusy = ref(false)
 function snoozeUpdate() {
     updateBannerBusy.value = true
@@ -270,6 +271,26 @@ onUnmounted(() => {
                     <span>{{ t('Cron job is not configured. Scheduled tasks, renewals, and automation may not run.') }}</span>
                     <Link :href="cronStatus?.setup_url || route('admin.system.cron-jobs')" class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
                         {{ t('Set Up Cron Job') }}
+                    </Link>
+                </div>
+            </div>
+
+            <!--
+                Credentials are readable by the public. Sits above the update banner, has
+                no dismiss control and no snooze on purpose: unlike an available update,
+                this cannot wait, and hiding it would leave the site leaking silently.
+            -->
+            <div v-if="securityAlert" :class="shellInsetClass" class="border-b border-red-300 bg-red-50 py-3 text-red-900 dark:border-red-900/50 dark:bg-red-900/25 dark:text-red-100">
+                <div class="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex items-start gap-2">
+                        <i class="ti ti-alert-triangle-filled mt-0.5 text-base"></i>
+                        <div>
+                            <p class="font-semibold">{{ securityAlert.title }}</p>
+                            <p class="mt-0.5 text-red-800 dark:text-red-200/90">{{ securityAlert.body }}</p>
+                        </div>
+                    </div>
+                    <Link :href="securityAlert.href" class="inline-flex shrink-0 items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">
+                        {{ securityAlert.action }}
                     </Link>
                 </div>
             </div>

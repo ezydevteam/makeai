@@ -381,6 +381,13 @@ class InstallController extends Controller
                 throw new \RuntimeException('file_put_contents returned false for: ' . $envPath);
             }
 
+            // Owner-only from the moment it exists. In the distribution layout .env sits
+            // inside the served tree (webroot/core), private by web server deny rules —
+            // and nginx honours none of them. Where nginx runs as its own user, 0600 is
+            // what stops an unconfigured VPS serving the database password in the clear.
+            // Best effort: a host that forbids chmod must not fail the install over it.
+            \App\Support\EnvFilePermissions::harden($envPath);
+
             // Verify by re-reading
             clearstatcache(true, $envPath);
             $verify = file_get_contents($envPath);

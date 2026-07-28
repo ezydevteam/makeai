@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\CronTaskRunRequest;
 use App\Http\Requests\Admin\MaintenanceSettingsRequest;
 use App\Jobs\SendMaintenanceNotice;
 use App\Services\BroadcastingService;
+use App\Support\EnvFilePermissions;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -943,9 +944,140 @@ class SystemController extends Controller
         ];
     }
 
+    /**
+     * Is the application directory readable over HTTP?
+     *
+     * The distribution layout puts the whole app in <webroot>/core so the buyer never has
+     * to repoint a document root — unzip into public_html and it works. The price is that
+     * core/ is inside the served tree, kept private by deny rules rather than by being
+     * unreachable. Apache and LiteSpeed get those rules from .htaccess (webroot plus a
+     * second deny-all inside core/), IIS from web.config.
+     *
+     * nginx reads none of it. A buyer who unzips onto an nginx VPS and never applies
+     * core/deploy/nginx.conf.example is serving core/.env as plain text — database
+     * password, APP_KEY and every API credential — with nothing on screen to suggest it.
+     * Documentation has not been enough, so the app checks itself.
+     *
+     * Verified by fetching the file rather than by inspecting config, because config is
+     * exactly what is wrong in the failing case. A 200 alone is not proof — hosts serve
+     * catch-all pages — so the body has to look like an env file too.
+     */
+    private function appDirectoryExposureCheck(): array
+    {
+        $label = translate('Application directory privacy');
+
+        // Only meaningful in the packaged layout. A standard checkout keeps the app
+        // outside the webroot entirely, so there is nothing to expose. Same shape test
+        // bootstrap/app.php uses to locate the webroot.
+        if (is_dir(base_path('public')) || ! is_file(base_path('../index.php'))) {
+            return [
+                'status' => 'pass',
+                'label' => $label,
+                'detail' => translate('Not applicable — the application is outside the webroot'),
+                'suggestion' => null,
+            ];
+        }
+
+        $appDir = basename(base_path());
+
+        // Cached: this is an outbound HTTP request and the health page is not.
+        $result = Cache::remember(
+            'system.app_dir_exposed',
+            now()->addHours(12),
+            fn () => $this->probeAppDirectory($appDir)
+        );
+
+        if ($result['state'] === 'exposed') {
+            Log::critical('Application directory is publicly readable over HTTP', [
+                'url' => "/{$appDir}/.env",
+            ]);
+
+            // Act, do not merely report. Where nginx runs as its own user — the usual
+            // split — dropping .env to 0600 makes the worker unable to open it and the
+            // leak becomes a 403 immediately, without waiting for anyone to edit a config
+            // file. Where both run as the same user it changes nothing, so the warning
+            // below stands either way.
+            $hardened = EnvFilePermissions::harden();
+
+            return [
+                'status' => 'fail',
+                'label' => $label,
+                'detail' => translate('EXPOSED — :path is publicly readable', ['path' => "/{$appDir}/.env"]),
+                'suggestion' => ($hardened
+                    ? translate('Permissions on .env were tightened to 0600 just now, which blocks this on most nginx setups — verify by opening the path above. ')
+                    : '')
+                    .translate('Your database password and APP_KEY may already be public. Apply the rules in :file and reload nginx, then change those credentials.', ['file' => "{$appDir}/deploy/nginx.conf.example"]),
+            ];
+        }
+
+        if ($result['state'] === 'unknown') {
+            return [
+                'status' => 'warn',
+                'label' => $label,
+                'detail' => translate('Could not be verified from this server'),
+                'suggestion' => translate('Open :path in a browser. If it downloads or displays, your credentials are public — deny the :dir directory in your web server config.', ['path' => "/{$appDir}/.env", 'dir' => $appDir]),
+            ];
+        }
+
+        return [
+            'status' => 'pass',
+            'label' => $label,
+            'detail' => translate('Private — :dir is not served', ['dir' => $appDir]),
+            'suggestion' => null,
+        ];
+    }
+
+    /**
+     * Fetch <site>/<appDir>/.env and decide what the answer means.
+     *
+     * Three outcomes, and the distinction between the last two is the point: a request
+     * that could not be made proves nothing, and reporting it as safety would be the
+     * one failure mode worse than not checking.
+     *
+     *   exposed    200 AND the body reads like an env file
+     *   protected  any non-200, or a 200 that is clearly a catch-all page
+     *   unknown    no site URL, or the request could not be made at all
+     */
+    private function probeAppDirectory(string $appDir): array
+    {
+        $base = rtrim((string) (settings('site_url') ?: config('app.url')), '/');
+
+        if ($base === '') {
+            return ['state' => 'unknown', 'reason' => 'no site URL configured'];
+        }
+
+        try {
+            $response = Http::withoutRedirecting()
+                ->timeout(5)
+                ->withHeaders(['User-Agent' => 'makeai-selfcheck'])
+                ->get("{$base}/{$appDir}/.env");
+        } catch (\Throwable $e) {
+            // Plenty of hosts block a server from resolving its own public hostname.
+            // That is not evidence either way.
+            return ['state' => 'unknown', 'reason' => $e->getMessage()];
+        }
+
+        if ($response->status() !== 200) {
+            return ['state' => 'protected', 'reason' => 'HTTP '.$response->status()];
+        }
+
+        // A 200 alone is not proof: hosts answer with catch-all pages for anything
+        // missing, and treating those as exposure would cry wolf on every correctly
+        // configured site.
+        $looksLikeEnv = Str::contains(
+            (string) $response->body(),
+            ['APP_KEY=', 'DB_PASSWORD=', 'DB_DATABASE=', 'APP_ENV=']
+        );
+
+        return $looksLikeEnv
+            ? ['state' => 'exposed', 'reason' => 'HTTP 200 and the body is an env file']
+            : ['state' => 'protected', 'reason' => 'HTTP 200 but not the env file (catch-all page)'];
+    }
+
     private function serverChecks(): array
     {
         return [
+            $this->appDirectoryExposureCheck(),
             [
                 'status' => version_compare(PHP_VERSION, '8.3', '>=') ? 'pass' : 'fail',
                 'label' => translate('PHP version'),

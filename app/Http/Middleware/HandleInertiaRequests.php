@@ -25,6 +25,7 @@ use App\Services\TranslationService;
 use App\Support\CountryCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
@@ -745,6 +746,41 @@ class HandleInertiaRequests extends Middleware
     /**
      * Get admin-specific shared props.
      */
+    /**
+     * A site-wide banner for the one misconfiguration that leaks credentials silently.
+     *
+     * The distribution layout keeps the app in <webroot>/core, private by deny rules
+     * rather than by being unreachable. nginx reads none of those rules, so a buyer who
+     * unzipped onto a VPS and never applied core/deploy/nginx.conf.example is serving
+     * core/.env — database password, APP_KEY, every API credential — in the clear.
+     *
+     * Deliberately reads the cached verdict only, never probing: this runs on every
+     * admin request, and an outbound HTTP call here would tax the whole panel. The probe
+     * itself belongs to the System Health page, which writes the cache entry. Nothing
+     * cached yet simply means no banner until Health has been opened once.
+     */
+    private function getSecurityAlert(): ?array
+    {
+        $verdict = Cache::get('system.app_dir_exposed');
+
+        if (! is_array($verdict) || ($verdict['state'] ?? null) !== 'exposed') {
+            return null;
+        }
+
+        $appDir = basename(base_path());
+
+        return [
+            'level' => 'critical',
+            'title' => translate('Your configuration file is publicly readable'),
+            'body' => translate('Anyone can open :path and read your database password and APP_KEY. Deny the :dir directory in your web server configuration, then change those credentials.', [
+                'path' => url("/{$appDir}/.env"),
+                'dir' => $appDir,
+            ]),
+            'action' => translate('Open System Health'),
+            'href' => '/admin/system/health',
+        ];
+    }
+
     private function getAdminProps(Request $request): ?array
     {
         $admin = auth('admin')->user();
@@ -764,6 +800,7 @@ class HandleInertiaRequests extends Middleware
             'permissions' => $admin->getAllPermissions(),
             'role' => $admin->role?->name,
             'coreUpdate' => $this->getCoreUpdateStatus($admin),
+            'securityAlert' => $this->getSecurityAlert(),
             'pendingCommentsCount' => Comment::where('status', 'pending')->count(),
             'sidebarCounts' => [
                 'premium' => [
