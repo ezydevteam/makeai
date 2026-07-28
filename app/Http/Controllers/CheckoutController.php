@@ -808,7 +808,11 @@ class CheckoutController extends Controller
 
         $user = $request->user();
         $options = [
-            'success_url' => route('user.dashboard').'?checkout=success',
+            // The same confirmation screen every other gateway returns to. Stripe used to
+            // drop the buyer on the dashboard with a ?checkout=success nobody read — no
+            // confirmation, no payment ID, and a different ending to the flow depending on
+            // which gateway they happened to pick.
+            'success_url' => route('checkout.pending', $payment),
             'cancel_url' => route('checkout.show', ['plan' => $plan->slug, 'billing' => $billing]),
             'metadata' => [
                 'plan_slug' => $plan->slug,

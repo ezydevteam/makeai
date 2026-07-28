@@ -225,7 +225,9 @@ class CreditTopupController extends Controller
                 'quantity' => 1,
             ]],
             [
-                'success_url' => route('user.dashboard').'?checkout=success',
+                // Same confirmation screen the other gateways use — which then forwards a
+                // top-up buyer to their usage page rather than the dashboard.
+                'success_url' => route('checkout.pending', $payment),
                 'cancel_url' => route('user.dashboard.credit-topup').'?checkout=cancelled',
                 'metadata' => [
                     'payment_id' => $payment->ulid,
