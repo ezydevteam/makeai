@@ -33,7 +33,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name', 'email', 'password', 'password_changed_at', 'ulid', 'avatar',
         'country', 'profession', 'phone', 'phone_country', 'sms_marketing_opt_in',
-        'credits', 'credits_used_today', 'credits_used_month',
+        'credits', 'topup_credits', 'credits_used_today', 'credits_used_month',
         'daily_limit', 'monthly_limit',
         'plan_id', 'subscription_status', 'subscription_ends_at',
         'email_verified_at', 'trial_ends_at',
@@ -62,6 +62,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'password_changed_at' => 'datetime',
             'credits' => 'decimal:4',
+            'topup_credits' => 'decimal:4',
             'credits_used_today' => 'decimal:4',
             'credits_used_month' => 'decimal:4',
             'daily_limit' => 'decimal:4',
@@ -577,6 +578,18 @@ class User extends Authenticatable implements MustVerifyEmail
 
             $fresh = $user->fresh();
 
+            // Plan credits are spent first, top-ups last — so the protected figure only
+            // moves once the wallet has fallen below it. Clamping is the whole rule: while
+            // the balance still covers the top-up, none of it has been touched.
+            //
+            // Without this the tracked figure would outlive the credits it describes, and
+            // grantPlanAllowance() would keep reserving room for a top-up that was long
+            // since spent — handing out free credits every renewal.
+            if ((float) $fresh->topup_credits > (float) $fresh->credits) {
+                $user->forceFill(['topup_credits' => $fresh->credits])->save();
+                $fresh = $user->fresh();
+            }
+
             $user->creditTransactions()->create([
                 'amount' => -$amount,
                 'balance_after' => $fresh->credits,
@@ -587,6 +600,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
             $this->forceFill([
                 'credits' => $fresh->credits,
+                'topup_credits' => $fresh->topup_credits,
                 'credits_used_today' => $fresh->credits_used_today,
                 'credits_used_month' => $fresh->credits_used_month,
             ]);
@@ -723,25 +737,77 @@ class User extends Authenticatable implements MustVerifyEmail
      * REDUCES a balance boosted by top-ups or admin grants. No-op for unlimited /
      * zero-credit plans. Logged as a 'purchase' credit transaction.
      */
+    /**
+     * Top the wallet UP TO the plan's allowance. For the recurring monthly refresh only.
+     *
+     * Deliberately not additive: the refresh runs on each subscription's anniversary, so
+     * adding would let a stalled cron be farmed for a lump sum, and would turn a monthly
+     * allowance into a balance that compounds forever.
+     *
+     * Do NOT use this for a purchase — see grantPurchasedPlanCredits(). Topping up to the
+     * allowance silently absorbs whatever the buyer already had, which is somebody else's
+     * money: top-ups they paid for, admin grants, leftover free-tier credits.
+     */
     public function grantPlanAllowance(float $planCredits, string $reason): void
     {
         if ($planCredits <= 0) {
             return;
         }
 
-        $current = (float) $this->fresh()->credits;
-        $delta = round($planCredits - $current, 4);
+        $fresh = $this->fresh();
+        $current = (float) $fresh->credits;
+
+        // Separately purchased credits sit ON TOP of the allowance, never inside it.
+        // Without this the wallet was topped up to the plan figure alone, so a subscriber
+        // holding 15,000 (10,000 plan + a 5,000 top-up) was already "at" the allowance and
+        // received nothing. They spent down, were topped back to 10,000, and across two or
+        // three cycles the 5,000 they had paid for was quietly absorbed.
+        $protected = (float) $fresh->topup_credits;
+        $target = round($planCredits + $protected, 4);
+        $delta = round($target - $current, 4);
 
         if ($delta <= 0) {
-            return; // already at or above the allowance (top-ups / admin grants)
+            return; // already at or above the allowance plus their own credits
         }
 
-        $this->addCredits($delta, 'purchase', $reason, ['plan_credits' => $planCredits]);
+        $this->addCredits($delta, 'purchase', $reason, [
+            'plan_credits' => $planCredits,
+            'protected_topup_credits' => $protected,
+        ]);
+    }
+
+    /**
+     * Grant a plan's credits for a purchase — the full amount, ADDED to the balance.
+     *
+     * Subscribing used to run through grantPlanAllowance(), which tops the wallet up to
+     * the plan figure instead of adding to it. So a user holding 23 credits who bought a
+     * 10,000-credit plan finished with 10,000, not 10,023: their existing balance was
+     * quietly consumed to pay for part of what they had just bought. Those 23 could have
+     * been a paid top-up or an admin grant, and neither has anything to do with a plan
+     * allowance the account did not have until this moment.
+     *
+     * The anniversary refresh keeps the top-up-to semantics, which is what stops a
+     * monthly allowance compounding.
+     */
+    public function grantPurchasedPlanCredits(float $planCredits, string $reason): void
+    {
+        if ($planCredits <= 0) {
+            return;
+        }
+
+        $this->addCredits($planCredits, 'purchase', $reason, ['plan_credits' => $planCredits]);
     }
 
     public function addCredits(float $amount, string $type, string $reason, array $meta = []): void
     {
         $this->increment('credits', $amount);
+
+        // A top-up is the user's own money and must survive every later plan renewal, so
+        // it is tracked separately as well as added to the wallet. grantPlanAllowance()
+        // reads this to work out how much of the balance it is not allowed to count.
+        if ($type === 'topup') {
+            $this->increment('topup_credits', $amount);
+        }
 
         $this->creditTransactions()->create([
             'amount' => $amount,

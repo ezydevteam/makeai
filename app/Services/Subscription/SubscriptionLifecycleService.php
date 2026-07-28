@@ -131,10 +131,13 @@ class SubscriptionLifecycleService
                 'subscription_ends_at' => $periodEnd,
             ]);
 
-            // Grant the plan's credit allowance for the new period (refreshes a
-            // spent-down balance; never wipes top-ups — see User::grantPlanAllowance).
+            // Grant the plan's credits for the purchase — ADDED, not topped up to. The
+            // comment here used to claim grantPlanAllowance() "never wipes top-ups"; it
+            // does exactly that, because topping a wallet UP TO the plan figure spends
+            // whatever was already in it. Someone with 23 credits buying a 10,000-credit
+            // plan ended on 10,000 rather than 10,023.
             if ($plan = Plan::find($payment->plan_id)) {
-                $payment->user->grantPlanAllowance((float) $plan->credits, "Plan credits: {$plan->name}");
+                $payment->user->grantPurchasedPlanCredits((float) $plan->credits, "Plan credits: {$plan->name}");
             }
 
             // Any new checkout (plan change, billing-cycle switch, or one-time
@@ -258,8 +261,10 @@ class SubscriptionLifecycleService
                 'has_trialed' => true,
             ]);
 
-            // A trial grants the plan's credit allowance for the trial period.
-            $user->grantPlanAllowance((float) $plan->credits, "Trial credits: {$plan->name}");
+            // A trial grants the plan's credits for the trial period, on top of whatever
+            // the account already held — starting a trial must not cost someone the
+            // credits they arrived with.
+            $user->grantPurchasedPlanCredits((float) $plan->credits, "Trial credits: {$plan->name}");
 
             return $subscription;
         });
