@@ -182,6 +182,33 @@ const renewUrl = computed(() => {
     return `/checkout?${params.toString()}`
 })
 
+/**
+ * Only offer renewal once it is nearly due — the last 7 days of access.
+ *
+ * The button sat in the banner from the moment a one-time plan was bought, so someone
+ * eleven months into an annual plan was being invited to pay for it again. Buying early
+ * does not extend the existing period either, so the offer was not just noisy but a way
+ * to lose money.
+ *
+ * Also shown once the date has passed: an expired plan is exactly when renewing is the
+ * point. A missing end date means nothing to count down to, so it stays hidden.
+ */
+const RENEWAL_WINDOW_DAYS = 7
+
+const canRenewNow = computed(() => {
+    const endsAt = planEndsAt.value
+
+    if (!endsAt || !props.plan?.slug) return false
+
+    const endsAtMs = new Date(endsAt).getTime()
+
+    if (Number.isNaN(endsAtMs)) return false
+
+    const daysRemaining = (endsAtMs - Date.now()) / 86_400_000
+
+    return daysRemaining <= RENEWAL_WINDOW_DAYS
+})
+
 const cancelScheduledChange = () => {
     if (cancelScheduledProcessing.value) return
 
@@ -255,7 +282,7 @@ const cancelScheduledChange = () => {
                     </span>
                 </p>
                 <Link
-                    v-if="plan?.slug"
+                    v-if="canRenewNow"
                     :href="renewUrl"
                     class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/30 dark:bg-surface-900 dark:text-sky-200 dark:hover:bg-sky-500/15"
                 >

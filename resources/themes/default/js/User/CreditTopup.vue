@@ -258,32 +258,6 @@ const submit = () => {
                         </div>
                     </section>
 
-                    <!-- Payment Method -->
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
-                        <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Payment method') }}</h2>
-
-                        <div v-if="gateways.length" class="grid gap-3 sm:grid-cols-2">
-                            <button
-                                v-for="gateway in gateways"
-                                :key="gateway.id"
-                                type="button"
-                                @click="selectedGatewaySlug = gateway.slug"
-                                :class="selectedGatewaySlug === gateway.slug ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 text-gray-700 hover:border-primary-200 hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800'"
-                                class="rounded-xl border p-4 text-left transition"
-                            >
-                                <span class="flex items-center justify-between gap-3">
-                                    <span class="text-sm font-bold">{{ gateway.name }}</span>
-                                    <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                                        {{ t('Test') }}
-                                    </span>
-                                </span>
-                                <span v-if="gateway.description" class="mt-1 block text-xs font-medium text-gray-500">{{ gateway.description }}</span>
-                            </button>
-                        </div>
-                        <div v-else class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                            {{ t('No payment gateway is available. Please contact support.') }}
-                        </div>
-                    </section>
                 </div>
 
                 <!-- Right Column: Summary -->
@@ -324,13 +298,47 @@ const submit = () => {
                             <span class="text-lg font-black text-gray-900 dark:text-white">{{ formatCurrency(totalAmount) }}</span>
                         </div>
 
+                        <!--
+                            Moved out of the left column to sit with the action it belongs to,
+                            as plain radios. Only rendered when there is a choice to make: with
+                            one gateway enabled a selector is a control with a single option, so
+                            the button names it instead.
+                        -->
+                        <fieldset v-if="gateways.length > 1" class="mt-5 border-t border-gray-100 pt-5 dark:border-surface-700">
+                            <legend class="mb-3 text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Payment method') }}</legend>
+                            <div class="space-y-1">
+                                <label
+                                    v-for="gateway in gateways"
+                                    :key="gateway.id"
+                                    class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-gray-50 dark:hover:bg-surface-800"
+                                >
+                                    <input
+                                        v-model="selectedGatewaySlug"
+                                        type="radio"
+                                        name="topup_gateway"
+                                        :value="gateway.slug"
+                                        class="h-4 w-4 shrink-0 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-surface-600 dark:bg-surface-800"
+                                    />
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ gateway.name }}</span>
+                                    <!-- Only ever shown on a test-mode gateway, where mistaking it for live costs a real order. -->
+                                    <span v-if="gateway.is_test_mode" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                        {{ t('Test') }}
+                                    </span>
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <div v-else-if="!gateways.length" class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                            {{ t('No payment gateway is available. Please contact support.') }}
+                        </div>
+
                         <button
                             type="button"
                             :disabled="!isValidAmount || !selectedGateway || submitting"
                             @click="submit"
-                            class="mt-6 w-full rounded-full bg-primary-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:!bg-primary-300 disabled:shadow-none dark:disabled:bg-surface-700"
+                            class="mt-5 w-full rounded-full bg-primary-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:!bg-primary-300 disabled:shadow-none dark:disabled:bg-surface-700"
                         >
-                            {{ submitting ? t('Processing...') : isValidAmount ? t('Proceed to Payment') : t('Enter :min or more', { min: formatCurrency(creditTopup.minimum) }) }}
+                            {{ submitting ? t('Processing...') : !isValidAmount ? t('Enter :min or more', { min: formatCurrency(creditTopup.minimum) }) : selectedGateway ? t('Proceed with :gateway', { gateway: selectedGateway.name }) : t('Proceed to Payment') }}
                         </button>
 
                         <p class="mt-3 text-center text-xs font-medium text-gray-400">

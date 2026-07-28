@@ -112,11 +112,21 @@ class UsageDashboardController extends Controller
             ?? $user->monthly_limit
             ?? (float) settings('user_monthly_credit_limit', 0);
 
+        // The wallet holds two kinds of credit with different rules: the plan allowance,
+        // which is refreshed to the plan figure each period, and separately purchased
+        // top-ups, which are the user's own money and survive every renewal. Shown apart
+        // so nobody has to guess which part of a balance resets — the aggregate is still
+        // what the sidebar reports.
+        $topupCredits = (float) $user->topup_credits;
+
         $stats = array_merge($stats, [
             'credits_remaining' => (float) $user->credits,
             'credits_used_today' => (float) $user->credits_used_today,
             'credits_used_month' => (float) $user->credits_used_month,
             'plan_credit_limit' => (float) $planCreditLimit,
+            'topup_credits' => $topupCredits,
+            // Whatever is left of the allowance, i.e. the part that will be topped back up.
+            'plan_credits_remaining' => max(0, (float) $user->credits - $topupCredits),
         ]);
 
         // Deliberately OUTSIDE the 5-minute stats cache: it is paginated (the cache key does
