@@ -271,7 +271,10 @@ class DemoSeeder extends Seeder
                 'is_active' => true,
                 'last_login_ip' => '203.0.113.' . mt_rand(2, 254),
                 'email_verified_at' => now()->subDays(mt_rand(1, 365)),
-                'last_login_at' => now()->subHours(mt_rand(1, 168)),
+                // Biased to the last day or two rather than flat across the week: the
+                // Active Users card counts last_login_at inside the window, so a uniform
+                // spread made today and yesterday tie.
+                'last_login_at' => now()->subHours(min(mt_rand(1, 168), mt_rand(1, 168))),
             ]);
 
             $this->backdate($user, $joinedAt);
@@ -281,10 +284,18 @@ class DemoSeeder extends Seeder
         // Guarantee today + recent-day signups so the signups chart is continuous at the
         // short ranges (7d/30d), not only monthly. Uses higher-index users the oauth /
         // referral / affiliate passes below never touch, so their timestamps stand.
-        foreach (range(0, 16) as $offset) {
-            $recentUser = $demoUsers[30 + $offset] ?? null;
+        // Weighted toward today rather than one-a-day: a flat line gives the signups card
+        // a 0% trend at every range, which on a demo reads as a product nobody is joining.
+        // Same 17 accounts, redistributed — three today, two on each of the last two days,
+        // then thinning out across the month.
+        // Reaches back ~8 weeks, not ~2: the 30d signups card compares against days 30-59,
+        // and with every seeded signup inside the last 25 days that window held almost
+        // nothing, so the card claimed a nonsense +1467% instead of a real trend.
+        $recentSignupDays = [0, 0, 1, 2, 3, 5, 7, 9, 12, 16, 20, 25, 31, 37, 43, 50, 57];
+        foreach ($recentSignupDays as $index => $daysAgo) {
+            $recentUser = $demoUsers[30 + $index] ?? null;
             $recentUser?->forceFill([
-                'created_at' => now()->subDays($offset)->setTime(mt_rand(8, 20), mt_rand(0, 59)),
+                'created_at' => now()->subDays($daysAgo)->setTime(mt_rand(8, 20), mt_rand(0, 59)),
             ])->save();
         }
 
@@ -354,22 +365,28 @@ class DemoSeeder extends Seeder
 
         $pickUser = fn () => $demoUsers[array_rand($demoUsers)];
 
-        // Today — spread across the hours up to now so the hourly chart is full.
-        for ($hour = 0; $hour <= now()->hour; $hour += mt_rand(1, 2)) {
-            foreach (range(1, mt_rand(1, 3)) as $ignored) {
-                $createUsage($pickUser(), now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
+        // Today — the WHOLE calendar day, not only the hours already elapsed. Seeding
+        // stopped at now()->hour, so a reset just after midnight left today nearly empty
+        // and every "today vs yesterday" card opened on a fall. See spreadOverDay().
+        foreach ($this->spreadOverDay(0, $this->dailyVolume(0), 6, 22) as $moment) {
+            $createUsage($pickUser(), $moment);
+        }
+
+        // Last 180 days — continuous 7d / 30d / 90d lines, with volume ramping toward the
+        // present so each range compares favourably against the range before it.
+        //
+        // 180 rather than 90: the 90d card compares against days 90-179, and while the
+        // daily timeline stopped at 90 that window held only the sparse monthly buckets,
+        // so the card read a fake +1200% instead of the real trend.
+        for ($day = 1; $day <= 179; $day++) {
+            foreach ($this->spreadOverDay($day, $this->dailyVolume($day), 6, 22) as $moment) {
+                $createUsage($pickUser(), $moment);
             }
         }
 
-        // Last 90 days — a few per day for continuous 7d / 30d / 90d lines.
-        for ($day = 1; $day <= 90; $day++) {
-            foreach (range(1, mt_rand(2, 4)) as $ignored) {
-                $createUsage($pickUser(), now()->subDays($day)->setTime(mt_rand(6, 22), mt_rand(0, 59)));
-            }
-        }
-
-        // Months 4-13 ago — volume per month so the lifetime (monthly) chart is continuous.
-        for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
+        // Months 7-13 ago — volume per month so the lifetime (monthly) chart is continuous.
+        // Starts past the daily loop above so the two never stack on the same days.
+        for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(8, 15)) as $ignored) {
                 $createUsage(
@@ -415,15 +432,17 @@ class DemoSeeder extends Seeder
             $this->backdate($log, $createdAt);
         };
 
-        for ($hour = 0; $hour <= now()->hour; $hour += mt_rand(2, 4)) {
-            $createInternalUsage(now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
+        // Platform work runs around the clock, so this one spans 00:00-23:00 rather than
+        // waking hours — but it is the same full-day, clock-independent spread.
+        foreach ($this->spreadOverDay(0, $this->dailyVolume(0, 0.4), 0, 23) as $moment) {
+            $createInternalUsage($moment);
         }
-        for ($day = 1; $day <= 90; $day++) {
-            foreach (range(1, mt_rand(1, 2)) as $ignored) {
-                $createInternalUsage(now()->subDays($day)->setTime(mt_rand(0, 23), mt_rand(0, 59)));
+        for ($day = 1; $day <= 179; $day++) {
+            foreach ($this->spreadOverDay($day, $this->dailyVolume($day, 0.4), 0, 23) as $moment) {
+                $createInternalUsage($moment);
             }
         }
-        for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
+        for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(4, 8)) as $ignored) {
                 $createInternalUsage($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(0, 23), mt_rand(0, 59)));
@@ -625,11 +644,17 @@ class DemoSeeder extends Seeder
         }
 
         $paymentRows = [
-            ['user' => $adminUser, 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 199.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Pro annual renewal', 'days' => 1],
+            // The largest labelled sale sits on today, not yesterday. Parked on day 1 it
+            // was a 199.00 lump in the comparison window that the current day had to
+            // out-earn, which flipped the "today" revenue card negative on its own.
+            ['user' => $adminUser, 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 199.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Pro annual renewal', 'days' => 0],
             ['user' => $demoUsers[2], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly subscription', 'days' => 2],
             ['user' => $demoUsers[4], 'plan' => $freePlan, 'gateway' => 'paypal', 'amount' => 49.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Credit top-up', 'days' => 0],
             ['user' => $demoUsers[7], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 29.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'One-time tool bundle', 'days' => 4],
-            ['user' => $demoUsers[9], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 499.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Professional annual plan', 'days' => 9],
+            ['user' => $demoUsers[9], 'plan' => $professionalPlan, 'gateway' => 'stripe', // Day 5, not day 9. At 499.00 this is the largest single sale in the set, and parked
+            // on day 9 it sat inside the window the 7d revenue card compares against — enough
+            // on its own to cancel out a current week with half as many sales again.
+            'amount' => 499.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Professional annual plan', 'days' => 5],
             ['user' => $demoUsers[12], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 99.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly renewal', 'days' => 17],
             ['user' => $demoUsers[15], 'plan' => null, 'gateway' => 'manual', 'amount' => 24.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Wallet refill', 'days' => 21],
             ['user' => $demoUsers[18], 'plan' => $freePlan, 'gateway' => 'stripe', 'amount' => 39.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'Premium export pack', 'days' => 26],
@@ -686,18 +711,26 @@ class DemoSeeder extends Seeder
             $this->backdate($payment, $createdAt);
         };
 
-        // Today + last 75 days: a sale on ~80% of days (1-2 each) for a continuous daily line.
-        for ($day = 0; $day <= 75; $day++) {
-            if ($day > 0 && mt_rand(1, 10) <= 2) {
-                continue; // ~20% quiet days for realism
+        // Today + last 75 days, ramping toward the present so the revenue cards read as
+        // growth at every range. Quiet days are confined to the older stretch: a gap two
+        // months back is realistic, whereas one inside the current fortnight is what made
+        // the 7d and 30d revenue trends flip negative.
+        // Full volume rather than a thinned curve. The revenue card sums money, and at
+        // 3-4 sales a day a single 199.00 annual plan landing on one side of the boundary
+        // swung the comparison by more than the whole trend — the card went red on a day
+        // that had MORE sales. Enough transactions per day and the price mix averages out,
+        // so the trend follows the volume ramp instead of the luck of the draw.
+        for ($day = 0; $day <= 179; $day++) {
+            if ($day > 6 && mt_rand(1, 10) <= 2) {
+                continue; // ~20% quiet days for realism, outside the current week
             }
-            foreach (range(1, mt_rand(1, 2)) as $ignored) {
-                $makeRevenue(now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59)));
+            foreach ($this->spreadOverDay($day, $this->dailyVolume($day), 8, 21) as $moment) {
+                $makeRevenue($moment);
             }
         }
 
-        // Months 3-13 ago: several sales per month for continuous lifetime revenue.
-        for ($monthsAgo = 3; $monthsAgo <= 13; $monthsAgo++) {
+        // Months 7-13 ago: several sales per month for continuous lifetime revenue.
+        for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(4, 9)) as $ignored) {
                 $makeRevenue($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
@@ -799,7 +832,9 @@ class DemoSeeder extends Seeder
 
             foreach (range(1, mt_rand(2, 4)) as $ignored) {
                 $geo = $loginCountries[$countryWeights[array_rand($countryWeights)]];
-                $createdAt = now()->subDays(mt_rand(0, 89))->setTime(mt_rand(0, 23), mt_rand(0, 59));
+                // Recency-biased rather than uniform across the 90 days, so Active Users
+                // and the traffic-source panels climb toward today like the rest.
+                $createdAt = now()->subDays($this->recentBiasedDaysAgo(89))->setTime(mt_rand(0, 23), mt_rand(0, 59));
 
                 $this->backdate(LoginHistory::create([
                     'user_id' => $user->id,
@@ -5952,6 +5987,80 @@ class DemoSeeder extends Seeder
     }
 
     /**
+     * How many records to seed for the day $daysAgo back.
+     *
+     * Every dashboard KPI compares a window against the window before it — today vs
+     * yesterday, 7d vs the prior 7d, 30d vs the prior 30d. A flat spread makes all of
+     * them land on roughly 0%, and the moment today is only partly seeded they go
+     * negative, which is why the demo read as a business in decline on both the admin
+     * and the creator dashboard.
+     *
+     * The bands below ramp toward the present, and each step is wide enough that the
+     * jitter inside it can never invert the comparison between two adjacent windows.
+     * Today is deliberately the busiest day on every chart.
+     *
+     * $scale thins or thickens the whole curve for series that should be quieter than
+     * generations (revenue, internal platform usage).
+     */
+    private function dailyVolume(int $daysAgo, float $scale = 1.0): int
+    {
+        // Tuned so growth is visible at every range a card offers but still believable:
+        // roughly +25% on today, +20% on 7d, +40% on 30d and +65% on 90d. A steeper ramp
+        // reads as fabricated — an early draft hit +1467% on 30d signups — and a flatter
+        // one puts the short ranges back on 0%.
+        [$low, $high] = match (true) {
+            $daysAgo === 0 => [9, 10],
+            $daysAgo <= 6 => [7, 8],
+            $daysAgo <= 13 => [6, 7],
+            $daysAgo <= 29 => [5, 6],
+            $daysAgo <= 59 => [4, 5],
+            $daysAgo <= 119 => [3, 4],
+            default => [2, 3],
+        };
+
+        return max(1, (int) round(mt_rand($low, $high) * $scale));
+    }
+
+    /**
+     * $count moments spread across the calendar day $daysAgo back, between $from and
+     * $to o'clock.
+     *
+     * Deliberately independent of the current clock. The loops this replaces ran
+     * `$hour <= now()->hour`, which had two consequences: today was truncated at
+     * whatever hour demo:reset happened to fire (the showcase account's loop started
+     * at 08:00, so a reset before then left today with a single row), and because each
+     * iteration consumed mt_rand() draws, the hour also shifted every later draw in the
+     * seeder — so no two resets produced the same demo despite the fixed RANDOM_SEED.
+     *
+     * Seeding hours later than "now" is correct here: every dashboard window ends at
+     * endOfDay(), so those rows are counted, and it is what makes today a whole day.
+     */
+    private function spreadOverDay(int $daysAgo, int $count, int $from = 7, int $to = 22): array
+    {
+        $day = now()->subDays($daysAgo)->startOfDay();
+        $span = max(1, $to - $from);
+        $moments = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $hour = $from + (int) floor($span * $i / max(1, $count));
+            $moments[] = $day->copy()->setTime(min(23, $hour), mt_rand(0, 59));
+        }
+
+        return $moments;
+    }
+
+    /**
+     * A day offset in [0, $max] biased toward the present — the smaller of two draws,
+     * so about three quarters of the values land in the newer half of the range. Keeps
+     * login sessions (and so the Active Users card) rising toward today instead of
+     * sitting flat across the whole 90-day window.
+     */
+    private function recentBiasedDaysAgo(int $max): int
+    {
+        return min(mt_rand(0, $max), mt_rand(0, $max));
+    }
+
+    /**
      * Generate a self-contained initials avatar (gradient circle + initials) onto the public
      * disk and return its relative key. No external service — like the ad banners, this can
      * never 404 and carries no licensing baggage for a redistributed product. The colour is
@@ -6478,7 +6587,12 @@ class DemoSeeder extends Seeder
         // of the month and one a month for the rest of the year.
         $signupTimes = collect([now()->subHours(mt_rand(3, 6))])
             ->merge(collect(range(1, 6))->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))))
-            ->merge(collect([8, 11, 14, 17, 20, 23, 26, 29])->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))));
+            // Runs to day 59, not day 29. The series used to jump straight from 29 to
+            // month 2, which left days 30-59 empty — and that is exactly the window the
+            // 30d signups card compares against, so the card read several hundred percent
+            // growth off an almost-empty baseline.
+            ->merge(collect([8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59])
+                ->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))));
 
         for ($monthsAgo = 2; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
@@ -7395,28 +7509,29 @@ class DemoSeeder extends Seeder
 
         $moments = collect();
 
-        // Today, a few hours apart, plus one inside the current hour so the 1D chart's
-        // current bucket is never the empty one.
-        for ($hour = 8; $hour <= now()->hour; $hour += 2) {
-            foreach (range(1, mt_rand(1, 2)) as $ignored) {
-                $moments->push(now()->startOfDay()->addHours($hour)->addMinutes(mt_rand(0, 59)));
-            }
+        // Today across the whole working day, plus one inside the current hour so the 1D
+        // chart's current bucket is never the empty one.
+        //
+        // This loop used to start at 08:00 and stop at now()->hour, which meant a
+        // demo:reset before 08:00 produced exactly ONE row for today against 2-5 for
+        // yesterday — the creator dashboard then opened on a drop every single morning.
+        foreach ($this->spreadOverDay(0, $this->dailyVolume(0, 0.8), 8, 21) as $moment) {
+            $moments->push($moment);
         }
         $moments->push(now()->startOfHour()->addMinutes(mt_rand(0, (int) now()->minute)));
 
         // Every day back to 90, which is the widest daily range anything asks for (the user
-        // dashboard's own credit chart offers 7d / this month / 90d). Volume tapers with age
-        // so the account reads as one that has been getting busier.
-        for ($day = 1; $day <= 89; $day++) {
-            $perDay = $day <= 29 ? mt_rand(2, 5) : mt_rand(1, 3);
-
-            foreach (range(1, $perDay) as $ignored) {
-                $moments->push(now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59)));
+        // dashboard's own credit chart offers 7d / this month / 90d). Volume ramps with
+        // recency so the account reads as one that has been getting busier at every range,
+        // not just against the 30-day boundary the old two-step taper happened to fall on.
+        for ($day = 1; $day <= 179; $day++) {
+            foreach ($this->spreadOverDay($day, $this->dailyVolume($day, 0.8), 8, 21) as $moment) {
+                $moments->push($moment);
             }
         }
 
-        // Months 3-11 back — the 90-day loop already covers everything nearer than that.
-        for ($monthsAgo = 3; $monthsAgo <= 11; $monthsAgo++) {
+        // Months 7-11 back — the 180-day loop already covers everything nearer than that.
+        for ($monthsAgo = 7; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(6, 12)) as $ignored) {
                 $moments->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
