@@ -55,6 +55,12 @@ class InstallController extends Controller
             $props['dbState'] = $request->session()->get('db_state');
         }
 
+        if ($step === 4) {
+            // The Site Setup step preselects the browser's zone; this is the list it is
+            // validated against and the one the buyer picks from if the guess is wrong.
+            $props['timezones'] = timezone_identifiers_list();
+        }
+
         if ($step === self::TOTAL_STEPS) {
             // Scheduled tasks (subscription renewals, usage resets, queued mail)
             // never run without this, and the buyer is redirected straight to the
@@ -459,6 +465,20 @@ class InstallController extends Controller
                 settings_set('site_url', rtrim($data['step_4']['site_url'], '/'), 'string', 'general');
                 settings_set('site_tagline', $data['step_4']['site_tagline'] ?? '', 'string', 'general');
 
+                // Timestamps are stored in UTC and rendered through display_tz(), which
+                // reads this setting — so without it a fresh install shows every date in
+                // UTC and looks hours out to anyone not sitting in it. The browser's zone
+                // is the best guess available during an install; anything unrecognised
+                // (old browser, hand-edited request) falls back to the UTC default rather
+                // than writing a zone PHP cannot resolve.
+                $detectedZone = (string) ($data['step_4']['site_timezone'] ?? '');
+                settings_set(
+                    'app_timezone',
+                    in_array($detectedZone, timezone_identifiers_list(), true) ? $detectedZone : 'UTC',
+                    'string',
+                    'general'
+                );
+
                 $license = $data['step_2']['license_result'] ?? null;
 
                 if ($license) {
@@ -600,6 +620,11 @@ class InstallController extends Controller
                 'site_name' => ['required', 'string', 'max:255'],
                 'site_url' => ['required', 'string', 'max:255'],
                 'site_tagline' => ['nullable', 'string', 'max:255'],
+                // Optional, and never fatal: the browser sends its detected zone, but an
+                // old browser or a spoofed value must not be able to fail an install that
+                // is otherwise fine. Anything not in the PHP zone list falls back to UTC
+                // when the setting is written.
+                'site_timezone' => ['nullable', 'string', 'max:64'],
             ]),
             5 => $request->validate([
                 'admin_name' => ['required', 'string', 'max:255'],

@@ -5,6 +5,7 @@ import ErrorAlert from './ErrorAlert.vue'
 const props = defineProps<{
     formData: Record<string, any>
     error?: string | null
+    timezones?: string[]
 }>()
 
 /**
@@ -28,11 +29,39 @@ const detectSiteUrl = (): string => {
     return `${window.location.origin}${base}`.replace(/\/+$/, '')
 }
 
+/**
+ * The zone this browser is in, e.g. "Asia/Dhaka".
+ *
+ * The application stores every timestamp in UTC and renders it through the
+ * app_timezone setting, so a fresh install with no zone chosen shows all dates in
+ * UTC — which reads as hours wrong to everyone outside it. There is no way to ask
+ * the server where the buyer is, and the host's own zone is usually UTC anyway, so
+ * the browser is the only real signal available during an install.
+ *
+ * Guarded because resolvedOptions().timeZone is undefined on some older browsers,
+ * and the server independently rejects anything it cannot resolve.
+ */
+const detectTimezone = (): string => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    } catch {
+        return 'UTC'
+    }
+}
+
 const site = reactive({
     site_name: props.formData?.step_4?.site_name ?? '',
     site_tagline: props.formData?.step_4?.site_tagline ?? '',
     site_url: props.formData?.step_4?.site_url ?? detectSiteUrl(),
+    site_timezone: props.formData?.step_4?.site_timezone ?? detectTimezone(),
 })
+
+// A detected zone the server would not accept is worse than no guess: it would be
+// silently replaced by UTC after the install with nothing shown here. Fall back in
+// the field itself so what the buyer sees is what gets saved.
+if (props.timezones?.length && !props.timezones.includes(site.site_timezone)) {
+    site.site_timezone = 'UTC'
+}
 
 defineExpose({ getData: () => ({ ...site }) })
 </script>
@@ -75,6 +104,21 @@ defineExpose({ getData: () => ({ ...site }) })
                     class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
                 />
                 <span class="mt-1 block text-xs text-slate-400">Auto-detected from your current URL — change if needed.</span>
+            </label>
+
+            <label class="block">
+                <span class="text-sm font-medium text-slate-700">Timezone</span>
+                <select
+                    v-model="site.site_timezone"
+                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                >
+                    <option v-if="!timezones?.length" :value="site.site_timezone">{{ site.site_timezone }}</option>
+                    <option v-for="zone in timezones" :key="zone" :value="zone">{{ zone }}</option>
+                </select>
+                <span class="mt-1 block text-xs text-slate-400">
+                    Auto-detected from your browser — change if needed. Dates are stored in UTC and
+                    displayed in this zone.
+                </span>
             </label>
         </div>
     </div>

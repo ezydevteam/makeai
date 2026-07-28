@@ -27,6 +27,9 @@ interface InstallProps {
     // Flashed by the controller when it refuses a populated database on submit,
     // so the Database step can reveal the reset card on the Next click alone.
     dbState?: string | null
+    // Sent on the Site Setup step so the timezone select has something to list and
+    // the browser-detected zone can be checked against what the server will accept.
+    timezones?: string[]
 }
 
 const props = defineProps<InstallProps>()
@@ -195,6 +198,7 @@ async function finalizeInstall() {
                     :all-pass="allPass"
                     :cron-command="cronCommand"
                     :db-state="dbState"
+                    :timezones="timezones"
                     :error="errorMessage"
                 />
             </div>
