@@ -157,6 +157,15 @@ class UpdateService
             $excludePaths = ['.env', 'storage', 'addons', 'node_modules', '.git'];
             $this->copyFiles($sourceDir, base_path(), $excludePaths);
 
+            // 6b. The webroot half of the package. copyFiles() above only ever writes
+            //     into base_path(), which is core/ — but the compiled frontend lives in
+            //     <webroot>/build, BESIDE core/ rather than inside it, and the package
+            //     ships no core/public at all. So updates delivered new PHP on top of the
+            //     buyer's original JavaScript and the frontend never moved. Skew like that
+            //     is worse than not updating: a Vue change and the controller it depends
+            //     on arrive separately.
+            $this->copyWebrootFiles($sourceDir);
+
             // 7. Migrate
             Artisan::call('migrate', ['--force' => true]);
 
@@ -597,6 +606,58 @@ class UpdateService
             }
         }
         return null;
+    }
+
+    /**
+     * Copy the parts of a package that belong in the webroot rather than in the
+     * application directory.
+     *
+     * Deliberately an allowlist of two entries rather than "everything beside core/":
+     *
+     *   build/     the compiled frontend — purely generated, never hand-edited, and the
+     *              whole reason this method exists.
+     *   index.php  the front controller, which has to move in step with bootstrap/app.php.
+     *
+     * Everything else in the webroot is left alone on purpose. favicon.ico and robots.txt
+     * are buyer branding, .htaccess and web.config routinely carry buyer redirects and
+     * security rules, and storage/ is their upload directory. Replacing any of those
+     * during an update would quietly destroy customisation the buyer never backed up.
+     */
+    private function copyWebrootFiles(string $sourceDir): void
+    {
+        $webroot = public_path();
+
+        // A standard Laravel checkout keeps assets in public/ inside the app root; the
+        // distribution package keeps them one level up, beside core/. Support both, so
+        // this does not depend on which shape the package was built in.
+        $source = is_dir($sourceDir.'/public')
+            ? $sourceDir.'/public'
+            : dirname($sourceDir);
+
+        if (! is_dir($source) || rtrim($source, '/\\') === rtrim($webroot, '/\\')) {
+            return;
+        }
+
+        foreach (['build', 'index.php'] as $entry) {
+            $from = $source.DIRECTORY_SEPARATOR.$entry;
+
+            if (! file_exists($from)) {
+                continue;
+            }
+
+            $to = $webroot.DIRECTORY_SEPARATOR.$entry;
+
+            if (is_dir($from)) {
+                // Merged, not replaced. Vite filenames are content-hashed, so new files
+                // land beside the old ones and manifest.json decides which are served —
+                // whereas a delete-then-copy would blank the site outright if the copy
+                // failed halfway through.
+                File::ensureDirectoryExists($to);
+                $this->copyFiles($from, $to, []);
+            } else {
+                File::copy($from, $to);
+            }
+        }
     }
 
     private function copyFiles(string $source, string $destination, array $exclude): void
