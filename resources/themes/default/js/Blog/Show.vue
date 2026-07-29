@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import UserLayout from '@themes/default/js/Layouts/UserLayout.vue'
 import SocialShare from '@themes/default/js/Components/SocialShare.vue'
@@ -113,9 +113,56 @@ const formatCount = (value: number): string => {
 const isShareOpen = ref(false)
 const shareDropdownRef = ref<HTMLElement | null>(null)
 
+/* The share panel is anchored with `left-0`, which only works while the button
+   sits on the left of the meta row. That row wraps and can be centred
+   (post_layout_centered), so on narrow screens the button drifts right and the
+   panel runs past the right edge. Measure once open and nudge it back inside. */
+const shareMenu = ref<HTMLElement | null>(null)
+const shareShift = ref(0)
+const SHARE_MENU_GUTTER = 12
+
+const shareMenuStyle = computed(() => (shareShift.value
+    ? { transform: `translateX(${shareShift.value}px)` }
+    : undefined))
+
+const positionShareMenu = (viewportWidth: number) => {
+    const el = shareMenu.value
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    let shift = 0
+    if (rect.right > viewportWidth - SHARE_MENU_GUTTER) shift = viewportWidth - SHARE_MENU_GUTTER - rect.right
+    // A panel wider than the screen can't satisfy both edges — keep the left one.
+    if (rect.left + shift < SHARE_MENU_GUTTER) shift = SHARE_MENU_GUTTER - rect.left
+    shareShift.value = shift
+}
+
+const toggleShareDropdown = () => {
+    isShareOpen.value = !isShareOpen.value
+    shareShift.value = 0
+    if (!isShareOpen.value) return
+
+    /* Read the viewport width *before* the panel mounts. An absolutely positioned
+       panel that spills past the right edge adds scrollable overflow, which widens
+       the layout viewport — measuring afterwards would chase that inflated width. */
+    const viewportWidth = document.documentElement.clientWidth
+    nextTick(() => positionShareMenu(viewportWidth))
+}
+
 onClickOutside(shareDropdownRef, () => {
     isShareOpen.value = false
+    shareShift.value = 0
 })
+
+// Re-measuring on resize hits the same inflated-viewport problem, so just close.
+const closeShareOnResize = () => {
+    if (!isShareOpen.value) return
+    isShareOpen.value = false
+    shareShift.value = 0
+}
+
+onMounted(() => window.addEventListener('resize', closeShareOnResize))
+onUnmounted(() => window.removeEventListener('resize', closeShareOnResize))
 </script>
 
 <template>
@@ -199,7 +246,7 @@ onClickOutside(shareDropdownRef, () => {
                                 class="relative inline-block"
                             >
                                 <button
-                                    @click="isShareOpen = !isShareOpen"
+                                    @click="toggleShareDropdown"
                                     type="button"
                                     class="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none transition-colors"
                                 >
@@ -209,7 +256,9 @@ onClickOutside(shareDropdownRef, () => {
 
                                 <div
                                     v-if="isShareOpen"
-                                    class="absolute left-0 mt-2 z-40 w-48 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-surface-800 dark:bg-surface-900 focus:outline-none"
+                                    ref="shareMenu"
+                                    :style="shareMenuStyle"
+                                    class="absolute left-0 mt-2 z-40 w-48 max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-surface-800 dark:bg-surface-900 focus:outline-none"
                                 >
                                     <div class="share-dropdown-menu">
                                         <SocialShare

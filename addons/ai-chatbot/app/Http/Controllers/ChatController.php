@@ -765,7 +765,7 @@ class ChatController extends Controller
             }
         }
 
-        $provider = $model ? $this->resolveProvider($model) : 'openai';
+        $provider = $model ? $this->resolveProvider($model) : (string) settings('default_ai_provider', 'openai');
 
         try {
             TokenGuard::before($user, null, $model);
@@ -1014,16 +1014,41 @@ class ChatController extends Controller
         ]);
     }
 
+    /**
+     * Map a model slug to the provider that actually serves it.
+     *
+     * The ai_models catalog is authoritative and must be consulted first. Aggregators
+     * re-sell other vendors' models under their own account, so the vendor name inside
+     * the slug says nothing about who to bill: on an OpenRouter-only install every model
+     * is served by OpenRouter, yet 'deepseek/deepseek-v4-flash' used to be matched on the
+     * substring 'deepseek' and sent to api.deepseek.com — which has no key configured and
+     * answers 401. sanitizeError() then reported that as "This AI provider is not
+     * configured", pointing the admin at the one provider they had set up correctly.
+     *
+     * Mirrors App\Services\AI\PromptBuilder::resolveProvider().
+     */
     private function resolveProvider(string $model): string
     {
+        $catalogued = \App\Models\AiModel::where('slug', $model)->value('provider');
+        if ($catalogued) {
+            return (string) $catalogued;
+        }
+
+        // Not in the catalog — infer from the slug prefix. Only a bare prefix is a real
+        // signal; a vendor name appearing mid-slug usually means an aggregator route.
+        $slug = strtolower($model);
+
         return match (true) {
-            str_contains($model, 'claude') => 'anthropic',
-            str_contains($model, 'gemini') => 'google',
-            str_contains($model, 'deepseek') => 'deepseek',
-            str_contains($model, 'perplexity') => 'perplexity',
-            str_contains($model, 'mistral') => 'mistral',
-            str_contains($model, 'dall-e') => 'openai',
-            default => 'openai',
+            str_starts_with($slug, 'gpt-') => 'openai',
+            str_starts_with($slug, 'o1'), str_starts_with($slug, 'o3'), str_starts_with($slug, 'o4') => 'openai',
+            str_starts_with($slug, 'dall-e') => 'openai',
+            str_starts_with($slug, 'claude') => 'anthropic',
+            str_starts_with($slug, 'gemini') => 'google',
+            str_starts_with($slug, 'deepseek') => 'deepseek',
+            str_starts_with($slug, 'grok') => 'xai',
+            str_starts_with($slug, 'mistral') => 'mistral',
+            str_starts_with($slug, 'perplexity'), str_starts_with($slug, 'sonar') => 'perplexity',
+            default => (string) settings('default_ai_provider', 'openai'),
         };
     }
 

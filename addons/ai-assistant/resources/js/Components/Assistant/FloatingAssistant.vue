@@ -316,9 +316,17 @@ onBeforeUnmount(() => {
 <template>
     <template v-if="settings">
         <!-- The panel itself is the same popover in both modes; only its anchor changes. -->
+        <!--
+            z-index: the launcher idles at z-50, but the OPEN panel has to clear the theme's
+            sticky top stack (z-[60], which wraps the announcement banner) and the mobile menu
+            (z-[80]). A child can't escape its parent's stacking context, so the raise has to
+            happen here on the root rather than on the panel. z-[90] keeps it under the layers
+            that are deliberately higher: bottom-popup announcement (z-[95]), announcement
+            popup modal (z-[100]) and the blocking app-modal layer (z-[120]/z-[125]).
+        -->
         <div
-            class="ai-assistant-root fixed z-50 flex flex-col gap-3"
-            :class="anchorClass"
+            class="ai-assistant-root fixed flex flex-col gap-3"
+            :class="[anchorClass, isOpen ? 'z-[90]' : 'z-50']"
             :style="rootStyle"
         >
             <AssistantShell

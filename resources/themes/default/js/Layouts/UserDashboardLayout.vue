@@ -284,7 +284,7 @@ function toggleSection(key: string) {
             <div class="mx-auto max-w-7xl px-6">
                 <!-- Mobile hamburger -->
                 <button class="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800 lg:hidden" @click="sidebarOpen = !sidebarOpen">
-                    <i class="ti ti-menu-2 text-lg"></i>
+                    <i class="ti ti-layout-grid-add text-lg"></i>
                     {{ t('Menu') }}
                 </button>
 

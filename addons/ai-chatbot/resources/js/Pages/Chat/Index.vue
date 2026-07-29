@@ -215,8 +215,10 @@ const confirmDeleteActiveConversation = async () => {
         <Link v-if="!isAuthenticated" :href="route('login')" class="px-4 py-1.5 rounded-full bg-[#1a1a1a] dark:bg-white text-white dark:text-[#1a1a1a] text-sm font-medium hover:opacity-90 transition-opacity no-underline">{{ t('Sign In') }}</Link>
     </div>
 
-    <!-- Authenticated: full layout with sidebar -->
-    <div v-if="isAuthenticated" class="chat-layout">
+    <!-- Full layout with sidebar. Guests get it too when guest messaging is on: their
+         conversations are persisted against session_id, so they have real history to
+         browse — the sidebar just hides the account-only sections (see ChatSidebar). -->
+    <div v-if="isAuthenticated || allowGuest" class="chat-layout">
         <Teleport to="body">
             <Transition
                 enter-active-class="transition-opacity duration-200"
@@ -294,7 +296,7 @@ const confirmDeleteActiveConversation = async () => {
                                 <i class="ti ti-chevron-down text-[10px]"></i>
                             </button>
                             <div v-if="breadcrumbMenuOpen" class="absolute left-0 top-full mt-1.5 min-w-[160px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50">
-                                <div class="px-3 py-1.5 text-[11px] font-medium text-[#b0aca8] dark:text-white/30">{{ t('Move to Project') }}</div>
+                                <div v-if="otherProjects.length" class="px-3 py-1.5 text-[11px] font-medium text-[#b0aca8] dark:text-white/30">{{ t('Move to Project') }}</div>
                                 <button v-for="proj in otherProjects" :key="proj.id" class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="onMoveToProject(proj.id)">
                                     <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: proj.color_hex || '#6b7280' }"></span>
                                     <span class="truncate">{{ proj.name }}</span>
@@ -372,16 +374,6 @@ const confirmDeleteActiveConversation = async () => {
         </div>
     </div>
 
-    <!-- Guest with allow_guest_messages: no sidebar, just chat -->
-    <div v-else-if="allowGuest" class="chat-layout">
-        <div class="chat-main chat-main-full">
-            <ChatWelcome v-if="!chat.activeConversation.value" />
-            <ChatMessages v-else />
-            <AdSection zone="chat_banner" class="mx-auto max-w-[768px] px-4" />
-            <ChatInput />
-        </div>
-    </div>
-
     <!-- Guest without permissions: login prompt -->
     <div v-else class="flex items-center justify-center h-screen bg-[#f6f5f4] dark:bg-[#1a1a1a]">
         <div class="text-center max-w-md px-6">
@@ -436,10 +428,6 @@ main { flex: 1 1 0% !important; min-height: 0 !important; position: relative !im
     flex-direction: column;
     min-width: 0;
     position: relative;
-}
-
-.chat-main-full {
-    max-width: 100%;
 }
 
 .sidebar-shell {

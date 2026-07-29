@@ -158,7 +158,7 @@ class PageController extends Controller
                 'icon' => 'ti ti-ticket',
                 'label' => translate('Support tickets'),
                 'value' => translate('Track an existing request'),
-                'href' => route('support.index'),
+                'href' => route('user.dashboard.support.index'),
                 'external' => false,
             ];
         }

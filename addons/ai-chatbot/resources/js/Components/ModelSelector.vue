@@ -162,14 +162,18 @@ const toggle = () => { open.value = !open.value }
 </script>
 
 <template>
-    <div v-if="allowModelSelect" class="relative shrink-0">
+    <!-- min-w-0 (not shrink-0): a long model name used to hold the composer toolbar
+         wider than the screen, pushing the send button out of view. The label
+         truncates instead; the full name stays available via title/the dropdown. -->
+    <div v-if="allowModelSelect" class="relative min-w-0">
         <button
-            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/8 hover:bg-black/10 dark:hover:bg-white/12 text-[11px] font-medium text-[#6e6a65] dark:text-white/40 transition-colors whitespace-nowrap"
+            class="inline-flex max-w-full items-center gap-1 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/8 hover:bg-black/10 dark:hover:bg-white/12 text-[11px] font-medium text-[#6e6a65] dark:text-white/40 transition-colors whitespace-nowrap"
             :class="{ '!text-amber-600 dark:!text-amber-400': displayModel === 'No model' }"
+            :title="displayModel"
             @click="toggle"
         >
-            <span>{{ displayModel }}</span>
-            <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            <span class="truncate">{{ displayModel }}</span>
+            <svg width="9" height="9" class="shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
         </button>
 
         <div v-if="open" ref="dropdownRef" class="absolute bottom-full right-0 mb-1.5 min-w-[190px] max-h-[280px] overflow-y-auto bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50">

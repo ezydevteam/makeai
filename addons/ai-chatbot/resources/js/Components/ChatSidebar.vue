@@ -88,7 +88,17 @@ type SidebarUser = {
 }
 
 const user = computed(() => page.props.auth?.user as SidebarUser | undefined)
+/* Guests reach this sidebar when guest messaging is enabled — their conversations are
+   session-scoped and fully usable, but anything hanging off a user account (projects,
+   tags, profile, sign-out) is not. Gate those on this, never on isProAvailable, which
+   is a global install flag rather than a statement about the current visitor. */
+const isAuthenticated = computed(() => Boolean(user.value))
 const isPro = computed(() => user.value?.is_pro === true || user.value?.plan?.type === 'pro')
+
+/* Whether Projects are usable at all. Both the collapsed rail's icon and the expanded
+   section must read this same value — when only one of them was gated, the icon opened
+   the sidebar onto a section that wasn't there. */
+const canUseProjects = computed(() => isAuthenticated.value && isProAvailable.value)
 // Plan name to show beneath the username — only meaningful for pro users.
 const planName = computed(() => (isPro.value ? (user.value?.plan_name || null) : null))
 const appName = computed(() => (page.props.appName as string) || t('Application'))
@@ -98,9 +108,19 @@ type Branding = {
     site_name?: string
     site_logo_light?: string
     site_logo_dark?: string
+    site_favicon_png?: string
+    site_favicon_ico?: string
 }
 
 const branding = computed(() => page.props.branding as Branding | undefined)
+
+// Collapsed rail shows the favicon, matching AdminSidebar. PNG first — the .ico is
+// often a multi-resolution file that browsers scale poorly at this size.
+// A favicon pointing at a missing file would otherwise leave a broken image in the
+// 36px rail button; fall back to the brand initial instead.
+const faviconFailed = ref(false)
+const sidebarFavicon = computed(() => (faviconFailed.value ? '' : (branding.value?.site_favicon_png || branding.value?.site_favicon_ico || '')))
+const brandInitial = computed(() => (branding.value?.site_name || appName.value).charAt(0).toUpperCase())
 
 const getLogoImage = () => {
     if (isDark.value) {
@@ -494,7 +514,25 @@ const otherProjects = computed(() => {
         }"
     >
         <!-- Top bar: logo + collapse -->
-        <div class="flex items-center justify-between p-3 border-b border-black/5 dark:border-white/5">
+        <div class="flex items-center border-b border-black/5 dark:border-white/5" :class="isCompactSidebar ? 'justify-center p-2' : 'justify-between p-3'">
+            <!-- Collapsed: favicon that reveals the expand toggle on hover, same as AdminSidebar -->
+            <Tooltip v-if="isCompactSidebar" :content="t('Expand sidebar')" placement="right" class="inline-flex">
+                <button
+                    type="button"
+                    class="chat-logo-toggle"
+                    :aria-label="t('Expand sidebar')"
+                    @click="collapsed = false"
+                >
+                    <img v-if="sidebarFavicon" :src="sidebarFavicon" :alt="branding?.site_name || appName" class="chat-favicon" @error="faviconFailed = true" />
+                    <span v-else class="chat-favicon-fallback bg-black/5 text-[#1a1a1a] dark:bg-white/10 dark:text-white/80">{{ brandInitial }}</span>
+                    <!-- Colours live in Tailwind classes, not the scoped block: :global(.dark)
+                         selectors are dropped by this build (the file's older one is dead too). -->
+                    <span class="chat-logo-toggle-overlay bg-white text-[#1a1a1a] dark:bg-surface-900 dark:text-white/80" aria-hidden="true">
+                        <i class="ti ti-layout-sidebar-left-expand text-[18px]"></i>
+                    </span>
+                </button>
+            </Tooltip>
+
             <Link v-show="!isCompactSidebar" href="/" class="flex items-center gap-2.5 no-underline shrink-0 group">
                 <img v-if="getLogoImage()" :src="getLogoImage()" :alt="appName" class="h-7 w-auto max-w-28 shrink-0 object-contain" />
                 <template v-else>
@@ -514,10 +552,10 @@ const otherProjects = computed(() => {
                         <i class="ti ti-search text-[17px]"></i>
                     </button>
                 </Tooltip>
-                <Tooltip :content="isCompactSidebar ? t('Expand sidebar') : t('Collapse sidebar')" placement="right">
-                    <button class="h-7 px-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center text-[#b0aca8] dark:text-white/30 transition-colors shrink-0" :class="{ 'ml-auto w-full justify-end': isCompactSidebar }" @click="collapsed = !collapsed">
-                        <i v-if="isCompactSidebar" class="ti ti-layout-sidebar-left-expand text-[18px]"></i>
-                        <i v-else class="ti ti-layout-sidebar-left-collapse text-[18px]"></i>
+                <!-- Collapsing only: expanding is handled by the favicon button above. -->
+                <Tooltip v-if="!isCompactSidebar" :content="t('Collapse sidebar')" placement="right">
+                    <button class="h-7 px-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center text-[#b0aca8] dark:text-white/30 transition-colors shrink-0" @click="collapsed = true">
+                        <i class="ti ti-layout-sidebar-left-collapse text-[18px]"></i>
                     </button>
                 </Tooltip>
             </div>
@@ -577,7 +615,7 @@ const otherProjects = computed(() => {
                 </button>
             </template>
             <div v-if="isCompactSidebar" class="mt-2 flex flex-col gap-2 items-center">
-                <Tooltip :content="t('Projects')" placement="right">
+                <Tooltip v-if="canUseProjects" :content="t('Projects')" placement="right">
                     <button
                         class="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-[#6e6a65] transition-colors hover:bg-black/10 dark:bg-white/10 dark:text-white/50 dark:hover:bg-white/15"
                         :class="{ 'bg-black/10 text-[#1a1a1a] dark:bg-white/15 dark:text-white': showProjects }"
@@ -614,7 +652,7 @@ const otherProjects = computed(() => {
 
         <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5" :class="{ 'px-1': isCompactSidebar }">
             <!-- Projects (only when no filter is active) -->
-            <template v-if="isProAvailable && !isCompactSidebar && !chat.selectedProject.value">
+            <template v-if="canUseProjects && !isCompactSidebar && !chat.selectedProject.value">
                 <div class="mb-1.5">
                     <button class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#6e6a65] dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="showProjects = !showProjects">
                         <i class="ti ti-folder-plus text-[15px]"></i>
@@ -858,7 +896,9 @@ const otherProjects = computed(() => {
                                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                                     <span>{{ t('Share') }}</span>
                                 </button>
-                                <div class="relative">
+                                <!-- Tags live on the user account; a guest's list is always empty
+                                     and creating one is refused server-side, so don't offer it. -->
+                                <div v-if="isAuthenticated" class="relative">
                                     <button
                                         class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                         @click.stop="activeSubmenu = activeSubmenu === 'tags' ? null : 'tags'"
@@ -940,11 +980,13 @@ const otherProjects = computed(() => {
             >
                 <div class="w-8 h-8 rounded-full bg-[#d9cec7] dark:bg-white/10 text-[#1a1a1a] dark:text-white/80 flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden">
                     <img v-if="user?.avatar" :src="mediaUrl(user.avatar)" :alt="user?.name" class="w-full h-full object-cover" />
-                    <span v-else>{{ user?.name?.charAt(0) || 'U' }}</span>
+                    <span v-else-if="isAuthenticated">{{ user?.name?.charAt(0) || 'U' }}</span>
+                    <i v-else class="ti ti-user text-[15px]"></i>
                 </div>
                 <span v-show="!isCompactSidebar" class="flex-1 min-w-0 text-left">
-                    <span class="block text-sm font-medium truncate">{{ user?.name || 'User' }}</span>
+                    <span class="block text-sm font-medium truncate">{{ isAuthenticated ? (user?.name || 'User') : t('Guest') }}</span>
                     <span v-if="planName" class="block text-[11px] font-medium leading-tight text-primary-600 dark:text-primary-400 truncate">{{ planName }}</span>
+                    <span v-else-if="!isAuthenticated" class="block text-[11px] leading-tight text-[#b0aca8] dark:text-white/30 truncate">{{ t('History saved on this device') }}</span>
                 </span>
                 <svg v-show="!isCompactSidebar" class="w-4 h-4 shrink-0 transition-transform" :class="{ 'rotate-180': menuOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
             </button>
@@ -1197,6 +1239,61 @@ const otherProjects = computed(() => {
 .sidebar.collapsed {
     width: 56px;
     min-width: 56px;
+}
+
+/* Collapsed brand button: favicon by default, expand affordance on hover. The hover
+   target is the whole rail (not just the button) so the sidebar advertises that it
+   opens wherever the pointer lands — same behaviour as AdminSidebar. */
+.chat-logo-toggle {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: background 0.15s ease;
+}
+
+.chat-favicon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.chat-favicon-fallback {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.chat-logo-toggle-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar.collapsed:hover .chat-logo-toggle-overlay,
+.chat-logo-toggle:focus-visible .chat-logo-toggle-overlay {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    /* Touch devices never "hover"; keep the favicon visible and let the tap expand. */
+    .sidebar.collapsed:hover .chat-logo-toggle-overlay {
+        opacity: 0;
+    }
 }
 
 @media (max-width: 1023px) {

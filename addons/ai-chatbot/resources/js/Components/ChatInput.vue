@@ -235,8 +235,11 @@ watch(
                     @input="autoResize"
                 ></textarea>
 
-                <div class="flex items-center justify-between gap-3 dark:border-white/10">
-                    <div class="flex items-center gap-2">
+                <!-- The tool buttons keep their size (shrink-0) and drop their labels below
+                     sm; only the right-hand group is allowed to shrink (min-w-0), so a long
+                     model name truncates instead of shoving the send button off-screen. -->
+                <div class="flex items-center justify-between gap-2 sm:gap-3 dark:border-white/10">
+                    <div class="flex shrink-0 items-center gap-1 sm:gap-2">
                         <button
                             v-if="enableFileUpload"
                             class="flex h-9 items-center justify-center gap-2 rounded-xl px-3 text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70 disabled:opacity-40"
@@ -247,7 +250,7 @@ watch(
                         >
                             <svg v-if="!uploading" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-5.7l-1.415-1.414" /></svg>
                             <svg v-else class="animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                            <span class="text-sm font-medium">{{ uploading ? t('Uploading...') : t('Attach') }}</span>
+                            <span class="hidden sm:inline text-sm font-medium">{{ uploading ? t('Uploading...') : t('Attach') }}</span>
                         </button>
                         <input v-if="enableFileUpload" ref="fileInputRef" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,.md,.docx" @change="onFileSelect" />
 
@@ -258,10 +261,11 @@ watch(
                                 ? 'bg-primary-500/10 text-primary-600 dark:bg-primary-500/15 dark:text-primary-400'
                                 : 'text-gray-500 hover:bg-black/5 hover:text-gray-700 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70'"
                             :title="chat.useKnowledgeBase.value ? t('Knowledge base enabled') : t('Use knowledge base')"
+                            :aria-label="chat.useKnowledgeBase.value ? t('Knowledge base enabled') : t('Use knowledge base')"
                             @click="chat.useKnowledgeBase.value = !chat.useKnowledgeBase.value"
                         >
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
-                            <span class="text-sm font-medium">{{ t('KB') }}</span>
+                            <span class="hidden sm:inline text-sm font-medium">{{ t('KB') }}</span>
                         </button>
 
                         <button
@@ -271,26 +275,27 @@ watch(
                                 ? 'bg-red-500/10 text-red-600 dark:bg-red-500/15 dark:text-red-400 animate-pulse'
                                 : 'text-gray-500 hover:bg-black/5 hover:text-gray-700 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70'"
                             :title="isRecording ? t('Stop recording') : t('Voice input')"
+                            :aria-label="isRecording ? t('Stop recording') : t('Voice input')"
                             @click="toggleRecording"
                         >
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                             </svg>
-                            <span class="text-sm font-medium">{{ isRecording ? t('Recording...') : t('Voice') }}</span>
+                            <span class="hidden sm:inline text-sm font-medium">{{ isRecording ? t('Recording...') : t('Voice') }}</span>
                         </button>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex min-w-0 items-center gap-2">
                         <ModelSelector />
 
                         <template v-if="chat.isStreaming.value">
-                            <button class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-red-500/10 px-3 text-red-600 transition-colors hover:bg-red-500/15 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25" :title="t('Stop')" :aria-label="t('Stop')" @click="stop">
+                            <button class="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/10 px-3 text-red-600 transition-colors hover:bg-red-500/15 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25" :title="t('Stop')" :aria-label="t('Stop')" @click="stop">
                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
                             </button>
                         </template>
                         <template v-else>
                             <button
-                                class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-primary-500 px-3 text-white shadow-sm transition-all hover:bg-primary-600 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-30 dark:bg-primary-500 dark:hover:bg-primary-600"
+                                class="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500 px-3 text-white shadow-sm transition-all hover:bg-primary-600 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-30 dark:bg-primary-500 dark:hover:bg-primary-600"
                                 :disabled="!inputText.trim() && !uploadedAttachments.length"
                                 @click="send"
                             >

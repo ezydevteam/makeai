@@ -44,6 +44,18 @@ const props = defineProps<{
 const search = ref(props.filters.q ?? '')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+/* A site with a dozen categories filled most of a phone screen with chips before the
+   first article. Below sm only the first two are kept, behind a show-more toggle. The
+   breakpoint is pure CSS (`hidden sm:inline-flex`) rather than matchMedia, so desktop
+   always renders the full set with no hydration flash and no resize listener. */
+const categoriesExpanded = ref(false)
+const COLLAPSED_CATEGORY_COUNT = 2
+// Counts what is genuinely hidden, so the badge stays honest when the active category is
+// past the cut-off and therefore force-shown (it would otherwise read one too many).
+const hiddenCategoryCount = computed(() => props.categories.filter(
+  (cat, index) => index >= COLLAPSED_CATEGORY_COUNT && props.activeCategory?.slug !== cat.slug,
+).length)
+
 // Debounced so a typed word is one request, not one per keystroke. `replace` keeps the
 // back button pointing at the page the visitor arrived from rather than every keystroke.
 watch(search, (value) => {
@@ -149,14 +161,21 @@ function helpfulPercent(a: Article): string | null {
         </span>
       </Link>
       <Link
-        v-for="cat in props.categories"
+        v-for="(cat, index) in props.categories"
         :key="cat.id"
         :href="categoryHref(cat.slug)"
         preserve-scroll
-        class="group inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-sm font-medium shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900"
-        :class="props.activeCategory?.slug === cat.slug
-          ? 'border-primary-400 text-primary-700 dark:border-primary-500/50 dark:text-primary-300'
-          : 'border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600 dark:border-surface-850 dark:text-gray-400 dark:hover:border-primary-500/50 dark:hover:text-primary-400'"
+        class="group items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-sm font-medium shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900"
+        :class="[
+          // The active category always stays visible — collapsing the chip that is
+          // currently filtering the list would hide why the results look the way they do.
+          (index >= COLLAPSED_CATEGORY_COUNT && !categoriesExpanded && props.activeCategory?.slug !== cat.slug)
+            ? 'hidden sm:inline-flex'
+            : 'inline-flex',
+          props.activeCategory?.slug === cat.slug
+            ? 'border-primary-400 text-primary-700 dark:border-primary-500/50 dark:text-primary-300'
+            : 'border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600 dark:border-surface-850 dark:text-gray-400 dark:hover:border-primary-500/50 dark:hover:text-primary-400',
+        ]"
       >
         <i v-if="cat.icon" :class="cat.icon"></i>
         {{ cat.name }}
@@ -169,6 +188,18 @@ function helpfulPercent(a: Article): string | null {
           {{ cat.articles_count }}
         </span>
       </Link>
+
+      <!-- Show-more toggle: mobile only, and only when there is something to reveal. -->
+      <button
+        v-if="hiddenCategoryCount > 0"
+        type="button"
+        class="sm:hidden inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-500 transition-all duration-300 hover:border-primary-400 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:border-primary-500/50 dark:hover:text-primary-400"
+        :aria-expanded="categoriesExpanded"
+        @click="categoriesExpanded = !categoriesExpanded"
+      >
+        <span>{{ categoriesExpanded ? t('Show less') : `+${hiddenCategoryCount}` }}</span>
+        <i class="ti text-xs transition-transform" :class="categoriesExpanded ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+      </button>
     </div>
 
     <!-- Empty state -->

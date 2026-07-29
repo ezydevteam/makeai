@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import FavoriteButton from '@themes/default/js/Components/FavoriteButton.vue'
 import Pagination from '@/Components/UI/Pagination.vue'
@@ -60,6 +60,18 @@ const { t } = useTranslate()
 const activeType = ref('all')
 const searchQuery = ref('')
 const viewMode = ref<'grid' | 'list'>('grid')
+
+/* The grid/list toggle is desktop-only: below md the grid is already a single column,
+   so list view just gives a cramped row. `effectiveViewMode` — not `viewMode` — drives
+   the layout, so someone who picked list on desktop and then narrows the window isn't
+   left in list view with no visible control to leave it. Their choice is remembered and
+   comes back when the toggle does. Same 767px breakpoint the theme uses elsewhere. */
+const isMobileView = ref(false)
+let mobileQuery: MediaQueryList | null = null
+const syncIsMobileView = (e: MediaQueryList | MediaQueryListEvent) => { isMobileView.value = e.matches }
+
+const effectiveViewMode = computed<'grid' | 'list'>(() => (isMobileView.value ? 'grid' : viewMode.value))
+
 const openDropdown = ref<number | null>(null)
 const addingToCollection = ref<string | null>(null)
 
@@ -96,8 +108,50 @@ const formatDate = (value: string | null) => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
+/* The panel is anchored `right-0`, but "Collect" is the first control in a
+   justify-between row, so it sits at the LEFT of the card and a right-anchored 200px
+   panel runs off the left edge of a phone screen. Only one panel is open at a time
+   (v-if is keyed to openDropdown), so a single ref covers every card: measure once open
+   and nudge it back inside. Same approach as the share menus in ToolPage/Blog Show. */
+const collectionMenu = ref<HTMLElement | null>(null)
+const collectionShift = ref(0)
+const COLLECTION_MENU_GUTTER = 12
+
+/* A function ref, not `ref="collectionMenu"`: a string ref declared inside a v-for is
+   populated by Vue as an ARRAY of elements, which would blow up getBoundingClientRect.
+   Nulls (fired when the previous card's panel unmounts) are ignored so they can't wipe
+   the entry that was just mounted; toggleDropdown clears it explicitly on close. */
+const setCollectionMenu = (el: Element | { $el?: Element } | null) => {
+    if (el) collectionMenu.value = (el as HTMLElement)
+}
+
+const collectionMenuStyle = computed(() => (collectionShift.value
+    ? { transform: `translateX(${collectionShift.value}px)` }
+    : undefined))
+
+const positionCollectionMenu = (viewportWidth: number) => {
+    const el = collectionMenu.value
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    let shift = 0
+    if (rect.right > viewportWidth - COLLECTION_MENU_GUTTER) shift = viewportWidth - COLLECTION_MENU_GUTTER - rect.right
+    // A panel wider than the screen can't satisfy both edges — keep the left one.
+    if (rect.left + shift < COLLECTION_MENU_GUTTER) shift = COLLECTION_MENU_GUTTER - rect.left
+    collectionShift.value = shift
+}
+
 function toggleDropdown(itemId: number) {
     openDropdown.value = openDropdown.value === itemId ? null : itemId
+    collectionShift.value = 0
+    collectionMenu.value = null
+    if (openDropdown.value === null) return
+
+    /* Read the viewport width *before* the panel mounts: an absolutely positioned panel
+       spilling past the right edge adds scrollable overflow, which widens the layout
+       viewport and would poison the measurement. */
+    const viewportWidth = document.documentElement.clientWidth
+    nextTick(() => positionCollectionMenu(viewportWidth))
 }
 
 function addToCollection(collectionUlid: string, toolSlug: string) {
@@ -115,11 +169,31 @@ function handleClickOutside(event: MouseEvent) {
     const target = event.target as HTMLElement
     if (!target.closest('[data-collection-dropdown]')) {
         openDropdown.value = null
+        collectionShift.value = 0
     }
 }
 
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onUnmounted(() => document.removeEventListener('click', handleClickOutside))
+// Re-measuring on resize hits the same inflated-viewport problem, so just close.
+function closeDropdownOnResize() {
+    if (openDropdown.value === null) return
+    openDropdown.value = null
+    collectionShift.value = 0
+}
+
+onMounted(() => {
+    document.addEventListener('click', handleClickOutside)
+    window.addEventListener('resize', closeDropdownOnResize)
+
+    mobileQuery = window.matchMedia('(max-width: 767px)')
+    syncIsMobileView(mobileQuery)
+    mobileQuery.addEventListener('change', syncIsMobileView)
+})
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside)
+    window.removeEventListener('resize', closeDropdownOnResize)
+    mobileQuery?.removeEventListener('change', syncIsMobileView)
+})
 </script>
 
 <template>
@@ -134,7 +208,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                 </p>
             </div>
 
-            <div class="inline-flex rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div class="hidden md:inline-flex rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
                 <button
                     type="button"
                     :class="viewMode === 'grid' ? 'bg-primary-50 text-primary-700 dark:!bg-primary-500/20 dark:text-primary-500' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
@@ -198,24 +272,24 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
             </div>
         </div>
 
-        <div v-if="visibleItems.length" :class="viewMode === 'grid' ? 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3' : 'space-y-3'">
+        <div v-if="visibleItems.length" :class="effectiveViewMode === 'grid' ? 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3' : 'space-y-3'">
             <article
                 v-for="item in visibleItems"
                 :key="`${item.type}-${item.model_id}`"
-                :class="viewMode === 'grid' ? 'flex flex-col' : 'flex items-center gap-4'"
+                :class="effectiveViewMode === 'grid' ? 'flex flex-col' : 'flex items-center gap-4'"
                 class="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:border-primary-200 hover:shadow-md dark:border-surface-800 dark:bg-surface-900"
             >
-                <Link :href="item.url" :class="viewMode === 'grid' ? 'block flex-1' : 'flex min-w-0 flex-1 items-center gap-4'">
+                <Link :href="item.url" :class="effectiveViewMode === 'grid' ? 'block flex-1' : 'flex min-w-0 flex-1 items-center gap-4'">
                     <div
                         v-if="item.image"
-                        :class="viewMode === 'grid' ? 'mb-4 aspect-[16/9] w-full' : 'h-16 w-24 shrink-0'"
+                        :class="effectiveViewMode === 'grid' ? 'mb-4 aspect-[16/9] w-full' : 'h-16 w-24 shrink-0'"
                         class="overflow-hidden rounded-lg bg-gray-100 dark:bg-white/5"
                     >
                         <img :src="item.image" :alt="item.title" class="h-full w-full object-cover">
                     </div>
                     <div
                         v-else
-                        :class="viewMode === 'grid' ? 'mb-4 h-10 w-10' : 'h-10 w-10 shrink-0'"
+                        :class="effectiveViewMode === 'grid' ? 'mb-4 h-10 w-10' : 'h-10 w-10 shrink-0'"
                         class="flex items-center justify-center rounded-xl border"
                         :style="{ background: `${item.color}15`, borderColor: `${item.color}30`, color: item.color }"
                     >
@@ -231,7 +305,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                     </div>
                 </Link>
 
-                <div :class="viewMode === 'grid' ? 'mt-4 flex justify-between gap-2 border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0 flex items-center gap-2'">
+                <div :class="effectiveViewMode === 'grid' ? 'mt-4 flex justify-between gap-2 border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0 flex items-center gap-2'">
                     <div v-if="item.type === 'ai_templates' && item.slug && props.collections.length > 0" class="relative" data-collection-dropdown>
                         <button
                             type="button"
@@ -243,7 +317,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                             <span>{{ t('Collect') }}</span>
                             <i class="ti ti-chevron-down text-xs transition" :class="{ 'rotate-180': openDropdown === item.id }"></i>
                         </button>
-                        <div v-if="openDropdown === item.id" class="absolute bottom-full right-0 z-50 mb-1 min-w-[200px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                        <div v-if="openDropdown === item.id" :ref="setCollectionMenu" :style="collectionMenuStyle" class="absolute bottom-full right-0 z-50 mb-1 min-w-[200px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                             <p class="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500">{{ t('Add to collection') }}</p>
                             <button
                                 v-for="col in props.collections"

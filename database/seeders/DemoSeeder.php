@@ -105,7 +105,7 @@ class DemoSeeder extends Seeder
 
         if (blank($adminPassword) || blank($userPassword)) {
             throw new \RuntimeException(
-                'DemoSeeder requires DEMO_ADMIN_PASSWORD and DEMO_USER_PASSWORD to be set in .env. '
+                'DemoSeeder requires DEMO_ADMIN_PASSWORD and DEMO_USER_PASSWORD to be set.'
                 . 'They have no default because the demo credentials are shown publicly on the sign-in page.'
             );
         }

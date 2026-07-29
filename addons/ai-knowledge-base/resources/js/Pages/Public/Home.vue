@@ -47,6 +47,9 @@ const props = defineProps<{
 }>()
 
 const searchQuery = ref('')
+// Drives the submit icon: arrow-right at rest, arrow-up-right while the field has focus,
+// so the button reads as "go" the moment the visitor starts typing.
+const heroSearchFocused = ref(false)
 const streaming = ref(false)
 const answer = ref('')
 // Sanitize the streamed AI answer before it reaches v-html.
@@ -225,15 +228,21 @@ onMounted(() => {
 
           <!-- Search Input Box -->
           <div class="mt-8 max-w-2xl mx-auto">
-            <div class="flex flex-col sm:flex-row gap-2.5 p-2 bg-white dark:bg-surface-850 rounded-full border border-gray-200 dark:border-surface-700 shadow-md">
-              <div class="relative flex-1">
-                <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-lg text-gray-400"></i>
+            <!-- One row at every width, so the `rounded-full` shell stays a true pill.
+                 Mobile drops the button's "Search" label instead of stacking it: an
+                 icon-only circle keeps the field usably wide on a narrow screen. -->
+            <div class="flex items-center gap-2 sm:gap-2.5 p-2 bg-white dark:bg-surface-850 rounded-full border border-gray-200 dark:border-surface-700 shadow-md">
+              <div class="relative flex-1 min-w-0">
+                <i class="ti ti-search absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-base sm:text-lg text-gray-400"></i>
                 <input
                   v-model="searchQuery"
                   @keydown.enter="doSearch"
+                  @focus="heroSearchFocused = true"
+                  @blur="heroSearchFocused = false"
                   type="text"
                   :placeholder="t('Search articles, guides, questions...')"
-                  class="w-full pl-11 pr-10 py-3 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none text-sm"
+                  class="w-full pl-10 sm:pl-11 py-2.5 sm:py-3 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none text-sm"
+                  :class="searchQuery ? 'pr-9' : 'pr-3'"
                 />
                 <button
                   v-if="searchQuery"
@@ -248,10 +257,11 @@ onMounted(() => {
               <button
                 @click="doSearch"
                 type="button"
-                class="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-full text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary-500/10 transition-all cursor-pointer"
+                :aria-label="t('Search')"
+                class="shrink-0 h-11 w-11 sm:h-auto sm:w-auto sm:px-6 sm:py-2.5 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-full text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary-500/10 transition-all cursor-pointer"
               >
-                <span>{{ t('Search') }}</span>
-                <i class="ti ti-arrow-right"></i>
+                <span class="hidden sm:inline">{{ t('Search') }}</span>
+                <i class="ti transition-transform duration-200" :class="heroSearchFocused ? 'ti-arrow-up-right' : 'ti-arrow-right'"></i>
               </button>
             </div>
 
@@ -318,8 +328,10 @@ onMounted(() => {
           <div class="flex-grow h-px bg-gray-200 dark:bg-surface-800"></div>
 
           <!-- Swiper hides these automatically (swiper-button-lock) when every
-               category already fits on screen, so there is nothing to scroll. -->
-          <div class="flex items-center gap-2 shrink-0">
+               category already fits on screen, so there is nothing to scroll. Hidden
+               outright on mobile, where the slider is swiped rather than tapped and the
+               arrows only crowd the heading. -->
+          <div class="hidden sm:flex items-center gap-2 shrink-0">
             <button type="button" class="kb-cat-nav kb-cat-prev" :aria-label="t('Previous categories')">
               <i class="ti ti-chevron-left"></i>
             </button>

@@ -120,16 +120,14 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
                 <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Notifications') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Review account updates, payments, documents, and admin messages.') }}</p>
             </div>
-            <div class="shrink-0 flex flex-wrap items-center gap-3">
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-2 btn-primary"
-                    @click="openPreferencesModal"
-                >
-                    <i class="ti ti-adjustments-horizontal text-base"></i>
-                    {{ t('Preferences') }}
-                </button>
-            </div>
+            <button
+                type="button"
+                class="shrink-0 inline-flex items-center gap-2 btn-primary"
+                @click="openPreferencesModal"
+            >
+                <i class="ti ti-adjustments-horizontal text-base"></i>
+                {{ t('Preferences') }}
+            </button>
         </div>
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
@@ -154,7 +152,11 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
                     <i :class="[resolveNotificationIconClass(item), 'text-lg']"></i>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                    <!-- The date pill drops onto its own line below sm. `flex-wrap` alone
+                         never wrapped it: the title/message block is `flex-1 min-w-0`, so it
+                         shrinks toward zero instead of pushing the pill down, leaving the
+                         date to eat most of a narrow row. -->
+                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-3">
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.title }}</h2>
@@ -201,16 +203,22 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
             <div
                 v-for="group in localGroups"
                 :key="group.key"
-                class="flex items-start gap-4 rounded-2xl border border-gray-200 p-4 dark:border-surface-700"
+                class="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-surface-700 sm:flex-row sm:items-start sm:gap-4"
             >
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
-                    <i :class="group.icon" class="text-xl"></i>
+                <!-- Icon + copy stay together; the switch pair drops below them on narrow
+                     screens. Side by side there is no room left for the description: the
+                     two labelled switches are shrink-0 and eat ~210px of a ~285px row, so
+                     the text was squeezed to a few pixels and ran into them. -->
+                <div class="flex min-w-0 flex-1 items-start gap-4">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+                        <i :class="group.icon" class="text-xl"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ group.label }}</h3>
+                        <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ group.description }}</p>
+                    </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ group.label }}</h3>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ group.description }}</p>
-                </div>
-                <div class="flex items-center gap-6 shrink-0">
+                <div class="flex shrink-0 items-center gap-6 pl-14 sm:pl-0">
                     <AppSwitch
                         :model-value="group.in_app"
                         :label="t('In-App')"
@@ -224,7 +232,7 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
                 </div>
             </div>
         </div>
-        <div class="mt-4 rounded-full border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+        <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
             <p class="text-xs text-blue-800 dark:text-blue-300">
                 <i class="ti ti-info-circle mr-1"></i>
                 {{ t('Security-critical emails (password reset, 2FA codes) are always sent to keep your account safe.') }}

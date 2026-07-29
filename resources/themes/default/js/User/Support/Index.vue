@@ -74,6 +74,32 @@ const statusOptions = [
     { value: 'closed', label: t('Closed') },
 ]
 
+/* The table used to render `t(ticket.status)` with a `capitalize` class, which turns the
+   raw enum into "Waiting_user" / "In_progress" — CSS can't replace the underscore, and the
+   raw key has no translation entry either. Mirrors Admin/Support/Tickets.vue. */
+const ticketStatusLabel = (value: string) => {
+    const labels: Record<string, string> = {
+        open: 'Open',
+        in_progress: 'In Progress',
+        waiting_user: 'Waiting User',
+        resolved: 'Resolved',
+        closed: 'Closed',
+    }
+
+    return t(labels[value] ?? value)
+}
+
+const ticketPriorityLabel = (value: string) => {
+    const labels: Record<string, string> = {
+        low: 'Low',
+        medium: 'Medium',
+        high: 'High',
+        urgent: 'Urgent',
+    }
+
+    return t(labels[value] ?? value)
+}
+
 const filter = () => {
     clearTimeout(searchTimeout)
     router.get(route('user.dashboard.support.index'), {
@@ -87,7 +113,7 @@ const filter = () => {
 }
 
 let searchTimeout: ReturnType<typeof setTimeout>
-watch(search, (value) => {
+watch(search, () => {
     clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => {
         filter()
@@ -226,8 +252,8 @@ const submit = () => {
                                 <div class="text-xs text-gray-500">{{ ticket.ticket_number }}</div>
                             </td>
                             <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ ticket.department?.name }}</td>
-                            <td class="px-4 py-4 text-center capitalize"><span :class="badgeClass(ticket.priority)" class="rounded-full px-2 py-1 text-xs font-medium">{{ t(ticket.priority) }}</span></td>
-                            <td class="px-4 py-4 text-center capitalize"><span :class="badgeClass(ticket.status)" class="rounded-full px-2 py-1 text-xs font-medium">{{ t(ticket.status) }}</span></td>
+                            <td class="px-4 py-4 text-center"><span :class="badgeClass(ticket.priority)" class="rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap">{{ ticketPriorityLabel(ticket.priority) }}</span></td>
+                            <td class="px-4 py-4 text-center"><span :class="badgeClass(ticket.status)" class="rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap">{{ ticketStatusLabel(ticket.status) }}</span></td>
                             <td class="px-4 py-4 text-center text-sm text-gray-500">{{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ticket.last_reply_at ?? ticket.updated_at)) }}</td>
                             <td class="px-4 py-4 text-right">
                                 <Link

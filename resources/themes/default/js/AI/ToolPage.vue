@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import UserLayout from '@themes/default/js/Layouts/UserLayout.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
 import DynamicForm, { type ToolField } from '@themes/default/js/Components/AI/DynamicForm.vue'
@@ -771,16 +771,57 @@ const submitReview = async () => {
 const isShareOpen = ref(false)
 const shareCopied = ref(false)
 
+/* The share panel is anchored with `right-0`, which is correct once the header
+   actions sit on the right (lg and up). On narrower screens the actions row is
+   left-aligned, so a right-anchored panel runs off the left edge of the screen.
+   Only one layout renders at a time, so a single ref covers every variant: after
+   opening we measure the panel and nudge it back inside the viewport. */
+const shareMenu = ref<HTMLElement | null>(null)
+const shareShift = ref(0)
+const SHARE_MENU_GUTTER = 12
+
+const positionShareMenu = (viewportWidth: number) => {
+    const el = shareMenu.value
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    let shift = 0
+    if (rect.right > viewportWidth - SHARE_MENU_GUTTER) shift = viewportWidth - SHARE_MENU_GUTTER - rect.right
+    // A panel wider than the screen can't satisfy both edges — keep the left one.
+    if (rect.left + shift < SHARE_MENU_GUTTER) shift = SHARE_MENU_GUTTER - rect.left
+    shareShift.value = shift
+}
+
+const shareMenuStyle = computed(() => (shareShift.value
+    ? { transform: `translateX(${shareShift.value}px)` }
+    : undefined))
+
+const toggleShareDropdown = () => {
+    isShareOpen.value = !isShareOpen.value
+    shareShift.value = 0
+    if (!isShareOpen.value) return
+
+    /* Read the viewport width *before* the panel mounts. An absolutely positioned
+       panel that spills past the right edge adds scrollable overflow, which widens
+       the layout viewport — measuring afterwards would chase that inflated width. */
+    const viewportWidth = document.documentElement.clientWidth
+    nextTick(() => positionShareMenu(viewportWidth))
+}
+
 const closeShareDropdown = () => {
     isShareOpen.value = false
+    shareShift.value = 0
 }
 
 onMounted(() => {
     document.addEventListener('click', closeShareDropdown)
+    // Re-measuring on resize hits the same inflated-viewport problem, so just close.
+    window.addEventListener('resize', closeShareDropdown)
 })
 
 onUnmounted(() => {
     document.removeEventListener('click', closeShareDropdown)
+    window.removeEventListener('resize', closeShareDropdown)
 })
 
 const copyToolLink = () => {
@@ -838,13 +879,13 @@ const copyToolLink = () => {
                         <div v-if="!toolPageSettings.hide_share" class="relative">
                             <button
                                 type="button"
-                                @click.stop="isShareOpen = !isShareOpen"
+                                @click.stop="toggleShareDropdown"
                                 class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
                             >
                                 <i class="ti ti-share text-[13px]"></i>
                                 {{ t('Share') }}
                             </button>
-                            <div v-if="isShareOpen" class="absolute right-0 mt-2 w-max min-w-[180px] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                            <div v-if="isShareOpen" ref="shareMenu" :style="shareMenuStyle" class="absolute right-0 mt-2 w-max min-w-[180px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
                                 <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :layout="'vertical'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
                             </div>
                         </div>
@@ -950,13 +991,13 @@ const copyToolLink = () => {
                         <div v-if="!toolPageSettings.hide_share" class="relative">
                             <button
                                 type="button"
-                                @click.stop="isShareOpen = !isShareOpen"
+                                @click.stop="toggleShareDropdown"
                                 class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
                             >
                                 <i class="ti ti-share text-[13px]"></i>
                                 {{ t('Share') }}
                             </button>
-                            <div v-if="isShareOpen" class="absolute right-0 mt-2 w-max min-w-[180px] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                            <div v-if="isShareOpen" ref="shareMenu" :style="shareMenuStyle" class="absolute right-0 mt-2 w-max min-w-[180px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
                                 <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :layout="'vertical'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
                             </div>
                         </div>
@@ -992,13 +1033,13 @@ const copyToolLink = () => {
                             <div v-if="!toolPageSettings.hide_share" class="relative">
                                 <button
                                     type="button"
-                                    @click.stop="isShareOpen = !isShareOpen"
+                                    @click.stop="toggleShareDropdown"
                                     class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
                                 >
                                     <i class="ti ti-share text-[13px]"></i>
                                     {{ t('Share') }}
                                 </button>
-                                <div v-if="isShareOpen" class="absolute right-0 mt-2 w-max min-w-[180px] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                                <div v-if="isShareOpen" ref="shareMenu" :style="shareMenuStyle" class="absolute right-0 mt-2 w-max min-w-[180px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
                                     <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :layout="'vertical'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
                                 </div>
                             </div>
@@ -1142,13 +1183,13 @@ const copyToolLink = () => {
                                 <div v-if="!toolPageSettings.hide_share" class="relative">
                                     <button
                                         type="button"
-                                        @click.stop="isShareOpen = !isShareOpen"
+                                        @click.stop="toggleShareDropdown"
                                         class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-[11px] font-bold text-gray-700 transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
                                     >
                                         <i class="ti ti-share text-[12px]"></i>
                                         {{ t('Share') }}
                                     </button>
-                                    <div v-if="isShareOpen" class="absolute right-0 mt-2 w-72 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                                    <div v-if="isShareOpen" ref="shareMenu" :style="shareMenuStyle" class="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-3.5 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
                                         <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
                                     </div>
                                 </div>

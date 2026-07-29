@@ -1408,7 +1408,7 @@ const activityTypeLabels: Record<string, string> = {
                 </h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Overview of your platform') }} · <span class="font-medium text-gray-600 dark:text-gray-300">{{ t('Showing') }}: {{ t(periodLabels[chartPeriod]) }}</span></p>
             </div>
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="flex flex-wrap items-center gap-3">
                 <div class="inline-flex rounded-xl border border-gray-200 bg-white p-1 dark:bg-surface-800 dark:border-surface-700 shrink-0">
                     <Tooltip
                         v-for="period in periodOptions"
