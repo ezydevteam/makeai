@@ -72,9 +72,35 @@ const search = ref(props.filters.search ?? '')
 const status = ref(props.filters.status ?? '')
 const filterDebounce = ref<number | null>(null)
 
-const zoneOptions = computed<SelectOption[]>(() =>
-    Object.entries(props.zones).map(([value, label]) => ({ value, label })),
-)
+/* Zone labels arrive as "Header banner — above the site header (728x90)", which is wider
+   than the select on a phone and gets cut. Below md only the part before the em dash is
+   shown; desktop keeps the full description. */
+const isNarrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+const syncIsNarrow = (e: MediaQueryList | MediaQueryListEvent) => { isNarrow.value = e.matches }
+
+const zoneOptions = computed<SelectOption[]>(() => {
+    const entries = Object.entries(props.zones)
+
+    if (!isNarrow.value) {
+        return entries.map(([value, label]) => ({ value, label }))
+    }
+
+    /* Shorten to the part before the em dash, but only where that stays unique — several
+       zones share a prefix ("Blog — between post cards" / "Blog — after post content"),
+       and collapsing both to "Blog" would leave two options that cannot be told apart.
+       Those keep their full label. */
+    const shortened = entries.map(([, label]) => label.split('—')[0].trim())
+    const seen = shortened.reduce<Record<string, number>>((counts, short) => {
+        counts[short] = (counts[short] ?? 0) + 1
+        return counts
+    }, {})
+
+    return entries.map(([value, label], index) => ({
+        value,
+        label: seen[shortened[index]] === 1 ? shortened[index] : label,
+    }))
+})
 const statusOptions = computed<SelectOption[]>(() => [
     { value: '', label: t('All statuses') },
     { value: 'active', label: t('Active') },
@@ -313,10 +339,15 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
+
+    narrowQuery = window.matchMedia('(max-width: 767px)')
+    syncIsNarrow(narrowQuery)
+    narrowQuery.addEventListener('change', syncIsNarrow)
 })
 
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleKeydown)
+    narrowQuery?.removeEventListener('change', syncIsNarrow)
 })
 </script>
 

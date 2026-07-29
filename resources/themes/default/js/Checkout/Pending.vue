@@ -29,6 +29,9 @@ const props = defineProps<{
     payment: PaymentPayload
     continueUrl: string
     continueLabel: string
+    // Present only for a pending payment on a gateway the server can re-query (Paddle
+    // Billing). Null everywhere else, which switches the polling below off entirely.
+    statusUrl?: string | null
 }>()
 
 const { t } = useTranslate()
@@ -127,23 +130,95 @@ const goNow = () => {
 
 const interactionEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
 
-onMounted(() => {
-    if (!isConfirmed.value) return
+/**
+ * Fallback for a webhook that never arrives.
+ *
+ * Paddle Billing has no per-payment return URL to verify on — its hosted checkout sends
+ * every buyer to one static success URL — so a payment that the webhook misses would sit
+ * on this screen reading "waiting for confirmation" indefinitely, exactly as Razorpay's
+ * did. Instead the page asks the server, which asks Paddle.
+ *
+ * Bounded on purpose: this is a backstop, not a substitute for the webhook. It gives up
+ * after two minutes rather than polling a gateway forever behind an abandoned tab, and
+ * it stops entirely while the tab is hidden.
+ */
+const POLL_INTERVAL_MS = 4000
+const MAX_POLL_ATTEMPTS = 30
 
-    interactionEvents.forEach((event) => window.addEventListener(event, cancelAutoContinue, { passive: true }))
+const checking = ref(false)
+const pollAttempts = ref(0)
 
-    timer = setInterval(() => {
-        countdown.value -= 1
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
-        if (countdown.value <= 0) {
-            stopCountdown()
-            router.visit(props.continueUrl)
+const stopPolling = () => {
+    if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+    }
+    checking.value = false
+}
+
+const pollStatus = async () => {
+    if (!props.statusUrl || document.hidden) return
+
+    if (pollAttempts.value >= MAX_POLL_ATTEMPTS) {
+        stopPolling()
+        return
+    }
+
+    pollAttempts.value += 1
+
+    try {
+        const response = await fetch(props.statusUrl, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+
+        // 404/419 means the session or the payment is gone — retrying cannot fix either.
+        if (!response.ok) {
+            stopPolling()
+            return
         }
-    }, 1000)
+
+        const data = await response.json()
+
+        if (data.settled) {
+            stopPolling()
+            // Re-render from the server so the heading, tone and continue button all
+            // follow the new status, rather than patching the status text in place.
+            router.reload()
+        }
+    } catch {
+        // Offline or a dropped request — leave the timer running and try again.
+    }
+}
+
+onMounted(() => {
+    if (isConfirmed.value) {
+        interactionEvents.forEach((event) => window.addEventListener(event, cancelAutoContinue, { passive: true }))
+
+        timer = setInterval(() => {
+            countdown.value -= 1
+
+            if (countdown.value <= 0) {
+                stopCountdown()
+                router.visit(props.continueUrl)
+            }
+        }, 1000)
+
+        return
+    }
+
+    if (props.statusUrl) {
+        checking.value = true
+        pollTimer = setInterval(pollStatus, POLL_INTERVAL_MS)
+        pollStatus()
+    }
 })
 
 onBeforeUnmount(() => {
     stopCountdown()
+    stopPolling()
     interactionEvents.forEach((event) => window.removeEventListener(event, cancelAutoContinue))
 })
 </script>
@@ -190,6 +265,13 @@ onBeforeUnmount(() => {
                         <h1 class="text-3xl font-black text-gray-900 dark:text-white">{{ statusView.title }}</h1>
                         <p class="mt-3 text-sm font-medium leading-6 text-gray-500 dark:text-gray-400">
                             {{ statusView.body }}
+                        </p>
+
+                        <!-- Says that something is actively happening, so the wait doesn't
+                             read as a dead page. Disappears as soon as polling stops. -->
+                        <p v-if="checking" class="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" aria-hidden="true"></span>
+                            {{ t('Checking with :gateway…', { gateway: gatewayLabel }) }}
                         </p>
                     </div>
 

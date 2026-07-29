@@ -216,7 +216,7 @@ const providerColorClasses: Record<string, string> = {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Providers') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage providers, model routing, fallback behavior, and the global AI experience from one place.') }}</p>
             </div>
-            <div class="shrink-0 flex gap-3">
+            <div class="shrink-0 flex flex-wrap gap-3">
                 <button
                     type="button"
                     class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"

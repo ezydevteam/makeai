@@ -586,12 +586,16 @@ const submit = () => {
                                 <i class="ti ti-x text-base"></i>
                             </button>
                         </div>
-                        <div class="grid grid-cols-4 gap-4">
-                            <div>
+                        <!-- Four fixed columns left each input ~60px wide on a phone. Key and
+                             Label carry real text so they get the full width on mobile; Type
+                             and Required pair up from sm, and the original 4-up row returns
+                             at lg. -->
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div class="sm:col-span-2 lg:col-span-1">
                                 <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Key') }}</label>
                                 <input v-model="field.name" @input="field.key = field.name" type="text" :placeholder="t('field_key')" class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm font-mono" />
                             </div>
-                            <div>
+                            <div class="sm:col-span-2 lg:col-span-1">
                                 <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Label') }}</label>
                                 <input v-model="field.label" type="text" :placeholder="t('Field Label')" class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
                             </div>
@@ -621,7 +625,9 @@ const submit = () => {
                         </div>
 
                         <!-- Limits for slider -->
-                        <div v-if="field.type === 'slider'" class="mt-4 grid grid-cols-4 gap-3">
+                        <!-- Min/Max/Step/Default are short numeric values, so two-up is
+                             comfortable on a phone; 4-up returns at lg with the row above. -->
+                        <div v-if="field.type === 'slider'" class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                             <div>
                                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{{ t('Lower Limit (Min)') }}</label>
                                 <input

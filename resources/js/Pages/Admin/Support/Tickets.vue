@@ -414,7 +414,7 @@ onBeforeUnmount(() => {
 
             <a
                 :href="route('admin.support.tickets.export')"
-                class="shrink-0 items-center justify-center gap-2 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
             >
                 <i class="ti ti-file-export text-base"></i>
                 {{ t('Export') }}
@@ -674,7 +674,7 @@ onBeforeUnmount(() => {
         <AppModal
             :open="showSettingsModal"
             max-width="max-w-4xl"
-            :title="t('Support Settings')"
+            :title="t('Support Ticket Settings')"
             :subtitle="t('Configure support ticket rules, notifications, and SLA thresholds.')"
             has-form
             @close="closeSettingsModal"
@@ -738,7 +738,7 @@ onBeforeUnmount(() => {
             </div>
 
             <template #footer>
-                <div class="flex items-center justify-between gap-3 w-full">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">{{ t('These changes affect the public support flow and admin ticket handling.') }}</div>
                     <div class="flex items-center gap-3">
                         <button

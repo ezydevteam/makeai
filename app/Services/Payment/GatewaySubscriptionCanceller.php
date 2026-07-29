@@ -183,28 +183,12 @@ class GatewaySubscriptionCanceller
 
     private function cancelPaddle(PaymentGateway $gateway, string $gatewaySubscriptionId, bool $immediately): void
     {
-        // Paddle Billing subscription ids are prefixed with "sub_"; the Classic API
-        // (used by the pay-link checkout in this app) issues numeric ids.
-        if (str_starts_with($gatewaySubscriptionId, 'sub_')) {
-            $apiKey = $gateway->getCredential('api_key');
-            $baseUrl = $gateway->is_test_mode ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
+        $apiKey = $gateway->getCredential('api_key');
+        $baseUrl = $gateway->is_test_mode ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
 
-            Http::withToken($apiKey)
-                ->post($baseUrl.'/subscriptions/'.$gatewaySubscriptionId.'/cancel', [
-                    'effective_from' => $immediately ? 'immediately' : 'next_billing_period',
-                ])->throw();
-
-            return;
-        }
-
-        $vendorId = $gateway->getCredential('vendor_id');
-        $authCode = $gateway->getCredential('api_key');
-
-        Http::asForm()
-            ->post('https://vendors.paddle.com/api/2.0/subscription/users_cancel', [
-                'vendor_id' => $vendorId,
-                'vendor_auth_code' => $authCode,
-                'subscription_id' => $gatewaySubscriptionId,
+        Http::withToken($apiKey)
+            ->post($baseUrl.'/subscriptions/'.$gatewaySubscriptionId.'/cancel', [
+                'effective_from' => $immediately ? 'immediately' : 'next_billing_period',
             ])->throw();
     }
 

@@ -168,15 +168,19 @@ onUnmounted(() => {
 </script>
 
 <template>
+    <!--
+        No card, border or reserved height around the widget: the provider renders its own
+        bordered box, so wrapping it in a second one framed a frame. The error state used
+        to tint that outer border — the message below carries it now, which is where the
+        rest of the form puts its errors anyway.
+
+        overflow-x-auto rather than hidden: the widget has a fixed ~304px width and would
+        be silently clipped on a narrow screen, leaving an uncompletable form.
+    -->
     <div v-if="config.enabled" class="space-y-2">
-        <div
-            class="rounded-2xl border border-gray-200 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]"
-            :class="{ 'border-danger-400/70': Boolean(error) }"
-        >
-            <div ref="container" class="flex min-h-[78px] items-center justify-center overflow-hidden rounded-xl"></div>
-            <p v-if="loading" class="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('Loading captcha...') }}</p>
-            <p v-else-if="renderFailed" class="mt-2 text-center text-sm text-danger-500">{{ t('Captcha could not be loaded. Please refresh and try again.') }}</p>
-        </div>
+        <div ref="container" class="overflow-x-auto"></div>
+        <p v-if="loading" class="text-sm text-gray-500 dark:text-gray-400">{{ t('Loading captcha...') }}</p>
+        <p v-else-if="renderFailed" class="text-sm text-danger-500">{{ t('Captcha could not be loaded. Please refresh and try again.') }}</p>
         <p v-if="error" class="auth-error">{{ error }}</p>
     </div>
 </template>

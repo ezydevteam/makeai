@@ -113,7 +113,7 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Canned Responses') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Manage reusable replies for support agents.') }}</p>
             </div>
-            <Link :href="route('admin.support.tickets.index')" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+            <Link :href="route('admin.support.tickets.index')" class="inline-flex w-fit items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
                 <i class="ti ti-arrow-left text-base"></i>
                 {{ t('Back to Tickets') }}
             </Link>

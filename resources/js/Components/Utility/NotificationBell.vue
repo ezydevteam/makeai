@@ -55,7 +55,13 @@ const notificationLabel = computed(() => props.label || t('Notifications'))
 const notificationWrapperClass = computed(() => props.ui?.wrapperClass || '')
 const notificationButtonClass = computed(() => props.ui?.triggerClass || 'relative flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700 dark:hover:text-white')
 const notificationButtonStyle = computed(() => props.ui?.triggerStyle ?? {})
-const notificationDropdownClass = computed(() => props.ui?.dropdownClass || 'absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-700 shadow-xl dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 rtl:left-0 rtl:right-auto')
+/* Below sm the panel spans the viewport instead of hanging off the bell. A fixed 360px
+   panel anchored `right-0` runs off the left edge on a phone, because the bell is rarely
+   the rightmost control (the admin header puts an avatar after it). `fixed` with no `top`
+   keeps the panel's static position — still directly under the bell, mt-2 and all — while
+   `inset-x-3` stretches it edge to edge, so nothing has to hard-code a header height.
+   Same shape as the theme mobile bar's own dropdownClass override. */
+const notificationDropdownClass = computed(() => props.ui?.dropdownClass || 'z-50 overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-700 shadow-xl dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 max-sm:fixed max-sm:inset-x-3 max-sm:mt-2 sm:absolute sm:right-0 sm:mt-2 sm:w-[360px] sm:rtl:left-0 sm:rtl:right-auto')
 const notificationIconClass = computed(() => props.ui?.iconClass || 'ti ti-bell')
 // Bell glyph size: 20px in the admin panel, 18px on the frontend. A caller can
 // still override it explicitly via ui.iconSizeClass.

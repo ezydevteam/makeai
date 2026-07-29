@@ -424,12 +424,12 @@ onBeforeUnmount(() => {
                 <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Addon Manager') }}</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Install, activate, and configure platform addons.') }}</p>
             </div>
-            <div class="flex items-center gap-2">
-                <button @click="checkUpdates" :disabled="checkingUpdates" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-200 hover:text-green-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:!border-green-800 dark:hover:!bg-green-900/20 dark:hover:!text-green-300">
+            <div class="flex flex-wrap items-center gap-2">
+                <button @click="checkUpdates" :disabled="checkingUpdates" class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-200 hover:text-green-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:!border-green-800 dark:hover:!bg-green-900/20 dark:hover:!text-green-300">
                     <i class="ti text-base" :class="checkingUpdates ? 'ti-loader animate-spin' : 'ti-refresh'"></i>
                     {{ checkingUpdates ? t('Checking...') : t('Check for Updates') }}
                 </button>
-                <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary-admin">
+                <button @click="showUploadModal = true" class="grow inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary-admin">
                     <i class="ti ti-upload text-base"></i>
                     {{ t('Upload Addon') }}
                 </button>
@@ -539,7 +539,7 @@ onBeforeUnmount(() => {
 
         <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40']" class="rounded-xl border p-5 shadow-sm transition-colors">
             <div class="flex gap-4">
-                <div class="flex min-w-0 items-start gap-4">
+                <div class="min-w-0 flex flex-col sm:flex-row sm:items-start gap-4">
                 <!-- Checkbox -->
                 <input
                     type="checkbox"
@@ -599,7 +599,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
                 </div>
-                <div class="ml-auto flex flex-wrap items-center gap-2 xl:justify-end overflow-visible">
+                <div class="ml-auto flex flex-wrap sm:items-center gap-2 xl:justify-end overflow-visible">
                     <TableActionMenu>
                         <template #default="{ close }">
                             <Link

@@ -37,8 +37,52 @@ const now = ref(Date.now())
 let nowTimer: number | null = null
 const allAnnouncements = computed(() => (page.props.announcements as Announcement[]) || [])
 const headerCoupon = computed(() => page.props.headerCoupon as HeaderCoupon | null)
+
+// Tapping the code copies it. Feedback is inline on the chip rather than a toast: this
+// component has no toast dependency, and the banner is already the thing being looked at.
+const couponCopied = ref(false)
+let couponCopiedTimer: number | null = null
+
+const copyCouponCode = async () => {
+    const code = headerCoupon.value?.code
+    if (!code) return
+
+    try {
+        await navigator.clipboard.writeText(code)
+    } catch {
+        // clipboard API needs a secure context; fall back to a throwaway selection.
+        const scratch = document.createElement('textarea')
+        scratch.value = code
+        scratch.setAttribute('readonly', '')
+        scratch.style.position = 'fixed'
+        scratch.style.opacity = '0'
+        document.body.appendChild(scratch)
+        scratch.select()
+        try { document.execCommand('copy') } catch { /* nothing else to try */ }
+        document.body.removeChild(scratch)
+    }
+
+    couponCopied.value = true
+    if (couponCopiedTimer !== null) window.clearTimeout(couponCopiedTimer)
+    couponCopiedTimer = window.setTimeout(() => { couponCopied.value = false }, 2000)
+}
+/* Dismissal is keyed to the coupon CODE, not a generic flag, so publishing a different
+   coupon shows the banner again to someone who dismissed the previous one. Persisted in
+   localStorage to match how the announcement topbar remembers its own dismissal. */
+const couponDismissed = ref(false)
+
+const couponStorageKey = computed(() => `header_coupon_${headerCoupon.value?.code ?? ''}_dismissed`)
+
+const dismissCoupon = () => {
+    couponDismissed.value = true
+    try {
+        localStorage.setItem(couponStorageKey.value, 'true')
+    } catch { /* private mode — dismissal just won't persist */ }
+}
+
 const headerCouponVisible = computed(() => {
     if (!headerCoupon.value) return false
+    if (couponDismissed.value) return false
     if (!headerCoupon.value.expires_at) return true
 
     return new Date(headerCoupon.value.expires_at).getTime() > now.value
@@ -230,6 +274,13 @@ onMounted(() => {
         now.value = Date.now()
     }, 60000)
 
+    // Restore a previous dismissal of this specific coupon.
+    if (headerCoupon.value) {
+        try {
+            couponDismissed.value = localStorage.getItem(couponStorageKey.value) === 'true'
+        } catch { /* storage unavailable — treat as not dismissed */ }
+    }
+
     // Process Topbars
     activeTopbars.value = allAnnouncements.value
         .filter(a => a.type === 'topbar' && shouldShow(a))
@@ -262,6 +313,10 @@ onUnmounted(() => {
         window.clearInterval(nowTimer)
     }
 
+    if (couponCopiedTimer !== null) {
+        window.clearTimeout(couponCopiedTimer)
+    }
+
     window.removeEventListener('scroll', scheduleOffsetRecompute)
     window.removeEventListener('resize', scheduleOffsetRecompute)
     window.removeEventListener('resize', recomputeTopBannerHeight)
@@ -276,15 +331,51 @@ onUnmounted(() => {
 
 <template>
     <div id="top-announcement-container" class="relative z-50 flex flex-col w-full">
-        <div v-if="headerCouponVisible && headerCoupon" class="relative z-50 bg-gradient-to-br from-primary-500 to-primary-600 px-4 py-2.5 text-white shadow-sm">
+        <div v-if="headerCouponVisible && headerCoupon" class="relative z-50 bg-gradient-to-br from-primary-500 to-primary-600 px-4 py-2.5 pe-11 text-white shadow-sm">
+            <!-- Absolutely positioned so it pins to the bar's edge and does not join the
+                 centred flex row (where it would shift the message off-centre and wrap onto
+                 its own line on mobile). pe-11 on the bar reserves its space. -->
+            <button
+                type="button"
+                class="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                :title="t('Dismiss')"
+                :aria-label="t('Dismiss')"
+                @click="dismissCoupon"
+            >
+                <i class="ti ti-x text-base" aria-hidden="true"></i>
+            </button>
             <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-sm font-semibold">
                 <span>{{ t(':discount off with coupon', { discount: headerCoupon.discount_label }) }}</span>
-                <code class="rounded-md bg-white/15 px-2 py-0.5 font-mono text-sm tracking-wide">{{ headerCoupon.code }}</code>
+                <!-- The copy affordance stays out of the way until hover/focus, so the chip
+                     reads as a code first. It is forced visible right after a copy so the
+                     tick still confirms the action on touch, where there is no hover. -->
+                <button
+                    type="button"
+                    class="group inline-flex cursor-pointer items-center rounded-md bg-white/15 px-2 py-0.5 font-mono text-sm tracking-wide transition hover:bg-white/25 active:scale-[0.98]"
+                    :title="couponCopied ? t('Copied!') : t('Copy code')"
+                    :aria-label="t('Copy code')"
+                    @click="copyCouponCode"
+                >
+                    <span>{{ headerCoupon.code }}</span>
+                    <!-- Collapsed to zero width (not just transparent) so the hidden icon
+                         leaves no gap beside the code; it expands on hover/focus, and stays
+                         open while the copied tick shows, which is the only feedback on
+                         touch where there is no hover. -->
+                    <span
+                        class="inline-flex max-w-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-4 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-4 group-focus-visible:opacity-100"
+                        :class="{ '!ml-1.5 !max-w-4 !opacity-100': couponCopied }"
+                        aria-hidden="true"
+                    >
+                        <i class="ti text-xs" :class="couponCopied ? 'ti-check' : 'ti-copy'"></i>
+                    </span>
+                </button>
+                <span aria-live="polite" class="sr-only">{{ couponCopied ? t('Copied!') : '' }}</span>
                 <span v-if="headerCouponEndingDate" class="text-xs font-medium text-white/85">
                     {{ t('Ends :date', { date: headerCouponEndingDate }) }}
                 </span>
-                <a :href="headerCoupon.pricing_url" class="rounded-full bg-white px-3 py-1 text-xs font-bold text-primary-700 transition hover:bg-primary-50">
-                    {{ t('Choose plan') }}
+                <a :href="headerCoupon.pricing_url" class="group inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-bold text-primary-700 transition hover:bg-primary-50">
+                    <span>{{ t('Choose plan') }}</span>
+                    <i class="ti ti-arrow-right text-sm transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
                 </a>
             </div>
         </div>

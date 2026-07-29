@@ -54,15 +54,28 @@ const wantsHeaderButton = computed(() => settings.value?.position === 'header-bu
 const headerMode = computed(() => wantsHeaderButton.value && headerSlotReady.value && !isMobile.value)
 
 /*
+ | The admin panel shares the SAME `frontendHeaderSettings` prop as the front end — an
+ | earlier comment here assumed it did not — so the bottom-bar clearance below was being
+ | applied on admin pages, which render no such bar. That floated the launcher 60px above
+ | where it belonged. Admin gets its own flat offset instead.
+ */
+// Keyed off the Inertia component name ("Admin/Dashboard/Index"), NOT page.props.admin —
+// that prop is shared on every page whenever an admin is signed in, so using it would
+// change the front end too.
+const isAdminPage = computed(() => String(page.component ?? '').startsWith('Admin/'))
+const ADMIN_BUBBLE_BOTTOM = 30
+
+/*
  | Bubble clearance for the theme's mobile bottom bar.
  |
  | The default theme can render a bottom nav on small screens, and the bubble sits exactly
  | where it does — so it would cover the nav (or be covered by it). The theme already
  | derives that bar's height from the same Inertia prop, so read it rather than guess:
- | 0 when disabled, 48 without menu labels, 60 with. Admin pages don't ship the prop, so
- | this is simply 0 there.
+ | 0 when disabled, 48 without menu labels, 60 with.
  */
 const mobileBottomBarHeight = computed(() => {
+    if (isAdminPage.value) return 0
+
     const mobileBottom = (page.props.frontendHeaderSettings as { mobile_bottom?: { enabled?: boolean; hide_menu_labels?: boolean } } | undefined)?.mobile_bottom
 
     if (!isMobile.value || mobileBottom?.enabled !== true) return 0
@@ -71,7 +84,9 @@ const mobileBottomBarHeight = computed(() => {
 })
 
 /** The bubble's own 1.5rem gap, plus any bottom bar it has to clear. */
-const bubbleBottom = computed(() => 24 + mobileBottomBarHeight.value)
+const bubbleBottom = computed(() => (isAdminPage.value
+    ? ADMIN_BUBBLE_BOTTOM
+    : 24 + mobileBottomBarHeight.value))
 
 /*
  | In header mode the panel is a full-viewport-height rail pinned to the right edge.

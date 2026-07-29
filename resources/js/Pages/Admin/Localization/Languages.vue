@@ -49,34 +49,45 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
 const filterDebounce = ref<number | null>(null)
 
+/* Below md these labels ("Jan 31, 2026 - Month name, day, year") are wider than the select,
+   so the descriptive half is dropped and only the sample is shown. Desktop is untouched. */
+const isNarrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+const syncIsNarrow = (e: MediaQueryList | MediaQueryListEvent) => { isNarrow.value = e.matches }
+
+const optionLabel = (sample: string, description: string) => (isNarrow.value ? sample : `${sample} - ${description}`)
+
 const dateFormatOptions = computed<SelectOption[]>(() => [
-    { value: 'MMM D, YYYY', label: `${t('Jan 31, 2026')} - ${t('Month name, day, year')}` },
-    { value: 'D MMM YYYY', label: `${t('31 Jan 2026')} - ${t('Day, month name, year')}` },
-    { value: 'MM/DD/YYYY', label: `${t('01/31/2026')} - ${t('US numeric date')}` },
-    { value: 'DD/MM/YYYY', label: `${t('31/01/2026')} - ${t('International numeric date')}` },
-    { value: 'YYYY-MM-DD', label: `${t('2026-01-31')} - ${t('ISO date')}` },
+    { value: 'MMM D, YYYY', label: optionLabel(t('Jan 31, 2026'), t('Month name, day, year')) },
+    { value: 'D MMM YYYY', label: optionLabel(t('31 Jan 2026'), t('Day, month name, year')) },
+    { value: 'MM/DD/YYYY', label: optionLabel(t('01/31/2026'), t('US numeric date')) },
+    { value: 'DD/MM/YYYY', label: optionLabel(t('31/01/2026'), t('International numeric date')) },
+    { value: 'YYYY-MM-DD', label: optionLabel(t('2026-01-31'), t('ISO date')) },
 ])
 
 const timeFormatOptions = computed<SelectOption[]>(() => [
-    { value: 'h:mm A', label: `${t('9:30 PM')} - ${t('12-hour clock')}` },
-    { value: 'HH:mm', label: `${t('21:30')} - ${t('24-hour clock')}` },
-    { value: 'HH:mm:ss', label: `${t('21:30:45')} - ${t('24-hour clock with seconds')}` },
+    { value: 'h:mm A', label: optionLabel(t('9:30 PM'), t('12-hour clock')) },
+    { value: 'HH:mm', label: optionLabel(t('21:30'), t('24-hour clock')) },
+    { value: 'HH:mm:ss', label: optionLabel(t('21:30:45'), t('24-hour clock with seconds')) },
 ])
 
+// Reversed here: the digit sample is the short half, so it is what gets dropped.
+const numberSystemLabel = (name: string, sample: string) => (isNarrow.value ? name : `${name} - ${sample}`)
+
 const numberSystemOptions = computed<SelectOption[]>(() => [
-    { value: 'latn', label: `${t('English digits')} - 123,456.78` },
-    { value: 'arab', label: `${t('Arabic-Indic digits')} - ١٢٣,٤٥٦.٧٨` },
-    { value: 'arabext', label: `${t('Eastern Arabic (Persian) digits')} - ۱۲۳,۴۵۶.۷۸` },
-    { value: 'beng', label: `${t('Bengali digits')} - ১২৩,৪৫৬.৭৮` },
-    { value: 'deva', label: `${t('Devanagari (Hindi) digits')} - १२३,४५६.७८` },
-    { value: 'thai', label: `${t('Thai digits')} - ๑๒๓,๔๕๖.๗๘` },
-    { value: 'tamldec', label: `${t('Tamil digits')} - ௧௨௩,௪௫௬.௭௮` },
-    { value: 'telu', label: `${t('Telugu digits')} - ౧౨౩,౪౫౬.౭౮` },
-    { value: 'knda', label: `${t('Kannada digits')} - ೧೨೩,೪೫೬.೭೮` },
-    { value: 'mlym', label: `${t('Malayalam digits')} - ൧൨൩,൪൫൬.൭൮` },
-    { value: 'gujr', label: `${t('Gujarati digits')} - ૧૨૩,૪૫૬.૭૮` },
-    { value: 'guru', label: `${t('Gurmukhi (Punjabi) digits')} - ੧੨੩,੪੫੬.੭੮` },
-    { value: 'mymr', label: `${t('Myanmar digits')} - ၁၂၃,၄၅၆.၇၈` },
+    { value: 'latn', label: numberSystemLabel(t('English digits'), '123,456.78') },
+    { value: 'arab', label: numberSystemLabel(t('Arabic-Indic digits'), '١٢٣,٤٥٦.٧٨') },
+    { value: 'arabext', label: numberSystemLabel(t('Eastern Arabic (Persian) digits'), '۱۲۳,۴۵۶.۷۸') },
+    { value: 'beng', label: numberSystemLabel(t('Bengali digits'), '১২৩,৪৫৬.৭৮') },
+    { value: 'deva', label: numberSystemLabel(t('Devanagari (Hindi) digits'), '१२३,४५६.७८') },
+    { value: 'thai', label: numberSystemLabel(t('Thai digits'), '๑๒๓,๔๕๖.๗๘') },
+    { value: 'tamldec', label: numberSystemLabel(t('Tamil digits'), '௧௨௩,௪௫௬.௭௮') },
+    { value: 'telu', label: numberSystemLabel(t('Telugu digits'), '౧౨౩,౪౫౬.౭౮') },
+    { value: 'knda', label: numberSystemLabel(t('Kannada digits'), '೧೨೩,೪೫೬.೭೮') },
+    { value: 'mlym', label: numberSystemLabel(t('Malayalam digits'), '൧൨൩,൪൫൬.൭൮') },
+    { value: 'gujr', label: numberSystemLabel(t('Gujarati digits'), '૧૨૩,૪૫૬.૭૮') },
+    { value: 'guru', label: numberSystemLabel(t('Gurmukhi (Punjabi) digits'), '੧੨੩,੪੫੬.੭੮') },
+    { value: 'mymr', label: numberSystemLabel(t('Myanmar digits'), '၁၂၃,၄၅၆.၇၈') },
 ])
 
 const statusOptions = computed<SelectOption[]>(() => [
@@ -266,10 +277,15 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
+
+    narrowQuery = window.matchMedia('(max-width: 767px)')
+    syncIsNarrow(narrowQuery)
+    narrowQuery.addEventListener('change', syncIsNarrow)
 })
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown)
+    narrowQuery?.removeEventListener('change', syncIsNarrow)
 })
 </script>
 

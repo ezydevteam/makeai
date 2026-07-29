@@ -113,7 +113,13 @@ class SecurityDataLeakTest extends TestCase
 
     // ─── 1b. Gateway credentials never reach the client ──
 
-    public function test_public_credentials_expose_only_a_configured_flag(): void
+    /**
+     * The admin screen shows a short mask so an admin can tell WHICH key is saved (live
+     * vs test is usually the first few characters). That is a deliberate, minimal
+     * disclosure to someone already holding the payments.gateways permission — the middle
+     * of the secret must still never leave the server.
+     */
+    public function test_public_credentials_expose_only_a_configured_flag_and_a_short_mask(): void
     {
         $gateway = PaymentGateway::create([
             'slug' => 'stripe', 'name' => 'Stripe', 'is_enabled' => true,
@@ -123,8 +129,17 @@ class SecurityDataLeakTest extends TestCase
         $public = $gateway->publicCredentials([['key' => 'secret_key']]);
 
         $this->assertTrue($public['secret_key']['configured']);
-        $this->assertSame('', $public['secret_key']['value']);
+
+        // Never the raw value, and never the middle of it.
         $this->assertStringNotContainsString('sk_live_GATEWAY_LEAK', json_encode($public));
+        $this->assertStringNotContainsString('GATEWAY_LEAK', json_encode($public), 'Only the first/last 3 chars may survive masking.');
+
+        // Exactly the documented shape: 3 leading + bullets + 3 trailing.
+        $this->assertSame('sk_••••••EAK', $public['secret_key']['masked']);
+
+        // The old contract exposed a permanently-empty `value`; it is gone, and nothing
+        // may reintroduce a field carrying the plaintext.
+        $this->assertSame(['configured', 'masked'], array_keys($public['secret_key']));
 
         // Belt-and-suspenders: even a raw serialization of the model drops the
         // credentials blob entirely ($hidden), so it can't leak by accident.

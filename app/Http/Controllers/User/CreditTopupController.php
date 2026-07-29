@@ -165,7 +165,31 @@ class CreditTopupController extends Controller
         ];
     }
 
+    /**
+     * Backstop for every gateway's session-creation call.
+     *
+     * Each `Http::` call below can throw ConnectionException on a timeout, DNS failure or
+     * refused outbound connection — `$response->failed()` does not cover that — and an
+     * uncaught one is a 500 in the middle of checkout. Catching at the dispatcher covers
+     * every gateway at once, including any added later, rather than relying on each
+     * builder remembering to guard itself.
+     */
     private function routeToGateway(Request $request, Payment $payment, PaymentGateway $gateway, PaymentGatewayManager $gateways)
+    {
+        try {
+            return $this->dispatchToGateway($request, $payment, $gateway, $gateways);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            \Illuminate\Support\Facades\Log::warning('Top-up gateway session could not be created (connection error)', [
+                'gateway' => $gateway->slug,
+                'payment_ulid' => $payment->ulid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->failGatewaySession($payment, translate('Could not reach :gateway. Please try again in a moment.', ['gateway' => $gateway->name]));
+        }
+    }
+
+    private function dispatchToGateway(Request $request, Payment $payment, PaymentGateway $gateway, PaymentGatewayManager $gateways)
     {
         if ($gateway->slug === 'bank_transfer') {
             return redirect()->route('checkout.bank.show', $payment);
@@ -299,35 +323,69 @@ class CreditTopupController extends Controller
         return $response->successful() ? $response->json('access_token') : null;
     }
 
+    /**
+     * Create a Paddle transaction and send the buyer to the checkout URL Paddle returns.
+     * See CheckoutController::createPaddlePayLink() for the full note.
+     */
     private function createPaddlePayLink(Request $request, Payment $payment, PaymentGateway $gateway)
     {
-        $vendorId = $gateway->getCredential('vendor_id');
-        $authCode = $gateway->getCredential('api_key');
-        if (! $vendorId || ! $authCode) {
-            return $this->failGatewaySession($payment, 'Paddle is not configured.');
+        $apiKey = (string) $gateway->getCredential('api_key');
+
+        if ($apiKey === '') {
+            return $this->failGatewaySession($payment, translate('Paddle is not configured.'));
         }
 
-        $response = \Illuminate\Support\Facades\Http::asForm()->post('https://vendors.paddle.com/api/2.0/product/generate_pay_link', [
-            'vendor_id' => $vendorId,
-            'vendor_auth_code' => $authCode,
-            'title' => translate('Credit Top-Up'),
-            'prices' => [strtoupper($payment->currency ?? 'USD').':'.number_format((float) $payment->amount, 2, '.', '')],
-            'quantity' => 1,
-            'return_url' => route('checkout.pending', $payment),
-            'webhook_url' => route('webhooks.paddle'),
-            'passthrough' => json_encode(['payment_ulid' => $payment->ulid]),
-        ]);
+        $base = $gateway->is_test_mode ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
 
-        if ($response->failed() || ! $response->json('success')) {
-            return $this->failGatewaySession($payment, $response->json('error.message', 'Paddle pay link failed.'));
+        // A connection failure throws rather than returning a response, and an uncaught
+        // one is a 500 mid-checkout — see CheckoutController::gatewayLookup().
+        try {
+            $response = \Illuminate\Support\Facades\Http::withToken($apiKey)->acceptJson()->timeout(20)->post($base.'/transactions', [
+                'items' => [[
+                    'quantity' => 1,
+                    'price' => [
+                        'description' => translate('Credit Top-Up'),
+                        'unit_price' => [
+                            'amount' => (string) $this->minorAmount((float) $payment->amount, $payment->currency ?? 'USD'),
+                            'currency_code' => strtoupper($payment->currency ?? 'USD'),
+                        ],
+                        'product' => ['name' => translate('Credit Top-Up'), 'tax_category' => 'standard'],
+                    ],
+                ]],
+                'custom_data' => ['payment_ulid' => $payment->ulid],
+                'collection_mode' => 'automatic',
+            ]);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            \Illuminate\Support\Facades\Log::warning('Paddle top-up transaction could not be created (connection error)', [
+                'payment_ulid' => $payment->ulid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->failGatewaySession($payment, translate('Could not reach Paddle. Please try again in a moment.'));
+        }
+
+        if ($response->failed()) {
+            return $this->failGatewaySession($payment, (string) (
+                $response->json('error.detail')
+                ?? $response->json('error.message')
+                ?? translate('Paddle checkout could not be started.')
+            ));
+        }
+
+        $checkoutUrl = (string) $response->json('data.checkout.url');
+
+        // Only populated from the seller's default payment link (Paddle dashboard →
+        // Checkout → Checkout settings); without it there is nowhere to send the buyer.
+        if ($checkoutUrl === '') {
+            return $this->failGatewaySession($payment, translate('Paddle has no default payment link configured. Set one in the Paddle dashboard under Checkout → Checkout settings.'));
         }
 
         $payment->update([
-            'gateway_payment_id' => $response->json('response.product_id'),
-            'metadata' => [...($payment->metadata ?: []), 'gateway_pay_link' => $response->json('response.url')],
+            'gateway_payment_id' => $response->json('data.id'),
+            'metadata' => [...($payment->metadata ?: []), 'gateway_pay_link' => $checkoutUrl],
         ]);
 
-        return redirect()->away($response->json('response.url'));
+        return redirect()->away($checkoutUrl);
     }
 
     private function createRazorpayPaymentLink(Request $request, Payment $payment, PaymentGateway $gateway)
@@ -343,7 +401,9 @@ class CreditTopupController extends Controller
             'currency' => strtoupper($payment->currency ?? 'USD'),
             'description' => translate('Credit Top-Up'),
             'reference_id' => $payment->ulid,
-            'callback_url' => route('checkout.pending', $payment),
+            // Server-side confirmation on return, so a top-up is not stranded when the
+            // webhook never lands. That handler branches on type and credits the wallet.
+            'callback_url' => route('checkout.razorpay.return', $payment),
             'callback_method' => 'get',
             'customer' => [
                 'name' => $request->user()->name,
@@ -379,8 +439,10 @@ class CreditTopupController extends Controller
             'total_amount' => number_format((float) $payment->amount, 2, '.', ''),
             'currency' => strtoupper($payment->currency ?? 'USD'),
             'tran_id' => $payment->ulid,
-            'success_url' => route('checkout.pending', $payment),
-            'fail_url' => route('checkout.pending', $payment),
+            // SSLCommerz returns the buyer by POSTing a form, so this must be the
+            // POST-capable verifying route — the GET-only pending page 405s every time.
+            'success_url' => route('checkout.sslcommerz.return', $payment),
+            'fail_url' => route('checkout.sslcommerz.return', $payment),
             'cancel_url' => route('user.dashboard.credit-topup').'?checkout=cancelled',
             'ipn_url' => route('webhooks.sslcommerz'),
             'cus_name' => $request->user()->name,
@@ -424,7 +486,8 @@ class CreditTopupController extends Controller
             'title' => translate('Credit Top-Up'),
             'callback_url' => route('webhooks.coingate').'?token='.$webhookToken,
             'cancel_url' => route('user.dashboard.credit-topup').'?checkout=cancelled',
-            'success_url' => route('checkout.pending', $payment),
+            // Confirms against CoinGate's order API instead of trusting the redirect.
+            'success_url' => route('checkout.coingate.return', $payment),
         ]);
 
         if ($response->failed()) {
@@ -451,7 +514,8 @@ class CreditTopupController extends Controller
             'amount' => $this->minorAmount((float) $payment->amount, $payment->currency ?? 'USD'),
             'currency' => strtoupper($payment->currency ?? 'USD'),
             'reference' => $payment->ulid,
-            'callback_url' => route('checkout.pending', $payment),
+            // Confirms via Paystack's verify endpoint instead of trusting the redirect.
+            'callback_url' => route('checkout.paystack.return', $payment),
             'metadata' => ['payment_ulid' => $payment->ulid],
         ]);
 
@@ -467,29 +531,51 @@ class CreditTopupController extends Controller
         return redirect()->away($response->json('data.authorization_url'));
     }
 
+    /**
+     * 2Checkout ConvertPlus buy link. A dynamic (ad-hoc price) link must be signed or
+     * 2Checkout rejects it and sends the buyer to its documentation site — see
+     * CheckoutController::createTwoCheckoutUrl() for the full note.
+     */
     private function createTwoCheckoutUrl(Request $request, Payment $payment, PaymentGateway $gateway)
     {
         $merchantCode = $gateway->getCredential('merchant_code');
-        if (! $merchantCode) {
-            return $this->failGatewaySession($payment, '2Checkout is not configured.');
+        $secretWord = $gateway->getCredential('secret_key');
+
+        if (! $merchantCode || ! $secretWord) {
+            return $this->failGatewaySession($payment, translate('2Checkout is not configured.'));
         }
 
-        $baseUrl = $gateway->is_test_mode ? 'https://sandbox.2checkout.com/checkout/buy' : 'https://secure.2checkout.com/checkout/buy';
-        $query = http_build_query([
-            'merchant' => $merchantCode,
-            'dynamic' => 1,
-            'prod' => translate('Credit Top-Up'),
-            'price' => number_format((float) $payment->amount, 2, '.', ''),
-            'qty' => 1,
+        // The general signed set (return-url, return-type, order-ext-ref) plus the
+        // dynamic-product set. `order-ext-ref` comes back as INS `vendor_order_id`, which
+        // is how the webhook finds this payment.
+        $signed = [
             'currency' => strtoupper($payment->currency ?? 'USD'),
-            'merchant_order_id' => $payment->ulid,
+            'order-ext-ref' => $payment->ulid,
+            'price' => number_format((float) $payment->amount, 2, '.', ''),
+            'prod' => translate('Credit Top-Up'),
+            'qty' => '1',
+            'return-type' => 'redirect',
             'return-url' => route('checkout.pending', $payment),
-            'x_receipt_link_url' => route('checkout.pending', $payment),
-        ]);
+            'type' => 'digital',
+        ];
+
+        ksort($signed);
+        $payload = collect($signed)->map(fn ($value) => strlen((string) $value).(string) $value)->implode('');
+
+        $query = [
+            ...$signed,
+            'merchant' => $merchantCode,
+            'dynamic' => '1',
+            'signature' => hash_hmac('sha256', $payload, $secretWord),
+        ];
+
+        if ($gateway->is_test_mode) {
+            $query['test'] = '1';
+        }
 
         $payment->update(['gateway_payment_id' => $payment->ulid]);
 
-        return redirect()->away($baseUrl.'?'.$query);
+        return redirect()->away('https://secure.2checkout.com/checkout/buy/?'.http_build_query($query));
     }
 
     private function failGatewaySession(Payment $payment, string $message)

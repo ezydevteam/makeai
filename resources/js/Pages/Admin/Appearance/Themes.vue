@@ -116,12 +116,12 @@ function onCodeInput(e: Event) {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Theme Manager') }}</h1>
                 <p class="text-sm text-gray-500 mt-1">{{ t('Upload, license, activate, and update themes.') }}</p>
             </div>
-            <div class="shrink-0 flex items-center gap-3">
-                <button @click="checkUpdates" :disabled="checkingUpdates" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-200 hover:text-green-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:!border-green-800 dark:hover:!bg-green-900/20 dark:hover:!text-green-300">
+            <div class="shrink-0 flex flex-wrap items-center gap-3">
+                <button @click="checkUpdates" :disabled="checkingUpdates" class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-200 hover:text-green-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:!border-green-800 dark:hover:!bg-green-900/20 dark:hover:!text-green-300">
                     <i class="ti text-base" :class="checkingUpdates ? 'ti-loader-2 animate-spin' : 'ti-refresh'"></i>
                     {{ checkingUpdates ? t('Checking...') : t('Check for Updates') }}
                 </button>
-                <button @click="showUpload = true" class="inline-flex items-center gap-2 btn-primary-admin">
+                <button @click="showUpload = true" class="grow inline-flex items-center gap-2 btn-primary-admin">
                     <i class="ti ti-upload text-base"></i>
                     {{ t('Upload Theme') }}
                 </button>

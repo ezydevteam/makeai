@@ -788,9 +788,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="border border-gray-100 dark:border-surface-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-primary-500/40 transition-all bg-white dark:bg-surface-900">
+    <!-- No `overflow-hidden` here: it was clipping every toolbar popup that was wider than
+         the editor (emoji, format, AI assist) instead of letting them spill out. The rounded
+         frame is preserved by rounding the first/last children instead — see the
+         `.rich-editor-shell` rules in the style block. Content can't spill in its place:
+         `pre` scrolls, tables are `table-layout: fixed; width: 100%`, images are max-w-full. -->
+    <div class="rich-editor-shell border border-gray-100 dark:border-surface-800 rounded-2xl focus-within:ring-1 focus-within:ring-primary-500/40 transition-all bg-white dark:bg-surface-900">
         <!-- Main Toolbar -->
-        <div v-if="editor && !isSourceMode" class="relative flex flex-wrap items-center gap-1 p-2 bg-gray-50 dark:bg-surface-800/50 border-b border-gray-100 dark:border-surface-800 overflow-visible">
+        <div v-if="editor && !isSourceMode" class="rich-editor-row relative flex flex-wrap items-center gap-1 p-2 bg-gray-50 dark:bg-surface-800/50 border-b border-gray-100 dark:border-surface-800 overflow-visible">
             <!-- Undo/Redo -->
             <button type="button" @click="editor.chain().focus().undo().run()" :disabled="!editor.can().undo()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Undo">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/></svg>
@@ -866,7 +871,11 @@ onBeforeUnmount(() => {
             <!-- Emoji -->
             <div v-if="variant === 'full'" data-rich-editor-emoji class="relative">
                 <button type="button" @click.stop="emojiOpen = !emojiOpen" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-600 dark:text-gray-400 transition-colors text-sm" title="Emoji">😊</button>
-                <div v-if="emojiOpen" class="absolute start-0 top-10 z-40 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-y-auto max-h-72">
+                <!-- 20rem is wider than a phone's editor column, and it is anchored to its
+                     own button rather than the toolbar, so below sm it goes viewport-wide
+                     instead. `fixed` with no `top` keeps its static position (still under
+                     the button); inset-x-3 supplies the horizontal bounds. -->
+                <div v-if="emojiOpen" class="absolute start-0 top-10 z-40 w-80 max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:w-auto rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-y-auto max-h-72">
                     <div v-for="group in emojiGroups" :key="group.label">
                         <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1 py-1">{{ group.label }}</div>
                         <div class="flex flex-wrap gap-0.5 mb-2">
@@ -890,7 +899,8 @@ onBeforeUnmount(() => {
                         </svg>
                         <span v-else>✨AI</span>
                     </button>
-                    <div v-if="aiAssistOpen" class="absolute end-0 top-10 z-40 w-64 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900" :style="{ maxHeight: `${toolbarAiMaxHeight}px` }">
+                    <!-- Same treatment as the emoji picker: viewport-wide below sm. -->
+                    <div v-if="aiAssistOpen" class="absolute end-0 top-10 z-40 w-64 max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:w-auto overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900" :style="{ maxHeight: `${toolbarAiMaxHeight}px` }">
                         <button v-for="action in defaultAiActions" :key="action.key" type="button" @click="runAiAssist(action)" :disabled="Boolean(aiAssistLoadingKey)" class="flex w-full flex-col rounded-lg px-3 py-2 text-start text-sm transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-violet-900/20">
                             <span class="font-medium text-gray-800 dark:text-gray-100">{{ action.label }}</span>
                             <span v-if="action.description" class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ action.description }}</span>
@@ -918,7 +928,13 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Overflow panel -->
-            <div v-if="variant === 'full' && overflowOpen" data-rich-editor-overflow class="absolute end-2 top-12 z-30 w-80 rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-3 shadow-lg">
+            <!-- The editor root is `overflow-hidden` (it has to be, for the rounded corners),
+                 so a panel wider than the editor is cut rather than spilling out — a flat
+                 w-80 overran a narrow editor by ~45px on a phone. The cap is relative to the
+                 container, so a roomy desktop editor is untouched: 20rem is still the smaller
+                 of the two there. No matching max-height: a percentage one resolves against
+                 the toolbar wrapper, not the editor, and collapsed the panel to 69px. -->
+            <div v-if="variant === 'full' && overflowOpen" data-rich-editor-overflow class="absolute end-2 top-12 z-30 w-80 max-w-[calc(100%-1rem)] rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-3 shadow-lg">
                 <!-- Font family/size/line-height -->
                 <div class="space-y-2 border-b border-gray-100 pb-3 dark:border-surface-800">
                     <AppSelect :options="fontOptions" @update:model-value="(v: any) => setFontFamily(String(v))" placeholder="Font" :size="5" />
@@ -967,7 +983,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Table Context Bar -->
-        <div v-if="editor && editor.isActive('table') && !isSourceMode" class="flex flex-nowrap items-center gap-1 overflow-x-auto p-1.5 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-900/30 text-[10px]">
+        <div v-if="editor && editor.isActive('table') && !isSourceMode" class="rich-editor-row flex flex-nowrap items-center gap-1 overflow-x-auto p-1.5 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-900/30 text-[10px]">
             <span class="font-black text-indigo-600 dark:text-indigo-400 uppercase px-2">Table</span>
             <button @click="editor.chain().focus().addColumnBefore().run()" class="px-2 py-1 bg-white dark:bg-surface-800 border border-indigo-200 dark:border-indigo-900/50 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">+Col L</button>
             <button @click="editor.chain().focus().addColumnAfter().run()" class="px-2 py-1 bg-white dark:bg-surface-800 border border-indigo-200 dark:border-indigo-900/50 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">+Col R</button>
@@ -989,13 +1005,13 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Source Mode Header -->
-        <div v-if="isSourceMode" class="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-surface-800/50 border-b border-gray-100 dark:border-surface-800">
+        <div v-if="isSourceMode" class="rich-editor-row flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-surface-800/50 border-b border-gray-100 dark:border-surface-800">
             <div class="text-[10px] font-black text-amber-600 uppercase">Source Mode</div>
             <button type="button" @click="toggleMode" class="px-3 py-1.5 bg-white dark:bg-surface-800 text-primary-600 border border-primary-100 dark:border-primary-900/30 rounded-xl text-[10px] font-black uppercase shadow-sm hover:bg-primary-50 dark:hover:bg-surface-700">Visual</button>
         </div>
 
         <!-- Editor Surface -->
-        <div class="relative bg-white dark:bg-surface-900" :class="variant === 'full' ? 'min-h-[400px]' : 'min-h-[140px]'">
+        <div class="rich-editor-row relative bg-white dark:bg-surface-900" :class="variant === 'full' ? 'min-h-[400px]' : 'min-h-[140px]'">
             <EditorContent v-if="!isSourceMode" :editor="editor" class="prose-container" :class="`rich-editor-${variant}`" />
             <textarea v-else :value="sourceContent" @input="handleSourceInput" class="w-full h-full min-h-[400px] p-6 text-sm font-mono bg-gray-900 text-gray-300 focus:ring-0 border-none outline-none resize-none" spellcheck="false"></textarea>
 
@@ -1023,7 +1039,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Status bar -->
-        <div v-if="editor" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50 px-4 py-2 text-xs text-gray-500 dark:border-surface-800 dark:bg-surface-800/50 dark:text-gray-400">
+        <div v-if="editor" class="rich-editor-row flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50 px-4 py-2 text-xs text-gray-500 dark:border-surface-800 dark:bg-surface-800/50 dark:text-gray-400">
             <div class="flex flex-wrap items-center gap-3">
                 <span>{{ textStats.words }} {{ t('words') }}</span>
                 <span>{{ textStats.characters }} {{ t('characters') }}</span>
@@ -1043,7 +1059,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- AI Sidebar -->
-        <aside v-if="aiSidebarOpen && aiAssist" class="border-t border-violet-100 bg-violet-50/70 p-4 dark:border-violet-900/30 dark:bg-violet-950/20">
+        <aside v-if="aiSidebarOpen && aiAssist" class="rich-editor-row border-t border-violet-100 bg-violet-50/70 p-4 dark:border-violet-900/30 dark:bg-violet-950/20">
             <div class="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ t('AI editor assistant') }}</h3>
@@ -1059,8 +1075,6 @@ onBeforeUnmount(() => {
             </div>
         </aside>
 
-        <!-- Link tooltip -->
-        <div v-if="linkTooltip.visible" class="pointer-events-none fixed z-50 max-w-xs truncate rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg" :style="{ left: `${linkTooltip.x + 12}px`, top: `${linkTooltip.y + 14}px` }">{{ linkTooltip.url }}</div>
 
         <!-- The five editor sub-modals below sit at z-[125]: above the app modal layer
              (z-[120]) so they still work when the editor is itself inside a modal, and above
@@ -1089,7 +1103,11 @@ onBeforeUnmount(() => {
                     <AppSelect v-model="linkTarget" :label="t('Link Target')" :options="linkTargetOptions" />
                     <AppColorPicker v-model="linkColor" :label="t('Link Color')" />
                 </div>
-                <div class="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
+                <!-- rounded-b-2xl matches the panel's own radius. This modal is
+                     `overflow-visible` (the select and colour picker have to escape it), so
+                     unlike the other modals here it cannot rely on the parent clipping the
+                     footer's background — square corners showed through underneath. -->
+                <div class="flex items-center justify-between rounded-b-2xl border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
                     <button v-if="linkEditing" type="button" @click="removeLink" class="rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20">{{ t('Remove link') }}</button><span v-else></span>
                     <div class="flex items-center gap-2"><button type="button" @click="closeLinkModal" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="applyLink" class="rounded-lg btn-primary transition-colors">{{ linkEditing ? t('Apply') : t('Add link') }}</button></div>
                 </div>
@@ -1174,6 +1192,27 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
+/*
+ | Rounded frame without clipping.
+ |
+ | The shell used to carry `overflow-hidden` so its children could not paint over the
+ | rounded corners — but that also cut off every toolbar popup wider than the editor. The
+ | corners are now handled by rounding the outermost in-flow rows instead.
+ |
+ | Keyed to `.rich-editor-row`, not :first-child/:last-child, because the shell also holds
+ | `fixed` sub-modals; an open modal would otherwise become :last-child and steal the
+ | bottom radius from the status bar. "First row" = not preceded by a row; "last row" =
+ | has no row after it. 15px = the shell's 16px radius less its 1px border.
+ */
+.rich-editor-shell > .rich-editor-row:not(.rich-editor-row ~ .rich-editor-row) {
+    border-start-start-radius: 15px;
+    border-start-end-radius: 15px;
+}
+.rich-editor-shell > .rich-editor-row:not(:has(~ .rich-editor-row)) {
+    border-end-start-radius: 15px;
+    border-end-end-radius: 15px;
+}
+
 .prose-container .ProseMirror { color: var(--color-text-primary, #1f2937); padding: 1.5rem; min-height: 400px; outline: none !important; }
 .prose-container.rich-editor-minimal .ProseMirror { min-height: 140px; padding: 1rem; }
 .prose-container.rich-editor-comment .ProseMirror { min-height: 180px; padding: 1rem; }

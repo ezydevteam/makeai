@@ -143,6 +143,28 @@ Route::middleware('auth')->group(function () {
             Route::get('/checkout/bank-transfer/{payment}', [CheckoutController::class, 'bankInstructions'])->name('checkout.bank.show');
             Route::post('/checkout/bank-transfer/{payment}/proof', [CheckoutController::class, 'uploadBankProof'])->name('checkout.bank.proof');
             Route::get('/checkout/paypal/return/{payment}', [CheckoutController::class, 'paypalReturn'])->name('checkout.paypal.return');
+            Route::get('/checkout/razorpay/return/{payment}', [CheckoutController::class, 'razorpayReturn'])->name('checkout.razorpay.return');
+            // Paddle's "default payment link" — the page Paddle builds checkout URLs from.
+            // It must live on our own domain and run Paddle.js; Paddle appends ?_ptxn=.
+            Route::get('/checkout/paddle/pay', [CheckoutController::class, 'paddlePay'])->name('checkout.paddle.pay');
+            // Paddle's success URL is a single static URL set in their dashboard, so unlike
+            // every other gateway it cannot carry the payment ulid.
+            Route::get('/checkout/paddle/return', [CheckoutController::class, 'paddleReturn'])->name('checkout.paddle.return');
+            Route::get('/checkout/status/{payment}', [CheckoutController::class, 'status'])
+                ->middleware('throttle:public,40,5')->name('checkout.status');
+
+            // Confirm-on-return for the gateways that hand the buyer straight back with no
+            // verification of their own. Without these, activation is webhook-only and a
+            // missing webhook strands a paying customer on "waiting for confirmation".
+            //
+            // SSLCommerz answers `match` because it returns the buyer by POSTing a form to
+            // success_url — a GET-only route 405s every single SSLCommerz payment.
+            Route::match(['get', 'post'], '/checkout/sslcommerz/return/{payment}', [CheckoutController::class, 'gatewayReturn'])
+                ->name('checkout.sslcommerz.return');
+            Route::get('/checkout/paystack/return/{payment}', [CheckoutController::class, 'gatewayReturn'])
+                ->name('checkout.paystack.return');
+            Route::get('/checkout/coingate/return/{payment}', [CheckoutController::class, 'gatewayReturn'])
+                ->name('checkout.coingate.return');
             Route::get('/checkout/pending/{payment}', [CheckoutController::class, 'pending'])->name('checkout.pending');
             Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
             Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');

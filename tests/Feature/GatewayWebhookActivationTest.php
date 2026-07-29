@@ -126,11 +126,59 @@ class GatewayWebhookActivationTest extends TestCase
         ]);
         $payment = $this->pendingPayment('paystack');
 
-        $payload = ['event' => 'charge.success', 'data' => ['reference' => $payment->ulid, 'id' => 'ps_1']];
+        // amount is minor units — pendingPayment() bills $50.
+        $payload = ['event' => 'charge.success', 'data' => [
+            'reference' => $payment->ulid, 'id' => 'ps_1', 'amount' => 5000, 'currency' => 'USD',
+        ]];
         $raw = json_encode($payload);
         $sig = hash_hmac('sha512', $raw, 'sk_test');
 
         $this->handle('paystack', $payload, $raw, ['x-paystack-signature' => $sig]);
+
+        $this->assertActivated($payment);
+    }
+
+    /**
+     * A correctly-signed notification for less than we billed must not activate.
+     *
+     * The signature proves the message came from Paystack; it says nothing about whether
+     * the figure inside matches the order. This guard used to exist only on the
+     * confirm-on-return path, so the two disagreed about what counted as paid.
+     */
+    public function test_paystack_rejects_an_underpaid_charge(): void
+    {
+        PaymentGateway::create([
+            'slug' => 'paystack', 'name' => 'Paystack', 'is_enabled' => true,
+            'credentials' => PaymentGateway::encryptCredentials(['secret_key' => 'sk_test']),
+        ]);
+        $payment = $this->pendingPayment('paystack');
+
+        $payload = ['event' => 'charge.success', 'data' => [
+            'reference' => $payment->ulid, 'id' => 'ps_1', 'amount' => 100, 'currency' => 'USD',
+        ]];
+        $raw = json_encode($payload);
+
+        $this->handle('paystack', $payload, $raw, ['x-paystack-signature' => hash_hmac('sha512', $raw, 'sk_test')]);
+
+        $this->assertSame('pending', $payment->fresh()->status);
+    }
+
+    /** A zero-decimal currency has no minor unit — ¥5000 is ¥5000, not ¥50. */
+    public function test_paystack_does_not_divide_a_zero_decimal_currency(): void
+    {
+        PaymentGateway::create([
+            'slug' => 'paystack', 'name' => 'Paystack', 'is_enabled' => true,
+            'credentials' => PaymentGateway::encryptCredentials(['secret_key' => 'sk_test']),
+        ]);
+        $payment = $this->pendingPayment('paystack', amount: 5000);
+        $payment->update(['currency' => 'JPY']);
+
+        $payload = ['event' => 'charge.success', 'data' => [
+            'reference' => $payment->ulid, 'id' => 'ps_1', 'amount' => 5000, 'currency' => 'JPY',
+        ]];
+        $raw = json_encode($payload);
+
+        $this->handle('paystack', $payload, $raw, ['x-paystack-signature' => hash_hmac('sha512', $raw, 'sk_test')]);
 
         $this->assertActivated($payment);
     }
@@ -149,47 +197,8 @@ class GatewayWebhookActivationTest extends TestCase
         $this->assertSame('pending', $payment->fresh()->status);
     }
 
-    // ─── Paddle (Classic RSA p_signature) ──────────
-
-    public function test_paddle_payment_succeeded_activates_with_a_valid_rsa_signature(): void
-    {
-        [$publicKey, $privateKey] = $this->rsaKeypair();
-        PaymentGateway::create([
-            'slug' => 'paddle', 'name' => 'Paddle', 'is_enabled' => true,
-            'credentials' => PaymentGateway::encryptCredentials(['public_key' => $publicKey]),
-        ]);
-        $payment = $this->pendingPayment('paddle');
-
-        $fields = [
-            'alert_name' => 'payment_succeeded',
-            'order_id' => 'ord_1',
-            'passthrough' => json_encode(['payment_ulid' => $payment->ulid]),
-        ];
-        $fields['p_signature'] = $this->paddleSignature($fields, $privateKey);
-
-        $this->handle('paddle', $fields);
-
-        $this->assertActivated($payment);
-    }
-
-    public function test_paddle_rejects_a_forged_signature(): void
-    {
-        [$publicKey] = $this->rsaKeypair();
-        PaymentGateway::create([
-            'slug' => 'paddle', 'name' => 'Paddle', 'is_enabled' => true,
-            'credentials' => PaymentGateway::encryptCredentials(['public_key' => $publicKey]),
-        ]);
-        $payment = $this->pendingPayment('paddle');
-
-        $this->handle('paddle', [
-            'alert_name' => 'payment_succeeded',
-            'order_id' => 'ord_1',
-            'passthrough' => json_encode(['payment_ulid' => $payment->ulid]),
-            'p_signature' => base64_encode('forged'),
-        ]);
-
-        $this->assertSame('pending', $payment->fresh()->status);
-    }
+    // Paddle is covered by PaddleBillingTest — it is the one gateway here whose webhook
+    // signs the RAW body rather than the parsed fields, so it needs that file's harness.
 
     // ─── CoinGate (per-order token + amount) ───────
 
@@ -351,68 +360,5 @@ class GatewayWebhookActivationTest extends TestCase
         $this->handle('paypal', $payload, json_encode($payload), ['paypal-auth-algo' => 'x', 'paypal-transmission-id' => 't']);
 
         $this->assertSame('pending', $payment->fresh()->status);
-    }
-
-    // ─── helpers ─────────────────────────────────
-
-    /**
-     * A fixed test RSA keypair. Generated once with `openssl genrsa 2048` and embedded
-     * so the suite does not depend on openssl_pkey_new() finding an openssl.cnf (it
-     * cannot on a bare Windows/Laragon PHP). Deriving the public key and signing from a
-     * loaded PEM need no config.
-     *
-     * @return array{0:string,1:\OpenSSLAsymmetricKey} [publicPem, privateKey]
-     */
-    private function rsaKeypair(): array
-    {
-        $privatePem = <<<'PEM'
------BEGIN PRIVATE KEY-----
-MIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQCglN8/OB/5K7tp
-H+qfB6L16HHNnNYESpgEwc577k3VCOt8g5n39dOBLY95HqXTYgOp34/clgVRqqfv
-cTCx+UNds7LyiFNNX5RzaBgCW0L5M1Yg32CxKb4J7v2DoaTnYiFRPEWDz2pM54Ml
-42gnnrjgiCssIqrB88JGixh4u9cdH6OznYnVRzU4lJWEKmPnAcd8CmuD7d+ZwAtL
-x118VmIcB/Txn3AA5orPc9vbO/1P/zMKE1ofTPQGStOFZTZQQBsWNcsVP/cvatRz
-i4PAX9JhXtGrr+clNtR4Eb2/h1Z4wIFWQ0V6uXEDmbnUvANBls5fEI9s4zOvHVz8
-y2TVyW+RAgMBAAECgf91t1dGAN7EykpDG3fjHLYEOWHeWMU1tXkQrlev11c3Kagh
-9Fc/w/WdvMhwVwc47kvBO8yPkr+oyRxSwFHyJcg8kymbTFRvY/cZ+DT22pqTaWQP
-X7Es2Rd222ZSGIJ1HHqlZ97jFtSA4TZC5XHKRDtDCI9IIMxiDKSzvJkz6H9z2Oke
-VLvym/FM6egtCJHnxxOxzGoXB6HX1fZlkB6QlpxK+yumErlGKnP5lv2AAS+OHKUe
-03gbGf41e8OPDPjfjZ0YSJsZVoba9BaHTmM59QTktUcHaKA4VcWNpyRYbXZrWBcw
-aR2bElQMPEarlNsmtp7MjyFfAuwK0rUmtmj+A3UCgYEA2esO3WLoAzVZPuATQ0Z0
-LvhufIArStUou3dgSggUXVjrlAubZ5N9aiyHM7vAOAlFYFoZ3zvD0JwiCVyQ+Win
-74faaFRBCbl3HN7HqLsQPS0PFauCH0LQJj+zca2I+YYCY0Quv1+HL6uhxXqQT99y
-7L7qmUTQX6u2FvTrDZFQ3WsCgYEAvKTCthH12mCkjCyVbY5Ya08IdcKV8bOVTbGV
-NO2bz7k1qigSE1JHZY9QSPd57PtLDmROKSJqicFEkFqlIi5ES2k2DagQQyL+tRrS
-ENvqwfg1INmAjbvN6QeXGLDRm+gX6JjmLse6wdziJDmgTBMnYD6YpNvxsHkQxAUH
-lt/bifMCgYBTAGb/B+cbIbzGaA6uNy2VnmZm4WKb9Ci5jrSMPhuTmoTQNMOSZekF
-AcTVfZOvREi6dFcaYecpk+6a5jkJ5kTgxTv5NO44x/2Ib4pYyDddNcZjGJpNUeN6
-ThUJHXHoqJRMPvIXTkltbNAHKbHB2ngpmGY+zqkXZ43JnKvS1SCZ1QKBgEZcPbOj
-J0v4V+dgiat/OENuCv3BQiQQk1OTNM+1ADSOJBH/OB60xaR/u7Y7d+KIKAqKJwz4
-pTwUNfqRlJ4XG6n06BBX6xjfaJksE8XuALWwWkCSX3x92+NazWSMLuIzwxciUFiK
-boH4XPCd/cfiLQGc11pGHvNvdG1oYthHTp85AoGBANG9B+V6XcReOM8Fr0NXB58m
-9+0RoGG23NMvnNjLAuHfuNtJQgw/k9d+f96Dlrvt9QCXJgT4R7KG0FAU03LhaMBn
-y5LM9/7UCzA2GJ1/RNY/CsY4nVRVK0Hhpa4I9hoV2D8vgYYFzO+yxwHM4boWcX2n
-P4HtR3nOGzla4j6cdahs
------END PRIVATE KEY-----
-PEM;
-
-        $privateKey = openssl_pkey_get_private($privatePem);
-        $publicPem = openssl_pkey_get_details($privateKey)['key'];
-
-        return [$publicPem, $privateKey];
-    }
-
-    /** Sign Paddle fields exactly as the verifier expects (ksort → stringify → serialize → SHA1). */
-    private function paddleSignature(array $fields, \OpenSSLAsymmetricKey $privateKey): string
-    {
-        ksort($fields);
-        foreach ($fields as $k => $v) {
-            if (! in_array(gettype($v), ['object', 'array'], true)) {
-                $fields[$k] = (string) $v;
-            }
-        }
-        openssl_sign(serialize($fields), $signature, $privateKey, OPENSSL_ALGO_SHA1);
-
-        return base64_encode($signature);
     }
 }

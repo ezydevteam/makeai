@@ -187,7 +187,11 @@ watch(
                     </p>
                 </div>
 
-                <div class="grid gap-4 lg:grid-cols-2">
+                <!-- grid-cols-1 at base: without a column definition the single implicit
+                     track is auto-sized (max-content), so the widget cards and the install
+                     snippet stretched the grid to 397px inside a 284px card. grid-cols-1 is
+                     minmax(0,1fr), which caps the track and lets the <pre> scroll instead. -->
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                         <div>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Public KB') }}</span>
@@ -239,13 +243,16 @@ watch(
                                 <img v-if="logoPreview || storedLogoUrl" :src="logoPreview || storedLogoUrl!" alt="Logo" class="h-full w-full object-contain" />
                                 <i v-else class="ti ti-photo text-xl text-gray-300 dark:text-gray-600"></i>
                             </div>
-                            <div class="flex flex-col items-start gap-2">
+                            <!-- min-w-0/flex-1 + a full-width input: a file input's intrinsic
+                                 width (filename plus the Choose-file button) exceeds this
+                                 card on a phone and otherwise refuses to shrink. -->
+                            <div class="flex min-w-0 flex-1 flex-col items-start gap-2">
                                 <input
                                     ref="logoInput"
                                     type="file"
                                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
                                     :disabled="logoForm.processing"
-                                    class="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
+                                    class="w-full max-w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
                                     @change="onLogoSelected"
                                 >
                                 <span v-if="logoForm.processing" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Saving...') }}</span>
@@ -295,7 +302,7 @@ watch(
                     </p>
                 </div>
 
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="block">
                         <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('AI Provider') }}</span>
                         <AppSelect
@@ -372,7 +379,11 @@ watch(
                     </p>
                 </div>
 
-                <div class="grid gap-4 lg:grid-cols-2">
+                <!-- grid-cols-1 at base: without a column definition the single implicit
+                     track is auto-sized (max-content), so the widget cards and the install
+                     snippet stretched the grid to 397px inside a 284px card. grid-cols-1 is
+                     minmax(0,1fr), which caps the track and lets the <pre> scroll instead. -->
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                         <div>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Widget') }}</span>

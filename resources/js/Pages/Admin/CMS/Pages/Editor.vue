@@ -457,7 +457,7 @@ onClickOutside(publishMenuRef, () => {
                     <div class="space-y-6">
                     <div>
                         <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Title') }}</label>
-                        <input v-model="form.title" @input="syncSlug" type="text" :placeholder="t('Enter page title')" class="w-full border-none bg-transparent p-1 text-4xl font-bold text-gray-900 placeholder:text-gray-300 focus:ring-0 dark:text-white dark:placeholder:text-gray-600">
+                        <input v-model="form.title" @input="syncSlug" type="text" :placeholder="t('Enter page title')" class="w-full border-none bg-transparent p-1 text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 placeholder:text-gray-300 focus:ring-0 dark:text-white dark:placeholder:text-gray-600">
                         <p v-if="form.errors.title" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.title }}</p>
                         <div class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-surface-800 dark:bg-surface-800">
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Slug') }}</label>

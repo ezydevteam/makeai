@@ -316,12 +316,16 @@ const retryCampaign = (id: number) => {
                 <article
                     v-for="campaign in campaigns.data"
                     :key="campaign.id"
-                    class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900"
+                    class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900"
                 >
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="min-w-0">
+                    <!-- min-w-0 on the article: a grid item defaults to min-width:auto, so it
+                         refused to shrink below the subject line and pushed the whole page
+                         into horizontal scroll on a phone. The row stacks below sm so the
+                         action buttons get their own line instead of squeezing the title. -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="truncate text-lg font-semibold text-gray-900 dark:text-white">{{ campaign.subject }}</h2>
+                                <h2 class="min-w-0 break-words text-lg font-semibold text-gray-900 dark:text-white">{{ campaign.subject }}</h2>
                                 <span
                                     class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
                                     :class="campaign.status === 'sent'
@@ -343,7 +347,7 @@ const retryCampaign = (id: number) => {
                             </p>
                         </div>
 
-                        <div class="flex flex-wrap items-center justify-end gap-2">
+                        <div class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                             <button
                                 v-if="campaign.status === 'draft'"
                                 type="button"

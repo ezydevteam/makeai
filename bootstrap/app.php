@@ -91,6 +91,11 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             'webhooks/*',
             'social/accounts/*/callback',
             'embed/*',
+            // SSLCommerz returns the buyer by POSTing a form from its own domain, so the
+            // request carries no CSRF token. The route re-verifies the payment against
+            // SSLCommerz's API before it activates anything, so the POST body is never
+            // trusted on its own.
+            'checkout/sslcommerz/return/*',
         ]);
 
         // The cookie-consent banner writes this cookie from JavaScript, so it must

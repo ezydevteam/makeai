@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\LazyCollection;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -118,15 +117,55 @@ class UsageDashboardController extends Controller
         // so nobody has to guess which part of a balance resets — the aggregate is still
         // what the sidebar reports.
         $topupCredits = (float) $user->topup_credits;
+        $usedThisMonth = (float) $user->credits_used_month;
+
+        // ── Plan allowance ──
+        //
+        // `credits_used_month` is TOTAL consumption, so charging all of it against the
+        // allowance made the plan bar read past its own limit — "3,226 / 2,000" — and
+        // silently attributed top-up spend to the plan. Cap it: the overflow by definition
+        // did not come from the allowance.
+        $planUsed = $planCreditLimit > 0 ? min($usedThisMonth, (float) $planCreditLimit) : 0.0;
+
+        // ── Top-up ──
+        //
+        // Read from `users.topup_credits`, the column that exists precisely to track this
+        // balance apart from the plan allowance. deductCredits() lowers it only when the
+        // wallet falls below it, which is exactly the moment a top-up is genuinely being
+        // drawn on — plan credits are spent first — so the column IS the answer to "how
+        // much of the top-up is left".
+        //
+        // Deriving usage from `credits_used_month - plan_limit` was the mistake: that is
+        // arithmetic on a usage counter, which moves on every generation whether or not
+        // the top-up was charged. Demo mode shows it plainly — usage is inflated but
+        // nothing is deducted, so the column is untouched and there is nothing to report.
+        //
+        // The ledger sum supplies only the DENOMINATOR: once the column has been drawn
+        // down it no longer knows what it started from.
+        $topupAdded = (float) $user->creditTransactions()
+            ->where('type', 'topup')
+            ->sum('amount');
+
+        $topupUsed = max(0.0, $topupAdded - $topupCredits);
+
+        // Until the top-up has actually been drawn on there is no "x of y" to show, so the
+        // card falls back to the plain balance. Zero here switches the ratio and bar off.
+        $topupTotal = $topupUsed > 0 ? $topupAdded : 0.0;
 
         $stats = array_merge($stats, [
             'credits_remaining' => (float) $user->credits,
             'credits_used_today' => (float) $user->credits_used_today,
-            'credits_used_month' => (float) $user->credits_used_month,
+            'credits_used_month' => $usedThisMonth,
             'plan_credit_limit' => (float) $planCreditLimit,
             'topup_credits' => $topupCredits,
             // Whatever is left of the allowance, i.e. the part that will be topped back up.
             'plan_credits_remaining' => max(0, (float) $user->credits - $topupCredits),
+            // Per-wallet usage, so each bar measures itself against its own ceiling.
+            'plan_credits_used_month' => $planUsed,
+            // Both 0 until the top-up is genuinely drawn on; the card then shows only the
+            // balance rather than a ratio against a ceiling nothing has been spent from.
+            'topup_credits_used' => $topupUsed,
+            'topup_credits_total' => $topupTotal,
         ]);
 
         // Deliberately OUTSIDE the 5-minute stats cache: it is paginated (the cache key does
@@ -355,7 +394,7 @@ class UsageDashboardController extends Controller
                     ->orderBy('label_date', 'asc')
                     ->orderBy('label_hour', 'asc')
                     ->get();
-                
+
                 return $rows->map(fn ($row) => [
                     'label' => \Carbon\Carbon::parse($row->label_date)->setHour($row->label_hour)->translatedFormat('M j, g A'),
                     'value' => (float) $row->credits,
@@ -370,7 +409,7 @@ class UsageDashboardController extends Controller
                     ->groupBy('date')
                     ->orderBy('date', 'asc')
                     ->get();
-                
+
                 return $rows->map(fn ($row) => [
                     'label' => \Carbon\Carbon::parse($row->date)->translatedFormat('M j'),
                     'value' => (float) $row->credits,
@@ -386,7 +425,7 @@ class UsageDashboardController extends Controller
                     ->orderBy('year', 'asc')
                     ->orderBy('month', 'asc')
                     ->get();
-                
+
                 return $rows->map(fn ($row) => [
                     'label' => \Carbon\Carbon::create($row->year, $row->month, 1)->translatedFormat('M Y'),
                     'value' => (float) $row->credits,
@@ -402,7 +441,7 @@ class UsageDashboardController extends Controller
                     ->groupBy('date')
                     ->orderBy('date', 'asc')
                     ->get();
-                
+
                 return $rows->map(fn ($row) => [
                     'label' => \Carbon\Carbon::parse($row->date)->translatedFormat('M j'),
                     'value' => (float) $row->credits,

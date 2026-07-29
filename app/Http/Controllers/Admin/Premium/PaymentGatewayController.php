@@ -25,6 +25,9 @@ class PaymentGatewayController extends Controller
             ->map(function (PaymentGateway $gateway) use ($definitions) {
                 $definition = $definitions[$gateway->slug] ?? ['fields' => []];
                 $webhookPath = $definition['webhook_path'] ?? null;
+                // Paddle alone needs a second URL copied into its dashboard: it builds
+                // checkout links from a page on OUR domain rather than hosting one.
+                $paymentLinkPath = $definition['payment_link_path'] ?? null;
 
                 return [
                     'id' => $gateway->id,
@@ -43,6 +46,9 @@ class PaymentGatewayController extends Controller
                         ])
                         ->all(),
                     'webhook_url' => $webhookPath ? rtrim(request()->getSchemeAndHttpHost(), '/').$webhookPath : null,
+                    'payment_link_url' => $paymentLinkPath ? rtrim(request()->getSchemeAndHttpHost(), '/').$paymentLinkPath : null,
+                    'payment_link_label' => isset($definition['payment_link_label']) ? translate($definition['payment_link_label']) : null,
+                    'payment_link_hint' => isset($definition['payment_link_hint']) ? translate($definition['payment_link_hint']) : null,
                     'credentials' => $gateway->publicCredentials($definition['fields'] ?? []),
                 ];
             });

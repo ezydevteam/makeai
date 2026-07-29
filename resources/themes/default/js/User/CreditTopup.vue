@@ -305,12 +305,12 @@ const submit = () => {
                             the button names it instead.
                         -->
                         <fieldset v-if="gateways.length > 1" class="mt-5 border-t border-gray-100 pt-5 dark:border-surface-700">
-                            <legend class="mb-3 text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Payment method') }}</legend>
+                            <legend class="mb-1 text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Payment method') }}</legend>
                             <div class="space-y-1">
                                 <label
                                     v-for="gateway in gateways"
                                     :key="gateway.id"
-                                    class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-gray-50 dark:hover:bg-surface-800"
+                                    class="flex cursor-pointer items-center gap-3 rounded-full px-2 py-2 transition hover:bg-gray-50 dark:hover:bg-surface-800"
                                 >
                                     <input
                                         v-model="selectedGatewaySlug"

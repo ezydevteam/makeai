@@ -1030,11 +1030,11 @@ onBeforeUnmount(() => {
             </div>
 
             <template #footer>
-                <div class="flex items-center justify-between gap-3 w-full">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
                     <button
                         type="button"
                         :disabled="estimating"
-                        class="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
+                        class="inline-flex w-fit items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
                         @click="estimateRows"
                     >
                         <svg v-if="estimating" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">

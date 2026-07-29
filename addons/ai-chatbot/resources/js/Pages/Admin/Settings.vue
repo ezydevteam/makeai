@@ -476,7 +476,10 @@ const removeLogo = () => {
                     </div>
                 </div>
 
-                <div v-if="visibleBooleanSettings(group).length || inlineAiSettings(group).length" class="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <!-- grid-cols-1 at base: with no column definition the single implicit track
+                     is auto-sized, i.e. max-content, so the cards rendered 312px wide inside
+                     a 276px card and spilled. grid-cols-1 is minmax(0,1fr), which caps it. -->
+                <div v-if="visibleBooleanSettings(group).length || inlineAiSettings(group).length" class="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <div
                         v-for="setting in visibleBooleanSettings(group)"
                         :key="setting.key"
@@ -675,13 +678,16 @@ const removeLogo = () => {
                             <i v-else class="ti ti-photo text-xl text-gray-300 dark:text-gray-600"></i>
                         </div>
 
-                        <div class="flex flex-col items-start gap-2">
+                        <!-- min-w-0/flex-1 + a full-width input: a file input's intrinsic
+                             width (filename plus the Choose-file button) is wider than this
+                             card on a phone, and without these it refused to shrink. -->
+                        <div class="flex min-w-0 flex-1 flex-col items-start gap-2">
                             <input
                                 ref="logoInput"
                                 type="file"
                                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
                                 :disabled="logoForm.processing"
-                                class="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
+                                class="w-full max-w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
                                 @change="onLogoSelected"
                             >
 

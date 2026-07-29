@@ -14,6 +14,7 @@ use App\Models\Coupon;
 use App\Models\Language;
 use App\Models\Menu;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\BroadcastingService;
 use App\Services\CaptchaService;
 use App\Services\CountryDetectionService;
@@ -684,7 +685,14 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
+        /* `$request->user()` resolves the DEFAULT guard, and a route group protected with
+           `auth:admin` (rather than the core `admin.auth`) calls shouldUse('admin') — so on
+           those pages this returns an App\Models\Admin and the User-typed eligibility check
+           blew up with a 500. Coupon rules are user-scoped, so anything that is not a User
+           is treated as no user at all. */
         $user = $request->user();
+        $user = $user instanceof User ? $user : null;
+
         if ($user && ! $coupon->isEligibleForUser($user)) {
             return null;
         }

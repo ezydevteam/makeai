@@ -370,9 +370,28 @@ class SubscriptionManagementController extends Controller
             'trial_ends_at' => null,
         ]);
 
-        // Immediate cancellation removes access now — tell the user (with the
-        // reason, if given), unlike a period-end cancel which they keep access for.
+        // Revoking the plan has to revoke its credits too.
+        //
+        // This branch clears plan_id by hand rather than going through
+        // SubscriptionLifecycleService::expireNow(), so it never reached
+        // downgradeUserIfNoOtherAccess() — the one place that strips the allowance. The
+        // user lost the plan and kept its entire credit balance, so an admin cancelling a
+        // 50k-credit subscription left the account holding 50k of spendable credit with
+        // no plan behind it and no further payments coming.
+        //
+        // resetPlanAllowance(0) targets 0 + topup_credits, so credits the user actually
+        // paid for separately survive — only the plan's allowance is taken back.
+        //
+        // Guarded on $endedSubscription: with no plan and no subscription there is no
+        // allowance to revoke, and zeroing there would confiscate free-tier balance and
+        // admin grants from someone who never had a subscription at all.
         if ($endedSubscription) {
+            $user->resetPlanAllowance(0, $reason
+                ? translate('Subscription cancelled by admin: :reason', ['reason' => $reason])
+                : translate('Subscription cancelled by admin: plan allowance revoked'));
+
+            // Immediate cancellation removes access now — tell the user (with the
+            // reason, if given), unlike a period-end cancel which they keep access for.
             app(NotificationEventService::class)->subscriptionEndedByAdmin($endedSubscription, $reason);
         }
 

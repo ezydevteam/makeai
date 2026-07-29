@@ -112,14 +112,14 @@ function save(status: 'draft' | 'published') {
             <div class="flex flex-wrap gap-3">
                 <Link
                     :href="route('addon.kb.admin.articles.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="grow inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                     :disabled="form.processing"
                     @click="save('draft')"
                 >
@@ -128,7 +128,7 @@ function save(status: 'draft' | 'published') {
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60"
+                    class="grow inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60"
                     :disabled="form.processing"
                     @click="save('published')"
                 >

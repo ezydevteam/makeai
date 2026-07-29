@@ -111,7 +111,7 @@ const formatBatchDate = (dateStr: string | null) => {
             </div>
             <Link
                 :href="route('addon.faker-ai.admin.index')"
-                class="inline-flex shrink-0 items-center gap-1 rounded-xl border border-primary-100 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:border-primary-900/30 dark:bg-primary-900/30 dark:text-primary-500 dark:hover:bg-primary-900/40"
+                class="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl border border-primary-100 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:border-primary-900/30 dark:bg-primary-900/30 dark:text-primary-500 dark:hover:bg-primary-900/40"
             >
                 <i class="ti ti-wand" />
                 {{ t('Generate') }}

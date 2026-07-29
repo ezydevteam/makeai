@@ -342,7 +342,7 @@ const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index <
                                 ref="searchInput"
                                 v-model="searchQuery"
                                 type="text"
-                                :placeholder="t('Search testimonials, company, role, or review')"
+                                :placeholder="t('Search testimonials...')"
                                 class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             >
                             <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
@@ -694,7 +694,7 @@ const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index <
             </div>
 
             <template #footer>
-                <div class="flex items-center justify-between gap-3 w-full">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Required fields are marked with *') }}
                     </div>

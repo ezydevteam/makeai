@@ -21,6 +21,11 @@ const toast = useToastr()
 const isPro = computed(() => !!page.props.isProAvailable)
 
 interface Stats {
+  plan_credits_used_month: number
+  // Optional so a page rendered before these existed cannot produce "NaN" — every read
+  // of them is coerced with `?? 0`.
+  topup_credits_used?: number
+  topup_credits_total?: number
   credits_remaining: number
   credits_used_today: number
   credits_used_month: number
@@ -119,9 +124,18 @@ const summaryCards = computed(() => [
   },
 ])
 
+/**
+ * The plan bar measures the PLAN's spend against the PLAN's allowance.
+ *
+ * It used to divide total monthly consumption by the plan limit, but consumption includes
+ * credits spent out of a top-up — so a user who bought extra credits and spent them saw
+ * their plan usage read past its own ceiling ("3,226 / 2,000") and their purchased spend
+ * silently counted against the allowance. The server now splits the month's spend between
+ * the two wallets; each bar shows only its own.
+ */
 const creditPercent = computed(() => {
   if (!stats.plan_credit_limit) return 0
-  return Math.min(100, Math.round((stats.credits_used_month / stats.plan_credit_limit) * 100))
+  return Math.min(100, Math.round((stats.plan_credits_used_month / stats.plan_credit_limit) * 100))
 })
 
 const creditBarColor = computed(() => {
@@ -138,21 +152,28 @@ const creditBarColor = computed(() => {
  * money and survives untouched. A single number cannot say which part of a balance is
  * about to reset, so the card shows both.
  *
- * Its bar measures what is LEFT rather than what has been used — a top-up has no monthly
- * quota to consume, so "used" would have nothing to be a percentage of. The high-water
- * mark is the largest balance seen this session, which is enough for the bar to shrink
- * as it is spent.
+ * The remaining figure comes from `users.topup_credits`, the column kept for exactly this
+ * balance. A ratio is only shown once that column has actually gone down — the plan
+ * allowance is spent first, so a month that merely exceeded its limit has not necessarily
+ * touched the top-up at all (demo mode inflates usage while deducting nothing). Until it
+ * has, the card shows the plain balance.
+ *
+ * Every read is coerced with `?? 0`: an older cached page without these props rendered
+ * `formatNumber(undefined)` as "NaN" right next to a real figure.
  */
-const hasTopupCredits = computed(() => Number(stats.topup_credits) > 0)
+const topupUsed = computed(() => Number(stats.topup_credits_used ?? 0))
+const topupTotal = computed(() => Number(stats.topup_credits_total ?? 0))
+const topupBalance = computed(() => Number(stats.topup_credits ?? 0))
+
+const hasTopupCredits = computed(() => topupBalance.value > 0 || topupTotal.value > 0)
+
+/** Only once credits have genuinely come out of the top-up does a ratio mean anything. */
+const showTopupUsage = computed(() => topupUsed.value > 0 && topupTotal.value > 0)
 
 const topupPercent = computed(() => {
-  const remaining = Number(stats.topup_credits)
-  const planRemaining = Number(stats.plan_credits_remaining)
-  const wallet = remaining + planRemaining
+  if (!showTopupUsage.value) return 0
 
-  if (wallet <= 0) return 0
-
-  return Math.min(100, Math.round((remaining / wallet) * 100))
+  return Math.min(100, Math.round((topupUsed.value / topupTotal.value) * 100))
 })
 
 const hasChartData = computed(() => {
@@ -335,7 +356,7 @@ onBeforeUnmount(() => {
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Monthly credit usage') }}</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Your current plan usage for this month.') }}</p>
           </div>
-          <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-500">{{ formatNumber(stats.credits_used_month) }} / {{ formatNumber(stats.plan_credit_limit) }} <span class="font-normal">{{ t('credits') }}</span></span>
+          <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-500">{{ formatNumber(stats.plan_credits_used_month) }} / {{ formatNumber(stats.plan_credit_limit) }} <span class="font-normal">{{ t('credits') }}</span></span>
         </div>
         <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
           <div
@@ -357,12 +378,18 @@ onBeforeUnmount(() => {
             <i class="ti ti-wallet text-base text-sky-600 dark:text-sky-400"></i>
             <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Top-up credits') }}</span>
           </div>
+          <!-- A ratio only once the top-up has actually been spent from; otherwise the
+               balance on its own, because nothing has come out of it to be a fraction. -->
           <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-400">
-            {{ formatNumber(stats.topup_credits) }} <span class="font-normal">{{ t('credits') }}</span>
+            <template v-if="showTopupUsage">{{ formatNumber(topupUsed) }} / {{ formatNumber(topupTotal) }}</template>
+            <template v-else>{{ formatNumber(topupBalance) }}</template>
+            <span class="font-normal">{{ t('credits') }}</span>
           </span>
         </div>
 
-        <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+        <!-- No bar while nothing has been drawn: an empty track reads as "all spent" and a
+             full one as "none left", and neither is true. -->
+        <div v-if="showTopupUsage" class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
           <div
             class="h-full rounded-full bg-sky-500 transition-all duration-500"
             :style="{ width: topupPercent + '%' }"

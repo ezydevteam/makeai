@@ -440,15 +440,19 @@ onUnmounted(() => {
             </main>
 
             <footer :class="shellInsetClass" class="border-t border-gray-200/80 py-3 text-xs text-gray-500 dark:border-surface-800 dark:text-gray-400">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="min-w-0">
+                <!-- Stacked on mobile the copyright came first and pushed the links out of
+                     easy reach, so the links take the top slot there (order-1) and the whole
+                     column centres. Both revert to source order and left/right alignment
+                     once the row goes horizontal at sm. -->
+                <div class="flex flex-col items-center gap-2 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+                    <p class="order-2 min-w-0 sm:order-none">
                         {{ t('© :year :site_name', { year: currentYear, site_name: siteName }) }}
                         <span class="mx-1 text-gray-300 dark:text-gray-600">•</span>
                         {{ t('MakeAI v:version', { version: appVersion }) }} -
                         {{ t('Developed by') }} <a href="https://ezydev.net" target="_blank" rel="noopener noreferrer" class="transition hover:text-primary-600 dark:hover:text-primary-300">EzyDev</a>
                     </p>
 
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
+                    <div class="order-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:order-none sm:justify-end">
                         <nav class="flex flex-wrap items-center gap-x-4 gap-y-1">
                             <a
                                 v-for="item in adminFooterLinks"

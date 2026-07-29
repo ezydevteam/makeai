@@ -137,7 +137,11 @@ class CreditTopupCheckoutTest extends TestCase
             'metadata' => ['total_credits' => 2500, 'base_credits' => 2500, 'bonus_credits' => 0],
         ]);
 
-        $payload = ['event' => 'charge.success', 'data' => ['reference' => $payment->ulid, 'id' => 'ps_1']];
+        // amount is minor units — this top-up bills $25. Paystack always sends it, and the
+        // webhook now refuses to activate on a charge whose amount it cannot confirm.
+        $payload = ['event' => 'charge.success', 'data' => [
+            'reference' => $payment->ulid, 'id' => 'ps_1', 'amount' => 2500, 'currency' => 'USD',
+        ]];
         $raw = json_encode($payload);
         $sig = hash_hmac('sha512', $raw, 'sk_test');
 

@@ -22,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -317,42 +318,66 @@ class CheckoutController extends Controller
             ),
         ]);
 
-        if ($gateway->slug === 'stripe') {
-            return $this->createStripeSession($request, $payment, $plan, $data['billing']);
-        }
+        return $this->dispatchToGateway($request, $payment, $plan, $gateway, $data['billing']);
+    }
 
-        if ($gateway->slug === 'bank_transfer') {
-            app(NotificationEventService::class)->transactionPending($payment);
+    /**
+     * Hand the prepared payment to its gateway's session builder.
+     *
+     * Wrapped so that a ConnectionException from ANY builder — timeout, DNS, refused
+     * outbound connection — becomes a failed session with a readable message instead of a
+     * 500 in the middle of checkout. `$response->failed()` does not cover a request that
+     * never got a response, and each builder guarding itself is a rule that only holds
+     * until someone adds the next gateway.
+     */
+    private function dispatchToGateway(Request $request, Payment $payment, Plan $plan, PaymentGateway $gateway, string $billing): RedirectResponse
+    {
+        try {
+            if ($gateway->slug === 'stripe') {
+                return $this->createStripeSession($request, $payment, $plan, $billing);
+            }
 
-            return redirect()->route('checkout.bank.show', $payment);
-        }
+            if ($gateway->slug === 'bank_transfer') {
+                app(NotificationEventService::class)->transactionPending($payment);
 
-        if ($gateway->slug === 'paypal') {
-            return $this->createPayPalOrder($request, $payment, $gateway);
-        }
+                return redirect()->route('checkout.bank.show', $payment);
+            }
 
-        if ($gateway->slug === 'paddle') {
-            return $this->createPaddlePayLink($request, $payment, $plan, $gateway);
-        }
+            if ($gateway->slug === 'paypal') {
+                return $this->createPayPalOrder($request, $payment, $gateway);
+            }
 
-        if ($gateway->slug === 'razorpay') {
-            return $this->createRazorpayPaymentLink($request, $payment, $plan, $gateway);
-        }
+            if ($gateway->slug === 'paddle') {
+                return $this->createPaddlePayLink($request, $payment, $plan, $gateway);
+            }
 
-        if ($gateway->slug === 'sslcommerz') {
-            return $this->createSslCommerzSession($request, $payment, $plan, $gateway);
-        }
+            if ($gateway->slug === 'razorpay') {
+                return $this->createRazorpayPaymentLink($request, $payment, $plan, $gateway);
+            }
 
-        if ($gateway->slug === 'coingate') {
-            return $this->createCoinGateOrder($request, $payment, $plan, $gateway);
-        }
+            if ($gateway->slug === 'sslcommerz') {
+                return $this->createSslCommerzSession($request, $payment, $plan, $gateway);
+            }
 
-        if ($gateway->slug === 'paystack') {
-            return $this->createPaystackTransaction($request, $payment, $gateway);
-        }
+            if ($gateway->slug === 'coingate') {
+                return $this->createCoinGateOrder($request, $payment, $plan, $gateway);
+            }
 
-        if ($gateway->slug === '2checkout') {
-            return $this->createTwoCheckoutUrl($request, $payment, $plan, $gateway);
+            if ($gateway->slug === 'paystack') {
+                return $this->createPaystackTransaction($request, $payment, $gateway);
+            }
+
+            if ($gateway->slug === '2checkout') {
+                return $this->createTwoCheckoutUrl($request, $payment, $plan, $gateway);
+            }
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning('Gateway session could not be created (connection error)', [
+                'gateway' => $gateway->slug,
+                'payment_ulid' => $payment->ulid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->failGatewaySession($payment, translate('Could not reach :gateway. Please try again in a moment.', ['gateway' => $gateway->name]));
         }
 
         app(NotificationEventService::class)->transactionPending($payment);
@@ -469,6 +494,394 @@ class CheckoutController extends Controller
             ->with('success', translate('Payment proof uploaded. Your transaction is pending review.'));
     }
 
+    /**
+     * How long to wait on a gateway lookup made while a buyer is watching.
+     *
+     * Laravel's default is 30s, which on these routes means the buyer stares at a blank
+     * tab for half a minute before anything happens. These lookups are confirmations of a
+     * charge the webhook also reports, so giving up early costs nothing.
+     */
+    private const GATEWAY_LOOKUP_TIMEOUT = 8;
+
+    /**
+     * Run a gateway lookup that must never take the page down with it.
+     *
+     * `$response->failed()` covers an HTTP error *response*; it does not cover a request
+     * that never got one. A DNS failure, a refused connection or a timeout throws
+     * ConnectionException instead, and an uncaught one turned a slow Paddle call into a
+     * 500 on the return page — for a buyer whose money had already been taken. These
+     * lookups are a convenience over the webhook, so a failure degrades to "still
+     * pending" rather than to an error screen.
+     *
+     * @return \Illuminate\Http\Client\Response|null null when the request never completed
+     */
+    private function gatewayLookup(callable $request, string $context, array $logContext = []): ?\Illuminate\Http\Client\Response
+    {
+        try {
+            $response = $request();
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning($context.' (connection error)', [...$logContext, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if ($response->failed()) {
+            Log::warning($context, [...$logContext, 'status' => $response->status()]);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Gateways whose settled state can be read back from an API using what the payment
+     * row already stores. These are the ones the pending screen can usefully poll and the
+     * ones whose return route can confirm a charge without waiting for the webhook.
+     *
+     * Not listed: Stripe and PayPal (settle before the buyer returns, and have their own
+     * return handlers), bank transfer (no API at all), and 2Checkout — its buy-link flow
+     * needs no API call at checkout, so we hold no credential that could query one back.
+     */
+    private const VERIFIABLE_GATEWAYS = ['paddle', 'paystack', 'coingate', 'sslcommerz'];
+
+    private function supportsStatusPolling(Payment $payment): bool
+    {
+        if (! in_array($payment->gateway, self::VERIFIABLE_GATEWAYS, true) || ! $payment->gateway_payment_id) {
+            return false;
+        }
+
+        $gateway = PaymentGateway::where('slug', $payment->gateway)->first();
+
+        if (! $gateway) {
+            return false;
+        }
+
+        return match ($payment->gateway) {
+            'paddle' => (bool) $gateway->getCredential('api_key'),
+            'paystack' => (bool) $gateway->getCredential('secret_key'),
+            'coingate' => (bool) $gateway->getCredential('auth_token'),
+            'sslcommerz' => (bool) $gateway->getCredential('store_id') && (bool) $gateway->getCredential('store_password'),
+            default => false,
+        };
+    }
+
+    /**
+     * Re-check a still-pending payment directly with its gateway, and activate it if the
+     * gateway says it is paid.
+     *
+     * The webhook remains the primary path; this is the fallback for when it is missing,
+     * misconfigured or merely slow. Safe to call repeatedly — the activation services
+     * row-lock and re-read status, so a webhook arriving mid-poll is not double-counted.
+     *
+     * Each per-gateway probe answers one question — "is this settled, and for how much?" —
+     * and the amount guard and activation are shared, so a gateway added here cannot
+     * accidentally skip the underpayment check.
+     */
+    private function confirmPendingPaymentWithGateway(Payment $payment, PaymentActivationService $activation): void
+    {
+        if ($payment->status !== 'pending' || ! $this->supportsStatusPolling($payment)) {
+            return;
+        }
+
+        $gateway = PaymentGateway::where('slug', $payment->gateway)->first();
+
+        $settled = match ($payment->gateway) {
+            'paddle' => $this->probePaddle($gateway, $payment),
+            'paystack' => $this->probePaystack($gateway, $payment),
+            'coingate' => $this->probeCoinGate($gateway, $payment),
+            'sslcommerz' => $this->probeSslCommerz($gateway, $payment),
+            default => null,
+        };
+
+        if (! $settled) {
+            return;
+        }
+
+        // Same rule as ProcessPaymentWebhookJob::paidAmountCovers() — overpayment is fine,
+        // a 1-cent tolerance absorbs rounding, and a currency swap is always a rejection.
+        $expected = (float) $payment->amount;
+
+        if ($expected > 0.0) {
+            $paid = (float) $settled['amount'];
+            $paidCurrency = strtoupper((string) $settled['currency']);
+
+            if ($paid <= 0.0 || $paidCurrency !== strtoupper((string) $payment->currency) || ($paid + 0.01) < $expected) {
+                Log::warning('Gateway confirmation rejected: amount or currency mismatch', [
+                    'gateway' => $payment->gateway,
+                    'payment_ulid' => $payment->ulid,
+                    'expected_amount' => $expected,
+                    'expected_currency' => $payment->currency,
+                    'paid_amount' => $paid,
+                    'paid_currency' => $paidCurrency,
+                ]);
+
+                return;
+            }
+        }
+
+        if ($payment->type === 'credit_topup') {
+            $activation->activateCreditTopup($payment, $settled['payment_id']);
+        } else {
+            $activation->activateFromPayment($payment, $settled['payment_id'], $settled['subscription_id'] ?? null);
+        }
+    }
+
+    /**
+     * Minor units back to major, the inverse of minorAmount(). Paddle and Paystack both
+     * report totals in minor units while `payments.amount` is major.
+     */
+    private function majorAmount(int $minor, string $currency): float
+    {
+        $zeroDecimal = ['BIF','CLP','DJF','GNF','JPY','KMF','KRW','MGA','PYG','RWF','UGX','VND','VUV','XAF','XOF','XPF'];
+
+        return in_array(strtoupper($currency), $zeroDecimal, true) ? (float) $minor : $minor / 100;
+    }
+
+    /** @return array{payment_id:string,amount:float,currency:string,subscription_id:?string}|null */
+    private function probePaddle(PaymentGateway $gateway, Payment $payment): ?array
+    {
+        $transactionId = (string) $payment->gateway_payment_id;
+
+        $response = $this->gatewayLookup(
+            fn () => Http::withToken((string) $gateway->getCredential('api_key'))->acceptJson()
+                ->timeout(self::GATEWAY_LOOKUP_TIMEOUT)
+                ->get($this->paddleBaseUrl($gateway).'/transactions/'.$transactionId),
+            'Paddle transaction lookup failed',
+            ['payment_ulid' => $payment->ulid, 'transaction_id' => $transactionId],
+        );
+
+        // `completed` is fully processed; `paid` is collected but still settling
+        // internally. The money is taken in both, and a buyer watching this page should
+        // not have to wait out Paddle's internal processing to get what they bought.
+        if (! $response || $response->failed() || ! in_array($response->json('data.status'), ['paid', 'completed'], true)) {
+            return null;
+        }
+
+        $currency = (string) $response->json('data.currency_code', $payment->currency);
+
+        return [
+            'payment_id' => $transactionId,
+            'amount' => $this->majorAmount((int) $response->json('data.details.totals.total', 0), $currency),
+            'currency' => $currency,
+            'subscription_id' => $response->json('data.subscription_id') ? (string) $response->json('data.subscription_id') : null,
+        ];
+    }
+
+    /** @return array{payment_id:string,amount:float,currency:string,subscription_id:?string}|null */
+    private function probePaystack(PaymentGateway $gateway, Payment $payment): ?array
+    {
+        // Paystack keys the transaction on the reference we chose, which is the ulid.
+        $response = $this->gatewayLookup(
+            fn () => Http::withToken((string) $gateway->getCredential('secret_key'))->acceptJson()
+                ->timeout(self::GATEWAY_LOOKUP_TIMEOUT)
+                ->get('https://api.paystack.co/transaction/verify/'.urlencode($payment->ulid)),
+            'Paystack transaction verify failed',
+            ['payment_ulid' => $payment->ulid],
+        );
+
+        if (! $response || $response->failed() || ! $response->json('status') || $response->json('data.status') !== 'success') {
+            return null;
+        }
+
+        $currency = (string) $response->json('data.currency', $payment->currency);
+
+        return [
+            'payment_id' => (string) $response->json('data.id', $payment->ulid),
+            'amount' => $this->majorAmount((int) $response->json('data.amount', 0), $currency),
+            'currency' => $currency,
+            'subscription_id' => null,
+        ];
+    }
+
+    /** @return array{payment_id:string,amount:float,currency:string,subscription_id:?string}|null */
+    private function probeCoinGate(PaymentGateway $gateway, Payment $payment): ?array
+    {
+        $orderId = (string) $payment->gateway_payment_id;
+        $baseUrl = $gateway->is_test_mode ? 'https://api-sandbox.coingate.com/v2' : 'https://api.coingate.com/v2';
+
+        $response = $this->gatewayLookup(
+            fn () => Http::withToken((string) $gateway->getCredential('auth_token'))->acceptJson()
+                ->timeout(self::GATEWAY_LOOKUP_TIMEOUT)
+                ->get($baseUrl.'/orders/'.$orderId),
+            'CoinGate order lookup failed',
+            ['payment_ulid' => $payment->ulid, 'order_id' => $orderId],
+        );
+
+        if (! $response || $response->failed() || $response->json('status') !== 'paid') {
+            return null;
+        }
+
+        // price_* is the order priced in OUR currency; receive_* is what the merchant is
+        // paid out in after conversion, which is not what we charged.
+        return [
+            'payment_id' => $orderId,
+            'amount' => (float) $response->json('price_amount', 0),
+            'currency' => (string) $response->json('price_currency', $payment->currency),
+            'subscription_id' => null,
+        ];
+    }
+
+    /** @return array{payment_id:string,amount:float,currency:string,subscription_id:?string}|null */
+    private function probeSslCommerz(PaymentGateway $gateway, Payment $payment): ?array
+    {
+        $baseUrl = $gateway->is_test_mode ? 'https://sandbox.sslcommerz.com' : 'https://securepay.sslcommerz.com';
+
+        // Queried by OUR transaction id rather than SSLCommerz's val_id: val_id only
+        // exists in the IPN/return payload, and the whole point here is to work without
+        // one having arrived.
+        $response = $this->gatewayLookup(
+            fn () => Http::acceptJson()->timeout(self::GATEWAY_LOOKUP_TIMEOUT)
+                ->get($baseUrl.'/validator/api/merchantTransIDvalidationAPI.php', [
+                    'tran_id' => $payment->ulid,
+                    'store_id' => $gateway->getCredential('store_id'),
+                    'store_passwd' => $gateway->getCredential('store_password'),
+                    'format' => 'json',
+                ]),
+            'SSLCommerz transaction lookup failed',
+            ['payment_ulid' => $payment->ulid],
+        );
+
+        if (! $response || $response->failed()) {
+            return null;
+        }
+
+        // The API answers with a list; take the settled element for our ulid.
+        $element = collect($response->json('element') ?: [])
+            ->first(fn ($row) => in_array(data_get($row, 'status'), ['VALID', 'VALIDATED'], true)
+                && (string) data_get($row, 'tran_id') === $payment->ulid);
+
+        if (! $element) {
+            return null;
+        }
+
+        // currency_amount/currency_type echo what we asked for; amount/currency may be
+        // the post-conversion store currency on a multi-currency store.
+        return [
+            'payment_id' => (string) (data_get($element, 'bank_tran_id') ?: data_get($element, 'val_id') ?: ''),
+            'amount' => (float) (data_get($element, 'currency_amount') ?: data_get($element, 'amount')),
+            'currency' => (string) (data_get($element, 'currency_type') ?: data_get($element, 'currency') ?: $payment->currency),
+            'subscription_id' => null,
+        ];
+    }
+
+    /**
+     * Confirm-on-return for gateways that hand the buyer back with nothing we can trust.
+     *
+     * SSLCommerz, Paystack and CoinGate all used to point their success URL straight at
+     * the pending screen, which only renders the row's current status — so activation was
+     * webhook-only and a webhook that never fired left a paying customer reading "waiting
+     * for confirmation" forever. That was the Razorpay bug, three more times.
+     *
+     * Nothing in the request is trusted: the payment comes from the route binding and the
+     * verdict from a server-to-server lookup. SSLCommerz in particular arrives as a POST
+     * from their domain (hence the CSRF exemption), and none of that body is read.
+     */
+    public function gatewayReturn(Request $request, Payment $payment, PaymentActivationService $activation): RedirectResponse
+    {
+        abort_unless($payment->user_id === $request->user()->id, 404);
+        abort_unless(in_array($payment->gateway, self::VERIFIABLE_GATEWAYS, true), 404);
+
+        $this->confirmPendingPaymentWithGateway($payment, $activation);
+
+        return redirect()->route('checkout.pending', $payment);
+    }
+
+    /**
+     * Polling endpoint for the pending screen. Re-checks with the gateway, then reports
+     * where the payment actually stands.
+     */
+    public function status(Request $request, Payment $payment, PaymentActivationService $activation): JsonResponse
+    {
+        abort_unless($payment->user_id === $request->user()->id, 404);
+
+        $this->confirmPendingPaymentWithGateway($payment, $activation);
+
+        $status = $payment->fresh()->status;
+
+        return response()->json([
+            'status' => $status,
+            'settled' => $status !== 'pending',
+        ]);
+    }
+
+    /**
+     * Paddle's default payment link — the page Paddle turns a transaction into a checkout on.
+     *
+     * Unlike every other gateway here, Paddle does not host the checkout for us. Its
+     * "default payment link" (dashboard → Checkout → Checkout settings) has to be a URL on
+     * OUR domain running Paddle.js; Paddle builds `checkout.url` by appending `?_ptxn=<txn>`
+     * to it, and Paddle.js opens the overlay for that transaction when the page loads.
+     * Point the dashboard setting at this route.
+     *
+     * The client-side token is a public credential — it is designed to ship to the browser
+     * and cannot be used for API calls. The secret API key never leaves the server.
+     */
+    public function paddlePay(Request $request): Response
+    {
+        $gateway = PaymentGateway::where('slug', 'paddle')->first();
+        $clientToken = $gateway?->getCredential('client_token');
+
+        abort_unless($gateway && $clientToken, 404);
+
+        $transactionId = (string) $request->query('_ptxn', '');
+
+        $payment = $transactionId !== ''
+            ? Payment::where('user_id', $request->user()->id)
+                ->where('gateway', 'paddle')
+                ->where('gateway_payment_id', $transactionId)
+                ->first()
+            : null;
+
+        return Inertia::render('Checkout/Paddle', [
+            // Same stripped chrome as the rest of the payment flow.
+            'hide_header' => true,
+            'hide_footer' => true,
+            'transactionId' => $transactionId,
+            'clientToken' => $clientToken,
+            'environment' => $gateway->is_test_mode ? 'sandbox' : 'production',
+            // Where Paddle sends the buyer once they have paid. paddleReturn() confirms
+            // the transaction server-side before showing them anything.
+            'returnUrl' => route('checkout.paddle.return'),
+            // If the overlay cannot open at all, the buyer still has somewhere to go that
+            // tells them the truth about their payment.
+            'fallbackUrl' => $payment
+                ? route('checkout.pending', $payment)
+                : route('user.dashboard.billing'),
+        ]);
+    }
+
+    /**
+     * Landing route for Paddle's hosted checkout.
+     *
+     * Paddle Billing's success URL is configured once in their dashboard and is the same
+     * for every buyer, so it cannot carry a payment ulid the way other gateways' return
+     * URLs do. Resolve from `_ptxn` when Paddle appends it, and otherwise fall back to
+     * this buyer's own most recent pending Paddle payment — which is correct because the
+     * route is authenticated and a buyer only has one checkout in flight at a time.
+     */
+    public function paddleReturn(Request $request, PaymentActivationService $activation): RedirectResponse
+    {
+        $transactionId = (string) $request->query('_ptxn', '');
+
+        $payment = $transactionId !== ''
+            ? Payment::where('user_id', $request->user()->id)->where('gateway', 'paddle')
+                ->where('gateway_payment_id', $transactionId)->first()
+            : null;
+
+        $payment ??= Payment::where('user_id', $request->user()->id)
+            ->where('gateway', 'paddle')
+            ->where('status', 'pending')
+            ->latest('id')
+            ->first();
+
+        if (! $payment) {
+            return redirect()->route('user.dashboard.billing');
+        }
+
+        $this->confirmPendingPaymentWithGateway($payment, $activation);
+
+        return redirect()->route('checkout.pending', $payment);
+    }
+
     public function pending(Payment $payment): Response
     {
         abort_unless($payment->user_id === auth()->id(), 404);
@@ -484,6 +897,12 @@ class CheckoutController extends Controller
             'hide_header' => true,
             'hide_footer' => true,
             'payment' => $this->paymentPayload($payment),
+            // Set only while there is something worth asking about: a pending payment on a
+            // gateway we can query. The page polls it as a fallback for a webhook that
+            // never lands, and stops the moment the payment settles.
+            'statusUrl' => $payment->status === 'pending' && $this->supportsStatusPolling($payment)
+                ? route('checkout.status', $payment)
+                : null,
             // Where a confirmed payment sends the buyer next. A subscriber wants the plan
             // they just bought; someone who topped up wants the credits they just bought.
             'continueUrl' => $payment->type === 'credit_topup'
@@ -562,6 +981,110 @@ class CheckoutController extends Controller
 
         // Captured and activated. Lands on the same confirmation screen every other
         // gateway uses, which then forwards on by payment type.
+        return redirect()->route('checkout.pending', $payment)
+            ->with('success', translate('Payment confirmed successfully.'));
+    }
+
+    /**
+     * Confirm a Razorpay payment link when the buyer returns to the browser.
+     *
+     * Razorpay used to send the buyer straight to checkout.pending, which only renders
+     * whatever status the row already had. That made the `payment_link.paid` webhook the
+     * SOLE path to activation, so any webhook that was never configured, never delivered,
+     * or rejected for a signature mismatch left a paid buyer staring at "waiting for
+     * confirmation" forever, with nothing in the UI to say so.
+     *
+     * The decision here is made from a server-to-server read of the payment link, never
+     * from the query string: Razorpay appends razorpay_payment_id/_signature to the
+     * callback, but those arrive via the buyer's browser, and a redirect a user can
+     * replay is not something to grant a plan on. The API answer cannot be forged.
+     *
+     * Both this and the webhook can land; activateFromPayment()/activateCreditTopup()
+     * row-lock and re-read status inside their transaction, so whichever arrives second
+     * is a no-op rather than a double activation.
+     */
+    public function razorpayReturn(Request $request, Payment $payment, PaymentActivationService $activation): RedirectResponse
+    {
+        abort_unless($payment->user_id === $request->user()->id && $payment->gateway === 'razorpay', 404);
+
+        // Already settled — usually the webhook won the race. Straight to the confirmation.
+        if ($payment->status === 'completed') {
+            return redirect()->route('checkout.pending', $payment);
+        }
+
+        // Deliberately not filtered by is_enabled, matching ProcessPaymentWebhookJob: money
+        // already taken must still activate even if the admin disabled the gateway after.
+        $gateway = PaymentGateway::where('slug', 'razorpay')->first();
+        $keyId = $gateway?->getCredential('key_id');
+        $keySecret = $gateway?->getCredential('key_secret');
+        $paymentLinkId = (string) $payment->gateway_payment_id;
+
+        if (! $keyId || ! $keySecret || $paymentLinkId === '') {
+            return redirect()->route('checkout.pending', $payment)
+                ->with('info', translate('Your payment is being confirmed. This can take a moment.'));
+        }
+
+        $response = $this->gatewayLookup(
+            fn () => Http::withBasicAuth($keyId, $keySecret)->acceptJson()
+                ->timeout(self::GATEWAY_LOOKUP_TIMEOUT)
+                ->get('https://api.razorpay.com/v1/payment_links/'.$paymentLinkId),
+            'Razorpay return: payment link lookup failed',
+            ['payment_ulid' => $payment->ulid, 'payment_link_id' => $paymentLinkId],
+        );
+
+        // No response at all, or an error one — the webhook is still the authoritative
+        // path, so send the buyer to a page that tells them so rather than to a 500.
+        if (! $response || $response->failed()) {
+            return redirect()->route('checkout.pending', $payment)
+                ->with('info', translate('Your payment is being confirmed. This can take a moment.'));
+        }
+
+        // "paid" is the only status that means settled. A link can also come back created,
+        // partially_paid, cancelled or expired — none of which have earned a plan.
+        if ($response->json('status') !== 'paid') {
+            return redirect()->route('checkout.pending', $payment);
+        }
+
+        // A signature proves authenticity but does not bind the amount, and Razorpay links
+        // accept partial payment. Compare in minor units against what we meant to charge,
+        // the same shape as ProcessPaymentWebhookJob::paidAmountCovers().
+        $expectedMinor = $this->minorAmount((float) $payment->amount, $payment->currency);
+        $paidMinor = (int) $response->json('amount_paid', 0);
+        $paidCurrency = strtoupper((string) $response->json('currency', ''));
+
+        if ($expectedMinor > 0 && ($paidMinor < $expectedMinor || $paidCurrency !== strtoupper((string) $payment->currency))) {
+            Log::warning('Razorpay return rejected: amount or currency mismatch', [
+                'payment_ulid' => $payment->ulid,
+                'expected_minor' => $expectedMinor,
+                'paid_minor' => $paidMinor,
+                'expected_currency' => $payment->currency,
+                'paid_currency' => $paidCurrency,
+            ]);
+
+            return redirect()->route('checkout.pending', $payment)
+                ->with('error', translate('The amount received did not match this order. Please contact support.'));
+        }
+
+        // The real pay_… id lives in the link's payments array; the link id is only a
+        // container. Falls back to the callback's value, then the link id, so the record
+        // always carries something traceable.
+        $gatewayPaymentId = (string) (
+            collect($response->json('payments') ?: [])
+                ->firstWhere('status', 'captured')['payment_id']
+            ?? $response->json('payments.0.payment_id')
+            ?? $request->query('razorpay_payment_id')
+            ?? $paymentLinkId
+        );
+
+        // Top-ups come through this same handler (CreditTopupController points its Razorpay
+        // callback here too), and they have no plan_id — sending one through
+        // activateFromPayment() would fail on a null plan_id after the money was taken.
+        if ($payment->type === 'credit_topup') {
+            $activation->activateCreditTopup($payment, $gatewayPaymentId);
+        } else {
+            $activation->activateFromPayment($payment, $gatewayPaymentId);
+        }
+
         return redirect()->route('checkout.pending', $payment)
             ->with('success', translate('Payment confirmed successfully.'));
     }
@@ -917,24 +1440,85 @@ class CheckoutController extends Controller
         return $gateway->is_test_mode ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     }
 
+    /**
+     * Paddle base URL for the current mode. Billing only — Classic has its own hosts.
+     */
+    private function paddleBaseUrl(PaymentGateway $gateway): string
+    {
+        return $gateway->is_test_mode ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
+    }
+
+    /**
+     * Open a Paddle checkout.
+     *
+     * Create a transaction server-side, then send the buyer to the checkout URL Paddle
+     * hands back. The amount is an inline non-catalog price, so plans do not have to be
+     * mirrored into Paddle's catalogue, and `custom_data` carries our ulid through to the
+     * webhook.
+     */
     private function createPaddlePayLink(Request $request, Payment $payment, Plan $plan, PaymentGateway $gateway): RedirectResponse
     {
-        $vendorId = $gateway->getCredential('vendor_id');
-        $authCode = $gateway->getCredential('api_key');
-        if (! $vendorId || ! $authCode) { return $this->failGatewaySession($payment, 'Paddle is not configured.'); }
+        $apiKey = (string) $gateway->getCredential('api_key');
 
-        $response = Http::asForm()->post('https://vendors.paddle.com/api/2.0/product/generate_pay_link', [
-            'vendor_id' => $vendorId, 'vendor_auth_code' => $authCode, 'title' => $plan->name,
-            'prices' => [strtoupper($payment->currency).':'.number_format((float) $payment->amount, 2, '.', '')],
-            'quantity' => 1, 'return_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
-            'webhook_url' => $this->absoluteUrl($request, '/webhooks/paddle'),
-            'passthrough' => json_encode(['payment_ulid' => $payment->ulid]),
+        if ($apiKey === '') {
+            return $this->failGatewaySession($payment, translate('Paddle is not configured.'));
+        }
+
+        // A longer budget than a lookup: this one creates the transaction, and there is
+        // nothing else that will do it if this request is abandoned.
+        $response = $this->gatewayLookup(fn () => Http::withToken($apiKey)->acceptJson()->timeout(20)->post($this->paddleBaseUrl($gateway).'/transactions', [
+            'items' => [[
+                'quantity' => 1,
+                'price' => [
+                    'description' => $plan->name,
+                    // Minor units as a STRING — Paddle rejects an integer here.
+                    'unit_price' => [
+                        'amount' => (string) $this->minorAmount((float) $payment->amount, $payment->currency),
+                        'currency_code' => strtoupper($payment->currency),
+                    ],
+                    'product' => ['name' => $plan->name, 'tax_category' => 'standard'],
+                ],
+            ]],
+            'custom_data' => ['payment_ulid' => $payment->ulid],
+            'collection_mode' => 'automatic',
+        ]), 'Paddle transaction could not be created', ['payment_ulid' => $payment->ulid]);
+
+        // Never reached Paddle at all — a timeout, DNS or a blocked outbound connection.
+        if (! $response) {
+            return $this->failGatewaySession($payment, translate('Could not reach Paddle. Please try again in a moment.'));
+        }
+
+        if ($response->failed()) {
+            // Paddle nests its message under error.detail, not error.message.
+            $error = $response->json('error.detail')
+                ?? $response->json('error.message')
+                ?? translate('Paddle checkout could not be started.');
+
+            return $this->failGatewaySession($payment, (string) $error);
+        }
+
+        $transactionId = (string) $response->json('data.id');
+        $checkoutUrl = (string) $response->json('data.checkout.url');
+
+        // Paddle only fills checkout.url from the seller's DEFAULT PAYMENT LINK (Paddle
+        // dashboard → Checkout → Checkout settings). Without it the transaction is created
+        // and then there is nowhere to send the buyer — so say exactly that rather than
+        // redirecting to an empty string.
+        if ($checkoutUrl === '') {
+            Log::warning('Paddle returned no checkout URL — default payment link is probably unset', [
+                'payment_ulid' => $payment->ulid,
+                'transaction_id' => $transactionId,
+            ]);
+
+            return $this->failGatewaySession($payment, translate('Paddle has no default payment link configured. Set one in the Paddle dashboard under Checkout → Checkout settings.'));
+        }
+
+        $payment->update([
+            'gateway_payment_id' => $transactionId,
+            'metadata' => [...($payment->metadata ?: []), 'gateway_pay_link' => $checkoutUrl],
         ]);
 
-        if ($response->failed() || ! $response->json('success')) { return $this->failGatewaySession($payment, $response->json('error.message', 'Paddle pay link failed.')); }
-
-        $payment->update(['gateway_payment_id' => $response->json('response.product_id'), 'metadata' => [...($payment->metadata ?: []), 'gateway_pay_link' => $response->json('response.url')]]);
-        return redirect()->away($response->json('response.url'));
+        return redirect()->away($checkoutUrl);
     }
 
     private function createRazorpayPaymentLink(Request $request, Payment $payment, Plan $plan, PaymentGateway $gateway): RedirectResponse
@@ -946,7 +1530,10 @@ class CheckoutController extends Controller
         $response = Http::withBasicAuth($keyId, $keySecret)->acceptJson()->post('https://api.razorpay.com/v1/payment_links', [
             'amount' => $this->minorAmount((float) $payment->amount, $payment->currency), 'currency' => strtoupper($payment->currency),
             'description' => $plan->name, 'reference_id' => $payment->ulid,
-            'callback_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid), 'callback_method' => 'get',
+            // Returns through razorpayReturn(), which confirms the charge with Razorpay
+            // server-side. Landing on checkout.pending directly left activation entirely
+            // dependent on the webhook.
+            'callback_url' => $this->absoluteUrl($request, '/checkout/razorpay/return/'.$payment->ulid), 'callback_method' => 'get',
             'customer' => ['name' => $request->user()->name, 'email' => $request->user()->email],
             'notes' => ['payment_ulid' => $payment->ulid],
         ]);
@@ -964,18 +1551,21 @@ class CheckoutController extends Controller
         if (! $storeId || ! $storePassword) { return $this->failGatewaySession($payment, translate('SSLCommerz is not configured.')); }
 
         $baseUrl = $gateway->is_test_mode ? 'https://sandbox.sslcommerz.com' : 'https://securepay.sslcommerz.com';
-        $response = Http::asForm()->post($baseUrl.'/gwprocess/v4/api.php', [
+        $response = $this->gatewayLookup(fn () => Http::asForm()->timeout(20)->post($baseUrl.'/gwprocess/v4/api.php', [
             'store_id' => $storeId, 'store_passwd' => $storePassword, 'total_amount' => number_format((float) $payment->amount, 2, '.', ''),
             'currency' => strtoupper($payment->currency), 'tran_id' => $payment->ulid,
-            'success_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
-            'fail_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
+            // Returns through gatewayReturn(), which confirms against SSLCommerz's own API.
+            // Note SSLCommerz POSTs the buyer back here, so that route accepts POST.
+            'success_url' => $this->absoluteUrl($request, '/checkout/sslcommerz/return/'.$payment->ulid),
+            'fail_url' => $this->absoluteUrl($request, '/checkout/sslcommerz/return/'.$payment->ulid),
             'cancel_url' => $this->absoluteUrl($request, '/checkout?plan='.$plan->slug.'&billing='.data_get($payment->metadata, 'billing_cycle', 'monthly')),
             'ipn_url' => $this->absoluteUrl($request, '/webhooks/sslcommerz'),
             'cus_name' => $request->user()->name, 'cus_email' => $request->user()->email,
             'cus_add1' => 'N/A', 'cus_city' => 'N/A', 'cus_country' => 'N/A', 'cus_phone' => 'N/A',
             'shipping_method' => 'NO', 'product_name' => $plan->name, 'product_category' => 'Subscription', 'product_profile' => 'non-physical-goods',
-        ]);
+        ]), 'SSLCommerz session could not be created', ['payment_ulid' => $payment->ulid]);
 
+        if (! $response) { return $this->failGatewaySession($payment, translate('Could not reach SSLCommerz. Please try again in a moment.')); }
         if ($response->failed() || ! $response->json('GatewayPageURL')) { return $this->failGatewaySession($payment, $response->json('failedreason', 'SSLCommerz session failed.')); }
 
         $payment->update(['gateway_payment_id' => $response->json('sessionkey'), 'metadata' => [...($payment->metadata ?: []), 'gateway_session_id' => $response->json('sessionkey')]]);
@@ -989,14 +1579,16 @@ class CheckoutController extends Controller
 
         $baseUrl = $gateway->is_test_mode ? 'https://api-sandbox.coingate.com/v2' : 'https://api.coingate.com/v2';
         $webhookToken = bin2hex(random_bytes(16));
-        $response = Http::withToken($token)->acceptJson()->asForm()->post($baseUrl.'/orders', [
+        $response = $this->gatewayLookup(fn () => Http::withToken($token)->acceptJson()->asForm()->timeout(20)->post($baseUrl.'/orders', [
             'order_id' => $payment->ulid, 'price_amount' => number_format((float) $payment->amount, 2, '.', ''),
             'price_currency' => strtoupper($payment->currency), 'receive_currency' => strtoupper($payment->currency),
             'title' => $plan->name, 'callback_url' => $this->absoluteUrl($request, '/webhooks/coingate?token='.$webhookToken),
             'cancel_url' => $this->absoluteUrl($request, '/checkout?plan='.$plan->slug.'&billing='.data_get($payment->metadata, 'billing_cycle', 'monthly')),
-            'success_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
-        ]);
+            // Confirms against CoinGate's order API on return rather than trusting the redirect.
+            'success_url' => $this->absoluteUrl($request, '/checkout/coingate/return/'.$payment->ulid),
+        ]), 'CoinGate order could not be created', ['payment_ulid' => $payment->ulid]);
 
+        if (! $response) { return $this->failGatewaySession($payment, translate('Could not reach CoinGate. Please try again in a moment.')); }
         if ($response->failed()) { return $this->failGatewaySession($payment, $response->json('message', 'CoinGate order failed.')); }
 
         $payment->update(['gateway_payment_id' => $response->json('id'), 'metadata' => [...($payment->metadata ?: []), 'coingate_webhook_token' => $webhookToken]]);
@@ -1008,35 +1600,107 @@ class CheckoutController extends Controller
         $secretKey = $gateway->getCredential('secret_key');
         if (! $secretKey) { return $this->failGatewaySession($payment, 'Paystack is not configured.'); }
 
-        $response = Http::withToken($secretKey)->acceptJson()->post('https://api.paystack.co/transaction/initialize', [
+        $response = $this->gatewayLookup(fn () => Http::withToken($secretKey)->acceptJson()->timeout(20)->post('https://api.paystack.co/transaction/initialize', [
             'email' => $request->user()->email, 'amount' => $this->minorAmount((float) $payment->amount, $payment->currency),
             'currency' => strtoupper($payment->currency), 'reference' => $payment->ulid,
-            'callback_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
+            // Confirms via Paystack's verify endpoint on return rather than trusting the redirect.
+            'callback_url' => $this->absoluteUrl($request, '/checkout/paystack/return/'.$payment->ulid),
             'metadata' => ['payment_ulid' => $payment->ulid],
-        ]);
+        ]), 'Paystack transaction could not be initialised', ['payment_ulid' => $payment->ulid]);
 
+        if (! $response) { return $this->failGatewaySession($payment, translate('Could not reach Paystack. Please try again in a moment.')); }
         if ($response->failed() || ! $response->json('status')) { return $this->failGatewaySession($payment, $response->json('message', 'Paystack transaction failed.')); }
 
         $payment->update(['gateway_payment_id' => $response->json('data.reference'), 'metadata' => [...($payment->metadata ?: []), 'gateway_access_code' => $response->json('data.access_code')]]);
         return redirect()->away($response->json('data.authorization_url'));
     }
 
+    /**
+     * The string 2Checkout signs for a ConvertPlus buy link.
+     *
+     * Parameters sorted by name, each value serialised as its BYTE length followed by the
+     * raw (un-encoded) value, concatenated with no separator. 2Checkout's own worked
+     * example — currency=USD, expiration=1893456000, price=10, prod=Software, qty=1,
+     * type=digital — must produce `3USD1018934560002108Software117digital`, which is what
+     * the test asserts.
+     */
+    private function twoCheckoutSignaturePayload(array $params): string
+    {
+        ksort($params);
+
+        return collect($params)
+            // strlen(), not mb_strlen(): the prefix counts UTF-8 bytes, so a plan name
+            // with an accent or a currency symbol must not be counted as characters.
+            ->map(fn ($value) => strlen((string) $value).(string) $value)
+            ->implode('');
+    }
+
+    private function twoCheckoutSignature(array $params, string $secretWord): string
+    {
+        return hash_hmac('sha256', $this->twoCheckoutSignaturePayload($params), $secretWord);
+    }
+
+    /**
+     * 2Checkout (Verifone) ConvertPlus buy link.
+     *
+     * Three things this used to get wrong, all of which end with 2Checkout bouncing the
+     * buyer to its documentation site instead of a payment form:
+     *
+     *  - **No signature.** Dynamic (ad-hoc price) buy links MUST be signed, or the link is
+     *    rejected outright — otherwise anyone could edit `price` in the URL.
+     *  - **No `type`.** It is required for dynamic products.
+     *  - **A sandbox hostname that does not exist.** Both environments are served from
+     *    secure.2checkout.com; test mode is the `test=1` parameter, not a different host.
+     *    `test` itself is explicitly NOT part of the signature.
+     *  - **Legacy parameter names.** `merchant_order_id` and `x_receipt_link_url` belong to
+     *    the old buy-link format, not ConvertPlus.
+     */
     private function createTwoCheckoutUrl(Request $request, Payment $payment, Plan $plan, PaymentGateway $gateway): RedirectResponse
     {
         $merchantCode = $gateway->getCredential('merchant_code');
-        if (! $merchantCode) { return $this->failGatewaySession($payment, '2Checkout is not configured.'); }
+        $secretWord = $gateway->getCredential('secret_key');
 
-        $baseUrl = $gateway->is_test_mode ? 'https://sandbox.2checkout.com/checkout/buy' : 'https://secure.2checkout.com/checkout/buy';
-        $query = http_build_query([
-            'merchant' => $merchantCode, 'dynamic' => 1, 'prod' => $plan->name,
-            'price' => number_format((float) $payment->amount, 2, '.', ''), 'qty' => 1,
-            'currency' => strtoupper($payment->currency), 'merchant_order_id' => $payment->ulid,
-            'return-url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
-            'x_receipt_link_url' => $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid),
-        ]);
+        if (! $merchantCode || ! $secretWord) {
+            return $this->failGatewaySession($payment, translate('2Checkout is not configured.'));
+        }
+
+        // Everything 2Checkout requires in the signature: the general set (return-url,
+        // return-type, order-ext-ref) plus the dynamic-product set. Raw values — the
+        // signature is computed before URL encoding.
+        //
+        // `order-ext-ref` is the ConvertPlus name for our own reference; the legacy
+        // `merchant_order_id` this used to send is not a ConvertPlus parameter. It comes
+        // back as `vendor_order_id` on the INS notification, which is what
+        // ProcessPaymentWebhookJob::processTwoCheckout() matches the payment on — so
+        // getting this name wrong also meant a paid order could never be matched to a user.
+        $returnUrl = $this->absoluteUrl($request, '/checkout/pending/'.$payment->ulid);
+
+        $signed = [
+            'currency' => strtoupper($payment->currency),
+            'order-ext-ref' => $payment->ulid,
+            'price' => number_format((float) $payment->amount, 2, '.', ''),
+            'prod' => $plan->name,
+            'qty' => '1',
+            'return-type' => 'redirect',
+            'return-url' => $returnUrl,
+            'type' => 'digital',
+        ];
+
+        $query = [
+            ...$signed,
+            'merchant' => $merchantCode,
+            'dynamic' => '1',
+            'signature' => $this->twoCheckoutSignature($signed, $secretWord),
+        ];
+
+        // Test orders run on the same host, flagged rather than routed elsewhere.
+        if ($gateway->is_test_mode) {
+            $query['test'] = '1';
+        }
 
         $payment->update(['gateway_payment_id' => $payment->ulid]);
-        return redirect()->away($baseUrl.'?'.$query);
+
+        return redirect()->away('https://secure.2checkout.com/checkout/buy/?'.http_build_query($query));
     }
 
     private function failGatewaySession(Payment $payment, string $message): RedirectResponse

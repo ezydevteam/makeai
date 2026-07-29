@@ -3243,7 +3243,7 @@ watch(() => [
                 <div v-else-if="activeTab === 'homepage'" class="space-y-6">
 
                     <section v-if="hasHomepageProviders" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <div class="flex items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <div class="flex-1">
                                 <h6 class="font-bold">{{ t('Homepage') }}</h6>
                                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">

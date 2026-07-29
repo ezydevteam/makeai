@@ -616,14 +616,13 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-
         <AppModal
             :open="showForm"
             max-width="max-w-5xl"
             :title="editingId ? t('Edit Announcement') : t('Add Announcement')"
             :subtitle="t('Configure placement, audience, timing, and call to action details.')"
             has-form
-            :confirm-text="editingId ? t('Save Changes') : t('Add Announcement')"
+            :confirm-text="editingId ? t('Save Changes') : t('Create')"
             :confirm-loading="form.processing"
             confirm-loading-text="Saving..."
             @close="closeForm"

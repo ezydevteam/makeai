@@ -157,12 +157,12 @@ const removeBackground = () => {
 
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label class="block max-md:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {{ t('Page title') }}
                         <input v-model="maintenanceForm.maintenance_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         <span v-if="maintenanceForm.errors.maintenance_title" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_title }}</span>
                     </label>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label class="block max-md:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {{ t('Estimated restoration time') }}
                         <input v-model="maintenanceForm.maintenance_estimated_restoration_time" type="datetime-local" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         <span v-if="maintenanceForm.errors.maintenance_estimated_restoration_time" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_estimated_restoration_time }}</span>

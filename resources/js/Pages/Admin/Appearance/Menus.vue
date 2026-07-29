@@ -579,16 +579,16 @@ const importMenu = () => {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Menu Builder') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Structure public navigation menus for headers, footers, mobile drawers, and sidebars.') }}</p>
             </div>
-            <div class="shrink-0 flex items-center gap-3">
-                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Export JSON')" @click="exportMenu">
+            <div class="shrink-0 flex flex-wrap items-center gap-3">
+                <button type="button" class="grow inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Export JSON')" @click="exportMenu">
                     <i class="ti ti-file-export text-base"></i>
                     {{ t('Export') }}
                 </button>
-                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Import JSON')" @click="showImportModal = true">
+                <button type="button" class="grow inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Import JSON')" @click="showImportModal = true">
                     <i class="ti ti-file-import text-base"></i>
                     {{ t('Import') }}
                 </button>
-                <button type="button" :disabled="reorderForm.processing || !selectedMenu" class="inline-flex items-center gap-2 btn-primary-admin disabled:cursor-not-allowed disabled:opacity-60" @click="saveChanges">
+                <button type="button" :disabled="reorderForm.processing || !selectedMenu" class="grow inline-flex items-center gap-2 btn-primary-admin disabled:cursor-not-allowed disabled:opacity-60" @click="saveChanges">
                     <svg v-if="reorderForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     <i v-else class="ti ti-device-floppy text-sm"></i>
                     <span>{{ reorderForm.processing ? t('Saving...') : t('Save Changes') }}</span>

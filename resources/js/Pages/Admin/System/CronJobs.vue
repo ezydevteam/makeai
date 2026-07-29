@@ -217,7 +217,7 @@ const runCronTask = (taskKey: string) => {
                         <div class="text-sm text-gray-700 dark:text-gray-300">{{ task.last_run_at ? formatDateTime(task.last_run_at) : t('Not run manually') }}</div>
                     </div>
                     <div class="col-span-12 flex items-center justify-end md:col-span-4 lg:col-span-2">
-                        <button type="button" :disabled="cronRunForm.processing" class="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:opacity-60 dark:border-primary-900/50 dark:bg-primary-900/20 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/40 dark:text-primary-200" @click="runCronTask(task.key)">
+                        <button type="button" :disabled="cronRunForm.processing" class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:opacity-60 dark:border-primary-900/50 dark:bg-primary-900/20 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/40 dark:text-primary-200" @click="runCronTask(task.key)">
                             <i class="ti ti-refresh text-base"></i>
                             {{ cronRunForm.processing && cronRunForm.task === task.key ? t('Running...') : t('Run Now') }}
                         </button>

@@ -38,21 +38,50 @@ const updatePosition = () => {
     const menu = menuRef.value
     if (!trigger || !menu) return
 
-    const triggerRect = trigger.getBoundingClientRect()
+    /* Measure the actual control, not the wrapper. `triggerRef` is on a wrapper div, and
+       where that wrapper is a child of a `flex` row (the addons page puts it in
+       `flex flex-wrap`) the default align-items:stretch makes it as tall as the whole row.
+       Positioning off the wrapper's bottom edge then dropped the menu far below the
+       three-dots icon. */
+    const triggerEl = trigger.querySelector('button, a, [role="button"]') ?? trigger
+    const triggerRect = triggerEl.getBoundingClientRect()
     const menuRect = menu.getBoundingClientRect()
 
-    const spaceBelow = window.innerHeight - triggerRect.bottom
+    const viewportWidth = document.documentElement.clientWidth
+    const viewportHeight = window.innerHeight
+    const MARGIN = 8
+
+    const spaceBelow = viewportHeight - triggerRect.bottom
     const spaceAbove = triggerRect.top
     const openUpward = spaceBelow < menuRect.height && spaceAbove > spaceBelow
 
-    const top = openUpward
+    let top = openUpward
         ? triggerRect.top - menuRect.height - props.offset
         : triggerRect.bottom + props.offset
 
-    // Align right side of menu with right side of trigger, unless it overflows left edge of viewport
+    /* Clamp to the viewport. Flipping upward only needs MORE room above than below — it
+       does not require enough room, so on a short screen (a phone in landscape) the menu
+       was placed at a negative top and cut off. Same on the way down when neither side
+       fits. A menu taller than the screen keeps its top edge visible and scrolls. */
+    if (top + menuRect.height > viewportHeight - MARGIN) {
+        top = viewportHeight - menuRect.height - MARGIN
+    }
+    if (top < MARGIN) {
+        top = MARGIN
+    }
+
+    // `left` is the menu's RIGHT edge — the panel is shifted by translateX(-100%).
+    // Right-align to the trigger, flip to left-aligned if that would overflow the left
+    // edge, then clamp so neither flip can push it off the opposite side.
     let left = triggerRect.right
-    if (left - menuRect.width < 16) {
+    if (left - menuRect.width < MARGIN) {
         left = triggerRect.left + menuRect.width
+    }
+    if (left > viewportWidth - MARGIN) {
+        left = viewportWidth - MARGIN
+    }
+    if (left - menuRect.width < MARGIN) {
+        left = Math.min(menuRect.width + MARGIN, viewportWidth - MARGIN)
     }
 
     menuStyle.value = {
@@ -102,7 +131,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="triggerRef" class="relative inline-flex justify-end">
+    <!-- self-start: as a flex child this wrapper would otherwise stretch to the row height. -->
+    <div ref="triggerRef" class="relative inline-flex self-start justify-end">
         <slot name="trigger" :toggle="toggle" :isOpen="isOpen">
             <button
                 type="button"

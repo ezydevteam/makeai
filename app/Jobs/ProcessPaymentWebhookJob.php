@@ -177,6 +177,20 @@ class ProcessPaymentWebhookJob implements ShouldQueue
     }
 
     /**
+     * Minor units to major, for the gateways that report totals in the smallest unit.
+     *
+     * NOT a plain `/ 100`: a zero-decimal currency has no minor unit, so ¥5000 is 5000 and
+     * dividing it would read a correctly-paid order as a hundredth of its price and reject
+     * it as underpaid. Mirrors CheckoutController::minorAmount()/majorAmount().
+     */
+    private function majorAmount(int $minor, string $currency): float
+    {
+        $zeroDecimal = ['BIF','CLP','DJF','GNF','JPY','KMF','KRW','MGA','PYG','RWF','UGX','VND','VUV','XAF','XOF','XPF'];
+
+        return in_array(strtoupper($currency), $zeroDecimal, true) ? (float) $minor : $minor / 100;
+    }
+
+    /**
      * Activate a payment, routing to the appropriate method based on payment type.
      */
     private function activatePayment(Payment $payment, string $gatewayPaymentId, SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation, ?string $gatewaySubscriptionId = null): void
@@ -389,7 +403,7 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         return $gateway->is_test_mode ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     }
 
-    // ─── Paddle (Classic API — matches the pay-link checkout flow) ──
+    // ─── Paddle ─────────────────────────────────
 
     private function processPaddle(SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): void
     {
@@ -405,39 +419,54 @@ class ProcessPaymentWebhookJob implements ShouldQueue
             return;
         }
 
-        $alert = (string) ($this->payload['alert_name'] ?? '');
-        $passthrough = json_decode((string) ($this->payload['passthrough'] ?? ''), true) ?: [];
-        $paymentUlid = $passthrough['payment_ulid'] ?? null;
-        $orderId = (string) ($this->payload['order_id'] ?? $this->payload['checkout_id'] ?? '');
-        $subscriptionId = isset($this->payload['subscription_id']) ? (string) $this->payload['subscription_id'] : null;
+        $event = (string) ($this->payload['event_type'] ?? '');
+        $data = $this->payload['data'] ?? [];
+        $paymentUlid = data_get($data, 'custom_data.payment_ulid');
+        $transactionId = (string) data_get($data, 'id', '');
+        $subscriptionId = data_get($data, 'subscription_id') ? (string) data_get($data, 'subscription_id') : null;
 
-        if ($alert === 'payment_succeeded' && $paymentUlid) {
-            $payment = Payment::where('ulid', $paymentUlid)->first();
-
-            if ($payment && $payment->status !== 'completed') {
-                $this->activatePayment($payment, $orderId, $lifecycle, $activation, $subscriptionId);
-            }
-        }
-
-        if ($alert === 'subscription_payment_succeeded' && $subscriptionId) {
-            // First charge of a new subscription carries the passthrough — activate the
-            // pending payment; later charges are renewals of the stored subscription.
+        // `transaction.completed` is the settled event — `transaction.paid` can still be
+        // followed by a failure on some payment methods.
+        if ($event === 'transaction.completed') {
             $payment = $paymentUlid ? Payment::where('ulid', $paymentUlid)->first() : null;
 
             if ($payment && $payment->status !== 'completed') {
-                $this->activatePayment($payment, $orderId, $lifecycle, $activation, $subscriptionId);
-            } else {
+                // Totals are minor-unit strings; the guard compares major units.
+                $currency = (string) data_get($data, 'currency_code', $payment->currency);
+                $paid = $this->majorAmount((int) data_get($data, 'details.totals.total', 0), $currency);
+
+                if (! $this->paidAmountCovers($payment, $paid, $currency)) {
+                    return;
+                }
+
+                $this->activatePayment($payment, $transactionId, $lifecycle, $activation, $subscriptionId);
+
+                return;
+            }
+
+            // No pending payment of ours — a renewal of a subscription we already track.
+            if (! $payment && $subscriptionId) {
+                $currency = strtoupper((string) data_get($data, 'currency_code', 'USD'));
+
                 $lifecycle->renewFromGatewaySubscription(
                     'paddle',
                     $subscriptionId,
-                    $orderId,
-                    (float) ($this->payload['sale_gross'] ?? 0),
-                    strtoupper((string) ($this->payload['currency'] ?? 'USD'))
+                    $transactionId,
+                    $this->majorAmount((int) data_get($data, 'details.totals.total', 0), $currency),
+                    $currency
                 );
             }
         }
 
-        if ($alert === 'subscription_cancelled' && $subscriptionId) {
+        if ($event === 'transaction.payment_failed') {
+            $payment = $paymentUlid ? Payment::where('ulid', $paymentUlid)->first() : null;
+
+            if ($payment) {
+                $lifecycle->fail($payment, 'transaction.payment_failed');
+            }
+        }
+
+        if ($event === 'subscription.canceled' && $subscriptionId) {
             $subscription = GatewaySubscription::where('gateway', 'paddle')
                 ->where('gateway_subscription_id', $subscriptionId)
                 ->first();
@@ -447,43 +476,52 @@ class ProcessPaymentWebhookJob implements ShouldQueue
             }
         }
 
-        if (in_array($alert, ['payment_refunded', 'subscription_payment_refunded'], true) && $orderId) {
-            $payment = Payment::where('gateway', 'paddle')->where('gateway_payment_id', $orderId)->first();
+        // Refunds are adjustments on Billing, not a refund event on the transaction.
+        if (in_array($event, ['adjustment.created', 'adjustment.updated'], true)
+            && data_get($data, 'action') === 'refund'
+            && data_get($data, 'status') === 'approved') {
+            $adjustedTransaction = (string) data_get($data, 'transaction_id', '');
+
+            $payment = $adjustedTransaction
+                ? Payment::where('gateway', 'paddle')->where('gateway_payment_id', $adjustedTransaction)->first()
+                : null;
 
             if ($payment) {
-                $lifecycle->refund($payment, $orderId);
+                $lifecycle->refund($payment, (string) data_get($data, 'id', ''));
             }
         }
     }
 
+    /**
+     * `Paddle-Signature: ts=<unix>;h1=<hmac>` where the HMAC is SHA-256 over
+     * "<ts>:<raw body>" keyed with the notification destination's secret (`ntfset_01…`).
+     * The raw body must be byte-for-byte what Paddle sent, which is why the controller
+     * captures it before Laravel parses the request.
+     */
     private function validPaddleSignature(PaymentGateway $gateway): bool
     {
-        $publicKey = $gateway->getCredential('public_key');
-        $signature = $this->payload['p_signature'] ?? null;
+        $secret = $gateway->getCredential('webhook_secret');
+        $header = $this->header('paddle-signature');
 
-        if (! $publicKey || ! $signature) {
+        if (! $secret || ! $header || $this->rawBody === '') {
             return false;
         }
 
-        $fields = $this->payload;
-        unset($fields['p_signature']);
-        ksort($fields);
+        $parts = [];
 
-        foreach ($fields as $key => $value) {
-            if (! in_array(gettype($value), ['object', 'array'], true)) {
-                $fields[$key] = (string) $value;
-            }
+        foreach (explode(';', $header) as $segment) {
+            [$key, $value] = array_pad(explode('=', $segment, 2), 2, null);
+            $parts[trim((string) $key)] = $value;
         }
 
-        $key = openssl_pkey_get_public($publicKey);
+        $timestamp = $parts['ts'] ?? null;
+        $signature = $parts['h1'] ?? null;
 
-        if ($key === false) {
-            Log::warning('Paddle webhook: public key credential is not a valid PEM key.');
-
+        if (! $timestamp || ! $signature) {
             return false;
         }
 
-        return openssl_verify(serialize($fields), (string) base64_decode((string) $signature, true), $key, OPENSSL_ALGO_SHA1) === 1;
+        return hash_equals(hash_hmac('sha256', $timestamp.':'.$this->rawBody, $secret), $signature);
     }
 
     // ─── Razorpay ───────────────────────────────
@@ -635,6 +673,19 @@ class ProcessPaymentWebhookJob implements ShouldQueue
             $payment = $paymentUlid ? Payment::where('ulid', $paymentUlid)->first() : null;
 
             if ($payment && $payment->status !== 'completed') {
+                // Paystack reports the charge in minor units. The earlier audit skipped
+                // this guard here on the grounds that the amount is fixed server-side at
+                // initialize — but the confirm-on-return path checks it, and one of the
+                // two silently disagreeing about what counts as paid is worse than either
+                // rule on its own. The signature proves the message is authentic; it does
+                // not prove the figure inside it matches what we billed.
+                $currency = (string) data_get($data, 'currency', $payment->currency);
+                $paid = $this->majorAmount((int) data_get($data, 'amount', 0), $currency);
+
+                if (! $this->paidAmountCovers($payment, $paid, $currency)) {
+                    return;
+                }
+
                 $this->activatePayment($payment, (string) data_get($data, 'id', ''), $lifecycle, $activation);
             }
         }

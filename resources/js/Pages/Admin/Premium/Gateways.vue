@@ -27,7 +27,14 @@ interface Gateway {
     sort_order: number
     fields: Field[]
     webhook_url: string | null
-    credentials: Record<string, { configured: boolean; value: string }>
+    // Paddle only: it builds checkout links from a page on our domain rather than hosting
+    // one, so this URL has to be copied into its dashboard alongside the webhook.
+    payment_link_url?: string | null
+    payment_link_label?: string | null
+    payment_link_hint?: string | null
+    // `masked` is a hint at the stored secret built server-side (e.g. "sk_••••••xyz") —
+    // never the value itself, and empty when nothing is saved or it will not decrypt.
+    credentials: Record<string, { configured: boolean; masked: string }>
 }
 
 const props = defineProps<{
@@ -43,19 +50,18 @@ const selectedGateway = computed(() => localGateways.value.find((gateway) => gat
 const draggingId = ref<number | null>(null)
 const dragOverId = ref<number | null>(null)
 const copiedWebhookSlug = ref<string | null>(null)
+const copiedPaymentLinkSlug = ref<string | null>(null)
 const editModalOpen = ref(false)
 
-function maskCredential(value: string): string {
-    if (!value) return ''
-    if (value.includes('*')) return value
-    if (value.length <= 4) return '*'.repeat(value.length)
-    if (value.length <= 8) return `${value.slice(0, 2)}****${value.slice(-2)}`
-
-    return `${value.slice(0, 3)}****${value.slice(-3)}`
-}
-
 const openEditModal = (gateway: Gateway) => {
+    const isSameGateway = selectedSlug.value === gateway.slug
     selectedSlug.value = gateway.slug
+
+    // Reopening the SAME gateway does not change selectedSlug, so the watcher that
+    // re-seeds the form never fires. Without this, a field whose mask was cleared by a
+    // focus and then abandoned would come back blank, reading as "not configured".
+    if (isSameGateway) resetForm()
+
     editModalOpen.value = true
 }
 
@@ -85,17 +91,25 @@ const configuredFieldCount = computed(() => {
     return selectedGateway.value.fields.filter((field) => selectedGateway.value?.credentials[field.key]?.configured).length
 })
 
+/**
+ * A field is missing only if it has never been saved AND nothing has been typed into it.
+ *
+ * Stored secrets are never sent to the browser (publicCredentials() returns `configured`
+ * and an empty string), so an already-configured field always renders blank. The old test
+ * treated blank as missing, which meant that once a gateway was configured the Enable
+ * toggle could never be used again — not to disable it, not to re-enable it, not to change
+ * the fee — without retyping every credential from scratch, which an admin who pasted them
+ * once and closed the tab generally cannot do.
+ *
+ * Blank means "keep what is stored", which is exactly what the backend does with it:
+ * PaymentGatewayController::update() skips empty values rather than overwriting.
+ */
 const hasMissingCredentialsForEnable = computed(() => {
     if (!selectedGateway.value) return false
 
-    return selectedGateway.value.fields.some((field) => {
-        const currentValue = String(form.credentials[field.key] ?? '').trim()
-        const existingValue = selectedGateway.value?.credentials[field.key]?.value ?? ''
-        const isConfigured = selectedGateway.value?.credentials[field.key]?.configured ?? false
-        const maskedValue = maskCredential(existingValue)
-
-        return !currentValue || (isConfigured && currentValue === maskedValue)
-    })
+    return selectedGateway.value.fields.some(
+        (field) => !typedValue(field) && !(selectedGateway.value?.credentials[field.key]?.configured ?? false),
+    )
 })
 
 const form = useForm({
@@ -115,12 +129,11 @@ const resetForm = () => {
         is_test_mode: selectedGateway.value.is_test_mode,
         processing_fee_type: selectedGateway.value.processing_fee_type,
         processing_fee_value: String(selectedGateway.value.processing_fee_value ?? 0),
-        credentials: Object.fromEntries(selectedGateway.value.fields.map((field) => {
-            const existingValue = selectedGateway.value?.credentials[field.key]?.value ?? ''
-            const isConfigured = selectedGateway.value?.credentials[field.key]?.configured ?? false
-
-            return [field.key, isConfigured ? maskCredential(existingValue) : '']
-        })),
+        // Seeded with the server-built mask so a saved credential reads as filled in.
+        // It resolves back to "" on submit — see typedValue().
+        credentials: Object.fromEntries(selectedGateway.value.fields.map(
+            (field) => [field.key, selectedGateway.value?.credentials[field.key]?.masked ?? ''],
+        )),
     })
     form.reset()
 }
@@ -135,22 +148,76 @@ watch(() => props.gateways, (gateways) => {
 watch(selectedSlug, resetForm, { immediate: true })
 
 const configuredLabel = (field: Field) => {
-    const configured = selectedGateway.value?.credentials[field.key]?.configured
+    const credential = selectedGateway.value?.credentials[field.key]
 
-    return configured ? t('Configured') : t('Not set')
+    // Saved but unreadable — almost always APP_KEY changed since it was entered. Saying
+    // "Configured" there sends an admin hunting the gateway dashboard for a fault that is
+    // on this side; the fix is to paste the credential again.
+    if (credential?.configured && !credential.masked) return t('Re-enter')
+
+    return credential?.configured ? t('Configured') : t('Not set')
 }
 
+const maskOf = (field: Field) => selectedGateway.value?.credentials[field.key]?.masked ?? ''
 
-const credentialDisplayValue = (field: Field) => {
-    const rawValue = String(form.credentials[field.key] ?? '')
-    const existingValue = selectedGateway.value?.credentials[field.key]?.value ?? ''
+/**
+ * Is this field still showing the stored value's mask rather than something typed?
+ *
+ * The mask is a real server-provided string, so this is an exact comparison rather than
+ * the guess the old code made against a mask it rebuilt from an empty value — which is
+ * why that version could never tell "untouched" from "missing".
+ */
+const showsMask = (field: Field) => {
+    const mask = maskOf(field)
 
-    if (rawValue.trim().length > 0) {
-        return rawValue
+    return mask !== '' && String(form.credentials[field.key] ?? '') === mask
+}
+
+/** What actually gets saved: the mask means "unchanged", so it resolves to nothing. */
+const typedValue = (field: Field) => (showsMask(field) ? '' : String(form.credentials[field.key] ?? '').trim())
+
+/**
+ * Clear the mask the moment the admin means to type, and put it back if they change their
+ * mind — so the field never ends up holding half a mask and half a key.
+ */
+const onCredentialFocus = (field: Field) => {
+    if (showsMask(field)) form.credentials[field.key] = ''
+}
+
+const onCredentialBlur = (field: Field) => {
+    if (maskOf(field) && String(form.credentials[field.key] ?? '').trim() === '') {
+        form.credentials[field.key] = maskOf(field)
+    }
+}
+
+/**
+ * A mask inside a password input renders as bullets OF bullets, which throws away the
+ * hint entirely. While the field holds the mask there is nothing secret on screen, so it
+ * shows as text; the moment a real value is typed it goes back to being a password.
+ */
+const credentialInputType = (field: Field) => {
+    if (field.type !== 'password') return 'text'
+
+    return showsMask(field) ? 'text' : 'password'
+}
+
+const credentialPlaceholder = (field: Field) => {
+    if (selectedGateway.value?.credentials[field.key]?.configured && !maskOf(field)) {
+        return t('Saved but unreadable — please enter it again')
     }
 
-    return maskCredential(existingValue)
+    return selectedGateway.value?.credentials[field.key]?.configured
+        ? t('Leave blank to keep the current value')
+        : t('Enter credential value')
 }
+
+const fieldError = (field: Field) => form.errors[`credentials.${field.key}` as keyof typeof form.errors] as string | undefined
+
+
+// Only ever what the admin has typed. A stored secret is never sent to the browser, so
+// there is nothing to mask — the "Configured" badge and the placeholder already say that
+// a value exists, and rendering a fake mask into the input made a blank field look filled.
+const credentialDisplayValue = (field: Field) => String(form.credentials[field.key] ?? '')
 
 const toggleGatewayEnabled = () => {
     const nextValue = !form.is_enabled
@@ -184,6 +251,22 @@ const copyWebhookUrl = async () => {
     }
 }
 
+const copyPaymentLinkUrl = async () => {
+    if (!selectedGateway.value?.payment_link_url) return
+
+    try {
+        await navigator.clipboard.writeText(selectedGateway.value.payment_link_url)
+        copiedPaymentLinkSlug.value = selectedGateway.value.slug
+        window.setTimeout(() => {
+            if (copiedPaymentLinkSlug.value === selectedGateway.value?.slug) {
+                copiedPaymentLinkSlug.value = null
+            }
+        }, 1800)
+    } catch {
+        toast.error(t('Unable to copy payment link URL.'))
+    }
+}
+
 const submit = () => {
     if (!selectedGateway.value) return
 
@@ -192,13 +275,11 @@ const submit = () => {
         return
     }
 
-    const credentialPayload = Object.fromEntries(selectedGateway.value.fields.map((field) => {
-        const currentValue = String(form.credentials[field.key] ?? '').trim()
-        const existingValue = selectedGateway.value?.credentials[field.key]?.value ?? ''
-        const maskedValue = maskCredential(existingValue)
-
-        return [field.key, currentValue === maskedValue ? '' : currentValue]
-    }))
+    // A field still showing its mask resolves to "", which the backend reads as "keep the
+    // stored value" — the mask itself must never be saved as a credential.
+    const credentialPayload = Object.fromEntries(selectedGateway.value.fields.map(
+        (field) => [field.key, typedValue(field)],
+    ))
 
     form.transform((data) => ({
         ...data,
@@ -207,7 +288,12 @@ const submit = () => {
         preserveScroll: true,
         onSuccess: () => {
             closeEditModal()
-        }
+        },
+        // The modal stays open on failure, and each field shows its own message — but a
+        // rejection with no toast reads as a dead Save button, so say something too.
+        onError: () => {
+            toast.error(t('Could not save this gateway. Check the highlighted fields.'))
+        },
     })
 }
 
@@ -440,22 +526,91 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                             </span>
                         </span>
 
+                        <!--
+                            Autofill is suppressed on purpose. A browser or password
+                            manager filling a saved site login into a gateway API key
+                            field silently overwrites a working credential, and the admin
+                            has no way to see it happened — the field looks the same
+                            either way. `new-password` is the value Chrome actually
+                            honours; `off` is widely ignored on credential-shaped inputs.
+                        -->
                         <textarea
                             v-if="field.type === 'textarea'"
                             v-model="form.credentials[field.key]"
                             rows="4"
-                            :placeholder="t('Leave blank to keep existing value')"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :placeholder="credentialPlaceholder(field)"
+                            autocomplete="off"
+                            spellcheck="false"
+                            data-lpignore="true"
+                            data-1p-ignore
+                            class="w-full rounded-lg border bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none dark:bg-gray-900 dark:text-white"
+                            :class="fieldError(field)
+                                ? 'border-red-400 focus:border-red-500 dark:border-red-700'
+                                : 'border-gray-200 focus:border-primary-500 dark:border-gray-700'"
+                            @focus="onCredentialFocus(field)"
+                            @blur="onCredentialBlur(field)"
                         />
                         <input
                             v-else
                             :value="credentialDisplayValue(field)"
-                            :type="field.type === 'password' ? 'password' : 'text'"
-                            :placeholder="selectedGateway.credentials[field.key]?.configured ? t('Enter a new value to replace the current one') : t('Enter credential value')"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :type="credentialInputType(field)"
+                            :placeholder="credentialPlaceholder(field)"
+                            autocomplete="new-password"
+                            autocapitalize="off"
+                            autocorrect="off"
+                            spellcheck="false"
+                            data-lpignore="true"
+                            data-1p-ignore
+                            class="w-full rounded-lg border bg-gray-50 px-4 py-2.5 font-mono text-sm text-gray-900 focus:outline-none dark:bg-gray-900 dark:text-white"
+                            :class="fieldError(field)
+                                ? 'border-red-400 focus:border-red-500 dark:border-red-700'
+                                : 'border-gray-200 focus:border-primary-500 dark:border-gray-700'"
                             @input="form.credentials[field.key] = ($event.target as HTMLInputElement).value"
+                            @focus="onCredentialFocus(field)"
+                            @blur="onCredentialBlur(field)"
                         />
+
+                        <!-- Server-side rejections were previously invisible: the modal
+                             simply refused to close with nothing said. -->
+                        <p v-if="fieldError(field)" class="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                            {{ fieldError(field) }}
+                        </p>
                     </label>
+                </div>
+            </div>
+
+            <!--
+                Payment link section (Paddle only).
+
+                Sits above the webhook because it is the harder requirement: without it
+                Paddle returns a transaction with no checkout URL and the buyer never
+                reaches a payment form at all, whereas a missing webhook merely delays
+                activation. Amber rather than blue for the same reason.
+            -->
+            <div v-if="selectedGateway.payment_link_url" class="rounded-xl border border-amber-100 bg-amber-50/50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+                <div class="flex items-start gap-3">
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-amber-600 shadow-sm dark:bg-amber-900/30 dark:text-amber-300">
+                        <i class="ti ti-link text-base"></i>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                {{ selectedGateway.payment_link_label || t('Default payment link') }}
+                            </p>
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                                @click="copyPaymentLinkUrl"
+                            >
+                                <i :class="copiedPaymentLinkSlug === selectedGateway.slug ? 'ti ti-check' : 'ti ti-copy'" class="text-xs"></i>
+                                {{ copiedPaymentLinkSlug === selectedGateway.slug ? t('Copied') : t('Copy') }}
+                            </button>
+                        </div>
+                        <code class="mt-2 block break-all text-xs text-gray-700 dark:text-gray-200 select-all">{{ selectedGateway.payment_link_url }}</code>
+                        <p v-if="selectedGateway.payment_link_hint" class="mt-2 text-xs font-medium leading-5 text-amber-800/80 dark:text-amber-200/70">
+                            {{ selectedGateway.payment_link_hint }}
+                        </p>
+                    </div>
                 </div>
             </div>
 

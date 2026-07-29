@@ -207,16 +207,16 @@ const importConfig = () => {
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Sidebar Builder') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure widgets for each sidebar area of the site.') }}</p>
                 </div>
-                <div class="shrink-0 flex items-center gap-3">
-                    <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Export JSON')" @click="exportConfig">
+                <div class="shrink-0 flex flex-wrap items-center gap-3">
+                    <button type="button" class="grow inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Export JSON')" @click="exportConfig">
                         <i class="ti ti-file-export text-base"></i>
                         {{ t('Export') }}
                     </button>
-                    <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Import JSON')" @click="importModalOpen = true">
+                    <button type="button" class="grow inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Import JSON')" @click="importModalOpen = true">
                         <i class="ti ti-file-import text-base"></i>
                         {{ t('Import') }}
                     </button>
-                    <button type="button" @click="submit" :disabled="form.processing" class="inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60">
+                    <button type="button" @click="submit" :disabled="form.processing" class="grow inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60">
                         <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <i v-else class="ti ti-device-floppy text-sm"></i>
                         <span>{{ form.processing ? t('Saving...') : t('Save Sidebar') }}</span>
@@ -248,7 +248,7 @@ const importConfig = () => {
                         <h2 class="font-heading text-md font-bold text-gray-700 dark:text-white">{{ t(areaMeta[activeArea].label) }}</h2>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t(areaMeta[activeArea].desc) }}</p>
                     </div>
-                    <button type="button" @click="openAddBlockModal" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary-100 px-3 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40">
+                    <button type="button" @click="openAddBlockModal" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-100 px-3 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40">
                         <i class="ti ti-plus text-base"></i>
                         {{ t('Add Widget') }}
                     </button>
