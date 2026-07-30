@@ -62,13 +62,18 @@ const showPolicyLinks = computed(() => props.config?.show_policy_links ?? true)
 const privacyUrl = computed(() => props.config?.privacy_policy_url ?? '/privacy-policy')
 const cookiePolicyUrl = computed(() => props.config?.cookie_policy_url ?? '/cookie-policy')
 
-const positionClass = computed(() => {
-    const map: Record<string, string> = {
-        top: 'items-start',
-        bottom: 'items-end',
-        center: 'items-center',
-    }
-    return map[bannerPosition.value] ?? 'items-end'
+// "bottom" is the inline variant: a full-width bar pinned to the bottom of the
+// viewport with no dimming backdrop, so the page stays readable and clickable.
+const isInline = computed(() => bannerPosition.value === 'bottom')
+
+// Only "center" is a true modal. "top" keeps its card, but with no scrim — so the
+// wrapper hugs the top edge instead of covering the viewport, otherwise an
+// invisible full-screen layer would swallow every click on the page behind it.
+const rootClass = computed(() => {
+    if (isInline.value) return 'fixed inset-x-0 bottom-0 z-[9999]'
+    if (bannerPosition.value === 'top') return 'fixed inset-x-0 top-0 z-[9999] flex justify-center p-4'
+
+    return 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm'
 })
 
 function acceptAll() {
@@ -97,20 +102,28 @@ function saveConsent() {
 </script>
 
 <template>
-    <div class="fixed inset-0 z-[9999] flex justify-center p-4 bg-black/40 backdrop-blur-sm" :class="positionClass">
-        <div class="w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden" :style="{ backgroundColor: bgColor, color: textColor, borderColor: textColor + '20' }">
-            <div class="p-6">
-                <div class="flex items-start gap-3 mb-4">
+    <!-- theme-paint-self: this banner is coloured entirely from the admin's GDPR
+         settings, so it opts out of the theme stylesheet's !important heading colour
+         (see ThemeCssController) which would otherwise repaint the title. -->
+    <div :class="['theme-paint-self', rootClass]">
+        <div
+            :class="isInline
+                ? 'w-full border-t shadow-[0_-6px_24px_-12px_rgba(0,0,0,0.35)]'
+                : 'w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden'"
+            :style="{ backgroundColor: bgColor, color: textColor, borderColor: textColor + '20' }"
+        >
+            <div :class="isInline ? 'mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-6 gap-y-4 px-4 py-4 sm:px-6 lg:px-8' : 'p-6'">
+                <div :class="isInline ? 'flex min-w-[16rem] flex-1 items-start gap-3' : 'flex items-start gap-3 mb-4'">
                     <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" :style="{ backgroundColor: buttonColor + '15' }">
                         <svg class="w-5 h-5" :style="{ color: buttonColor }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" /></svg>
                     </div>
                     <div class="flex-1">
-                        <h3 class="text-lg font-bold">{{ bannerTitle }}</h3>
+                        <h3 class="text-lg font-bold" :style="{ color: textColor }">{{ bannerTitle }}</h3>
                         <p class="mt-1 text-sm opacity-70">{{ bannerDescription }}</p>
                     </div>
                 </div>
 
-                <div v-if="showCustomize" class="space-y-3 mb-5">
+                <div v-if="showCustomize" :class="isInline ? 'order-last grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-4' : 'space-y-3 mb-5'">
                     <label class="flex items-start gap-3 p-3 rounded-lg opacity-50 cursor-not-allowed" :style="{ backgroundColor: textColor + '08' }">
                         <input type="checkbox" checked disabled class="mt-0.5 w-4 h-4 rounded border-current opacity-40">
                         <div>
@@ -119,7 +132,7 @@ function saveConsent() {
                         </div>
                     </label>
 
-                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($el as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($el as HTMLElement).style.backgroundColor = textColor + '08'">
+                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '08'">
                         <input v-model="consent.functional" type="checkbox" class="mt-0.5 w-4 h-4 rounded border-current" :style="{ accentColor: buttonColor }">
                         <div>
                             <span class="text-sm font-medium">{{ t('Functional') }}</span>
@@ -127,7 +140,7 @@ function saveConsent() {
                         </div>
                     </label>
 
-                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($el as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($el as HTMLElement).style.backgroundColor = textColor + '08'">
+                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '08'">
                         <input v-model="consent.analytics" type="checkbox" class="mt-0.5 w-4 h-4 rounded border-current" :style="{ accentColor: buttonColor }">
                         <div>
                             <span class="text-sm font-medium">{{ t('Analytics') }}</span>
@@ -135,7 +148,7 @@ function saveConsent() {
                         </div>
                     </label>
 
-                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($el as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($el as HTMLElement).style.backgroundColor = textColor + '08'">
+                    <label class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors" :style="{ backgroundColor: textColor + '08' }" @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '14'" @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = textColor + '08'">
                         <input v-model="consent.marketing" type="checkbox" class="mt-0.5 w-4 h-4 rounded border-current" :style="{ accentColor: buttonColor }">
                         <div>
                             <span class="text-sm font-medium">{{ t('Marketing') }}</span>
@@ -144,14 +157,14 @@ function saveConsent() {
                     </label>
                 </div>
 
-                <div class="flex flex-col sm:flex-row gap-2.5">
-                    <button @click="acceptAll" class="flex-1 rounded-xl px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-90" :style="{ backgroundColor: buttonColor, color: buttonTextColor }">
+                <div :class="isInline ? 'flex flex-wrap items-center gap-2.5' : 'flex flex-col sm:flex-row gap-2.5'">
+                    <button @click="acceptAll" class="rounded-xl px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-90" :class="isInline ? '' : 'flex-1'" :style="{ backgroundColor: buttonColor, color: buttonTextColor }">
                         {{ acceptAllText }}
                     </button>
-                    <button v-if="showCustomize" @click="acceptSelected" class="flex-1 rounded-xl border px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-80" :style="{ borderColor: buttonColor, color: buttonColor }">
+                    <button v-if="showCustomize" @click="acceptSelected" class="rounded-xl border px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-80" :class="isInline ? '' : 'flex-1'" :style="{ borderColor: buttonColor, color: buttonColor }">
                         {{ saveText }}
                     </button>
-                    <button v-if="!showCustomize" @click="showCustomize = true" class="flex-1 rounded-xl border px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-80" :style="{ borderColor: textColor + '40', color: textColor }">
+                    <button v-if="!showCustomize" @click="showCustomize = true" class="rounded-xl border px-5 py-2.5 text-sm font-bold transition-colors hover:opacity-80" :class="isInline ? '' : 'flex-1'" :style="{ borderColor: textColor + '40', color: textColor }">
                         {{ customizeText }}
                     </button>
                     <button v-if="!showCustomize" @click="acceptNecessary" class="rounded-xl border px-5 py-2.5 text-sm font-medium transition-colors hover:opacity-80" :style="{ borderColor: textColor + '20', color: textColor, opacity: 0.7 }">
@@ -159,7 +172,7 @@ function saveConsent() {
                     </button>
                 </div>
 
-                <p v-if="showPolicyLinks" class="mt-3 text-center text-xs" :style="{ color: textColor, opacity: 0.5 }">
+                <p v-if="showPolicyLinks" :class="isInline ? 'order-last w-full text-center text-xs' : 'mt-3 text-center text-xs'" :style="{ color: textColor, opacity: 0.5 }">
                     <a :href="privacyUrl" class="underline hover:opacity-80">{{ t('Privacy Policy') }}</a>
                     <span class="mx-1">·</span>
                     <a :href="cookiePolicyUrl" class="underline hover:opacity-80">{{ t('Cookie Policy') }}</a>

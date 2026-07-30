@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -36,10 +37,28 @@ const { t } = useTranslate()
 const form = useForm({ ...props.gdpr })
 
 const positionOptions = [
-    { value: 'bottom', label: t('Bottom Banner') },
-    { value: 'top', label: t('Top Banner') },
-    { value: 'center', label: t('Center Modal') },
+    { value: 'bottom', icon: 'ti-layout-bottombar', label: t('Bottom Banner'), description: t('Full-width bar pinned to the bottom, inline with the page — no dimmed backdrop.') },
+    { value: 'top', icon: 'ti-layout-navbar', label: t('Top Banner'), description: t('Floating card at the top of the page — no dimmed backdrop.') },
+    { value: 'center', icon: 'ti-layout-distribute-horizontal', label: t('Center Modal'), description: t('Centred modal over a dimmed backdrop that blocks the page.') },
 ]
+
+const consentModeOptions = [
+    { value: 'disabled', icon: 'ti-shield-off', label: t('Disabled'), description: t('No cookie consent banner is shown to anyone.') },
+    { value: 'eu', icon: 'ti-flag', label: t('EU / EEA Visitors Only'), description: t('Show the banner only to visitors your geolocation source places in the EU or EEA.') },
+    { value: 'global', icon: 'ti-world', label: t('All Visitors'), description: t('Show the banner to every visitor, regardless of country.') },
+]
+
+// The two stored booleans (enabled + eu_only) collapse into one three-way choice.
+// Turning consent off leaves eu_only untouched so the scope is remembered if it
+// is switched back on.
+const consentMode = computed<string>({
+    get: () => (!form.enabled ? 'disabled' : form.eu_only ? 'eu' : 'global'),
+    set: (value) => {
+        form.enabled = value !== 'disabled'
+        if (value === 'eu') form.eu_only = true
+        if (value === 'global') form.eu_only = false
+    },
+})
 
 const saveSettings = () => {
     form.post(route('admin.gdpr.settings.update'), { preserveScroll: true })
@@ -70,38 +89,46 @@ const saveSettings = () => {
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control whether cookie consent is active, which visitors see it, and how it enters the page.') }}</p>
                         </div>
 
-                        <div class="space-y-4">
-                            <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
-                                <div>
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Global GDPR Cookie Consent') }}</span>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show the granular cookie consent banner to visitors.') }}</p>
+                        <div class="space-y-5">
+                            <div>
+                                <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cookie Consent Mode') }}</span>
+                                <div class="grid gap-3 md:grid-cols-3" role="radiogroup">
+                                    <label
+                                        v-for="opt in consentModeOptions"
+                                        :key="opt.value"
+                                        class="flex cursor-pointer flex-col gap-1.5 rounded-xl border p-4 transition-colors"
+                                        :class="consentMode === opt.value
+                                            ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20 dark:ring-primary-400'
+                                            : 'border-gray-200 bg-white hover:border-gray-300 dark:border-surface-700 dark:bg-surface-800'"
+                                    >
+                                        <input v-model="consentMode" type="radio" :value="opt.value" class="sr-only">
+                                        <span class="flex items-center gap-2">
+                                            <i :class="['ti', opt.icon, 'text-base', consentMode === opt.value ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500']"></i>
+                                            <span class="text-sm font-semibold" :class="consentMode === opt.value ? 'text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'">{{ opt.label }}</span>
+                                            <i v-if="consentMode === opt.value" class="ti ti-circle-check ml-auto text-base text-primary-600 dark:text-primary-400"></i>
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ opt.description }}</span>
+                                    </label>
                                 </div>
-                                <AppSwitch v-model="form.enabled" />
-                            </label>
-
-                            <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
-                                <div>
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('EU / EEA Countries Only') }}</span>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Only show the banner to EU and EEA visitors using your configured geolocation source.') }}</p>
-                                </div>
-                                <AppSwitch v-model="form.eu_only" />
-                            </label>
+                            </div>
 
                             <div>
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Banner Position') }}</label>
-                                <div class="grid gap-3 md:grid-cols-3">
-                                    <button
+                                <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Banner Position') }}</span>
+                                <div class="grid gap-3 md:grid-cols-3" role="radiogroup">
+                                    <label
                                         v-for="opt in positionOptions"
                                         :key="opt.value"
-                                        type="button"
-                                        class="rounded-xl border px-4 py-3 text-sm font-medium transition-colors"
+                                        class="flex cursor-pointer flex-col gap-1.5 rounded-xl border p-4 transition-colors"
                                         :class="form.banner_position === opt.value
-                                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/20 dark:text-primary-400'
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                        @click="form.banner_position = opt.value"
+                                            ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20 dark:ring-primary-400'
+                                            : 'border-gray-200 bg-white hover:border-gray-300 dark:border-surface-700 dark:bg-surface-800'"
                                     >
-                                        {{ opt.label }}
-                                    </button>
+                                        <input v-model="form.banner_position" type="radio" :value="opt.value" class="sr-only">
+                                        <span class="flex items-center gap-2">
+                                            <i :class="['ti', opt.icon, 'text-base', form.banner_position === opt.value ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500']"></i>
+                                            <span class="text-sm font-semibold" :class="form.banner_position === opt.value ? 'text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'">{{ opt.label }}</span>
+                                        </span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -116,32 +143,32 @@ const saveSettings = () => {
                         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
                                 {{ t('Title') }}
-                                <input v-model="form.banner_title" type="text" :placeholder="t('Enter banner title')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.banner_title" type="text" :placeholder="t('Enter banner title')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
                                 {{ t('Description') }}
-                                <textarea v-model="form.banner_description" rows="4" :placeholder="t('Explain how cookies are used on your site')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                                <textarea v-model="form.banner_description" rows="4" :placeholder="t('Explain how cookies are used on your site')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500"></textarea>
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Accept All Button') }}
-                                <input v-model="form.banner_accept_all_text" type="text" :placeholder="t('Accept All')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.banner_accept_all_text" type="text" :placeholder="t('Accept All')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Customize Button') }}
-                                <input v-model="form.banner_customize_text" type="text" :placeholder="t('Customize')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.banner_customize_text" type="text" :placeholder="t('Customize')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Necessary Only Button') }}
-                                <input v-model="form.banner_necessary_text" type="text" :placeholder="t('Necessary Only')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.banner_necessary_text" type="text" :placeholder="t('Necessary Only')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Save Preferences Button') }}
-                                <input v-model="form.banner_save_text" type="text" :placeholder="t('Save Preferences')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.banner_save_text" type="text" :placeholder="t('Save Preferences')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
                         </div>
                     </section>
@@ -179,12 +206,12 @@ const saveSettings = () => {
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Privacy Policy URL') }}
-                                <input v-model="form.privacy_policy_url" type="text" :placeholder="t('https://example.com/privacy')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.privacy_policy_url" type="text" :placeholder="t('https://example.com/privacy')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Cookie Policy URL') }}
-                                <input v-model="form.cookie_policy_url" type="text" :placeholder="t('https://example.com/cookies')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <input v-model="form.cookie_policy_url" type="text" :placeholder="t('https://example.com/cookies')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 placeholder:text-gray-400 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500">
                             </label>
                         </div>
                     </section>

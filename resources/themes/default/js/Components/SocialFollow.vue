@@ -112,7 +112,7 @@ const surfaceClassesFor = (platform: string) => platformSurfaceClasses[platform]
 const formatCount = (count: number) => numberFormatter.value.format(count)
 const iconItemBaseClass = computed(() => props.iconItemClass
     ? 'inline-flex items-center justify-center'
-    : 'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-all shadow-sm hover:-translate-y-0.5')
+    : 'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-all shadow-sm hover:-translate-y-0.5')
 </script>
 
 <template>

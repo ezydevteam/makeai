@@ -1214,7 +1214,7 @@ const socialIconButtonClass = (block: any) => {
 const socialButtonWithTextClass = (block: any) => {
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
     const base = 'header-soft-icon-button flex items-center gap-2 px-3 py-1.5 text-sm font-semibold transition-all duration-200'
-    
+
     let shapeClass = 'rounded-xl'
     if (displayStyle === 'circular_soft_bg' || displayStyle === 'icon_only') {
         shapeClass = 'rounded-full'
@@ -1401,7 +1401,7 @@ const commandPaletteButtonStyle = (block: any): HeaderStyle => {
         style.background = commandPaletteDisplayStyle(block) === 'search_light'
             ? 'rgba(255, 255, 255, 0.05)'
             : 'transparent'
-        
+
         if (hoverColor) {
             style['--header-command-hover-bg'] = `color-mix(in srgb, ${hoverColor} 10%, transparent)`
             style['--header-command-hover-border'] = `color-mix(in srgb, ${hoverColor} 24%, transparent)`
@@ -2549,7 +2549,7 @@ onUnmounted(() => {
                     leave-from-class="translate-x-0"
                     leave-to-class="-translate-x-full rtl:translate-x-full"
                 >
-                    <aside class="absolute inset-y-0 left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-full flex-col border-r border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-surface-900 rtl:left-auto rtl:right-0 rtl:border-l rtl:border-r-0">
+                    <aside class="mobile-drawer-surface absolute inset-y-0 left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-full flex-col border-r border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-surface-900 rtl:left-auto rtl:right-0 rtl:border-l rtl:border-r-0">
                         <div class="flex h-16 items-center justify-between border-b border-gray-100 px-5 dark:border-surface-800">
                             <Link href="/" class="flex min-w-0 items-center gap-2" @click="closeMobileMenu">
                                 <img v-if="drawerLogo" :src="drawerLogo" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
@@ -2703,6 +2703,11 @@ onUnmounted(() => {
                                 {{ t('No menu items found.') }}
                             </div>
                         </nav>
+
+                        <!-- Same profiles the footer links to (shared socialFollow prop) -->
+                        <div v-if="socialProfiles.length" class="shrink-0 border-t border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <SocialFollow display-mode="icons" />
+                        </div>
                     </aside>
                 </Transition>
             </div>
@@ -2796,6 +2801,27 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Mobile drawer surface: a soft wash of the theme's body background over the base
+   panel colour, so the drawer reads as part of the page instead of a flat white sheet.
+   The drawer is teleported to <body>, so it sits outside .frontend-theme and carries
+   the palette through .frontend-theme-vars — which only ships the light values. Light
+   mode can therefore tint from --color-bg; dark mode layers a neutral wash instead. */
+.mobile-drawer-surface {
+    background-image: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-bg, #f8fafc) 18%, transparent) 0%,
+        color-mix(in srgb, var(--color-bg, #f8fafc) 68%, transparent) 48%,
+        color-mix(in srgb, var(--color-bg, #f8fafc) 96%, transparent) 100%
+    );
+}
+.dark .mobile-drawer-surface {
+    background-image: linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.05) 0%,
+        rgb(255 255 255 / 0.02) 45%,
+        rgb(2 6 23 / 0.45) 100%
+    );
+}
 .header-section-overlay {
     isolation: isolate;
     transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, backdrop-filter 0.5s ease, opacity 0.5s ease;

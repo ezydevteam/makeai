@@ -791,7 +791,7 @@ const footerContentItemOptions = computed(() => [
 ])
 
 const activeFooterContentItemOptions = computed(() => {
-    const layout = footerForm.settings.layout || 'default'
+    const layout = normalizeFooterLayout(footerForm.settings.layout)
     let options = footerContentItemOptions.value
 
     if (['floating_panel', 'card_grid', 'spotlight'].includes(layout)) {
@@ -847,6 +847,17 @@ const defaultFooterStyleColumns: Record<string, Record<string, string[]>> = {
     card_grid: { col_1: ['about_text'], col_2: ['menu'], col_3: ['custom_text'], col_4: ['contact_info'], col_5: ['categories'] },
     split_band: { col_1: ['menu'], col_2: ['contact_info'], col_3: ['custom_text'], col_4: ['categories'] },
     floating_panel: { col_1: ['menu'], col_2: ['contact_info'], col_3: ['custom_text'], col_4: ['categories'] },
+}
+
+// Stored settings can carry a footer layout this build doesn't ship — installs
+// seeded before the styles were reworked hold 'columns'. style_columns is only ever
+// keyed by the styles above, so an unknown layout left the column editor binding to
+// undefined. Coerce it the way AppFooter already does on the frontend, so the editor
+// and the rendered footer agree on which style is active.
+const normalizeFooterLayout = (value: unknown): string => {
+    const layout = typeof value === 'string' ? value : ''
+
+    return layout in defaultFooterStyleColumns ? layout : 'default'
 }
 
 const fontSizeOptions = ['12px', '13px', '14px', '15px', '16px', '18px', '20px'].map((value) => ({ value, label: value }))
@@ -1174,7 +1185,7 @@ const headerForm = useForm({
 const footerForm = useForm({
     section: 'footer',
     settings: {
-        layout: resolvedFooterDefaults.value.layout ?? 'default',
+        layout: normalizeFooterLayout(resolvedFooterDefaults.value.layout),
         style_columns: resolvedFooterStyleColumns.value,
         logo_mode: resolvedFooterDefaults.value.logo_mode ?? 'light',
         brand_title: resolvedFooterDefaults.value.brand_title ?? '',
@@ -2208,7 +2219,7 @@ function openAddItemModal(columnKey: string): void {
 }
 
 function addItemToColumn(itemValue: string): void {
-    const layout = footerForm.settings.layout || 'default'
+    const layout = normalizeFooterLayout(footerForm.settings.layout)
     const colKey = activeAddItemColumnKey.value
 
     if (!footerForm.settings.style_columns) {
@@ -2231,14 +2242,14 @@ function openSettingsModal(itemValue: string): void {
 }
 
 function removeItem(columnKey: string, index: number): void {
-    const layout = footerForm.settings.layout || 'default'
+    const layout = normalizeFooterLayout(footerForm.settings.layout)
     if (footerForm.settings.style_columns?.[layout]?.[columnKey]) {
         footerForm.settings.style_columns[layout][columnKey].splice(index, 1)
     }
 }
 
 function confirmRemoveItem(columnKey: string, index: number): void {
-    const layout = footerForm.settings.layout || 'default'
+    const layout = normalizeFooterLayout(footerForm.settings.layout)
     const item = footerForm.settings.style_columns?.[layout]?.[columnKey]?.[index]
     const option = footerContentItemOptions.value.find(o => o.value === item)
     const itemName = option ? option.label : (item || '')

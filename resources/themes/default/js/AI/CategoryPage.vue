@@ -279,7 +279,7 @@ const isProTool = (tool: Template) => {
 
                     <div v-if="tool.views_count" class="mt-4 flex items-center justify-end text-xs text-gray-400">
                         <span class="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                            <i class="ti ti-eye text-[10px]"></i>
+                            <i class="ti ti-player-play text-[10px]"></i>
                             {{ formatViews(tool.views_count) }}
                         </span>
                     </div>

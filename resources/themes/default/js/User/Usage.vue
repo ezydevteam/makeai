@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
           <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-400">
             <template v-if="showTopupUsage">{{ formatNumber(topupUsed) }} / {{ formatNumber(topupTotal) }}</template>
             <template v-else>{{ formatNumber(topupBalance) }}</template>
-            <span class="font-normal">{{ t('credits') }}</span>
+            <span class="font-normal"> {{ t('credits') }}</span>
           </span>
         </div>
 

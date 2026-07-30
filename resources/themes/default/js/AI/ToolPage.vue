@@ -286,7 +286,11 @@ const formatViews = (views: number): string => {
 // divider used "category && (usage || rating)", so with a 0 usage count a tool with both a
 // category and a rating rendered BOTH dividers as "• •". A divider must only sit between
 // two adjacent items that are actually visible.
-const showCategoryMeta = computed(() => Boolean(props.tool.category) && !toolPageSettings.value.hide_category)
+// The category the meta row should link to, or null when there is none to show. Returning
+// the object rather than a boolean lets the template narrow it — a `Boolean(...)` flag
+// leaves `tool.category` possibly-undefined inside the very block that flag guards.
+const metaCategory = computed(() => (toolPageSettings.value.hide_category ? null : props.tool.category ?? null))
+const showCategoryMeta = computed(() => metaCategory.value !== null)
 const showUsageMeta = computed(() => Boolean(props.tool.usage_count || props.tool.views_count) && !toolPageSettings.value.hide_usage_count)
 const showRatingMeta = computed(() => !toolPageSettings.value.hide_rating && Boolean(props.tool.avg_rating))
 const showCategoryUsageDivider = computed(() => showCategoryMeta.value && showUsageMeta.value)
@@ -915,10 +919,10 @@ const copyToolLink = () => {
                                         <!-- Simple Metadata Row just below title -->
                                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1 mb-2">
                                             <!-- Category -->
-                                            <span v-if="showCategoryMeta" class="flex items-center gap-1">
+                                            <span v-if="metaCategory" class="flex items-center gap-1">
                                                 <i class="ti ti-folder text-base text-gray-400"></i>
-                                                <Link :href="routeTo('ai.tools.category', tool.category.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
-                                                    {{ tool.category.name }}
+                                                <Link :href="routeTo('ai.tools.category', metaCategory.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
+                                                    {{ metaCategory.name }}
                                                 </Link>
                                             </span>
 
@@ -976,7 +980,7 @@ const copyToolLink = () => {
                     <div class="flex items-center gap-2" :class="{ 'ml-auto': toolPageSettings.hide_breadcrumbs }">
                         <Tooltip v-if="(tool.usage_count || tool.views_count) && toolPageSettings.layout !== 'minimalist' && toolPageSettings.layout !== 'modern'" :content="t('Total views')" placement="bottom">
                             <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
-                                <i class="ti ti-eye text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                <i class="ti ti-player-play text-[13px] text-gray-600 dark:text-gray-200"></i>
                                 {{ formatViews(tool.usage_count || tool.views_count || 0) }}
                             </span>
                         </Tooltip>
@@ -1077,10 +1081,10 @@ const copyToolLink = () => {
                             <!-- Simple Metadata Row just below title (Minimalist & Modern layouts) -->
                             <div v-if="toolPageSettings.layout === 'minimalist' || toolPageSettings.layout === 'modern'" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mt-1.5 mb-2">
                                 <!-- Category -->
-                                <span v-if="showCategoryMeta" class="flex items-center gap-1">
+                                <span v-if="metaCategory" class="flex items-center gap-1">
                                     <i class="ti ti-folder text-base text-gray-400"></i>
-                                    <Link :href="routeTo('ai.tools.category', tool.category.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
-                                        {{ tool.category.name }}
+                                    <Link :href="routeTo('ai.tools.category', metaCategory.slug)" class="font-medium text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors no-underline">
+                                        {{ metaCategory.name }}
                                     </Link>
                                 </span>
 
@@ -1167,7 +1171,7 @@ const copyToolLink = () => {
                             <div class="flex items-center gap-3">
                                 <Tooltip v-if="(tool.usage_count || tool.views_count) && !toolPageSettings.hide_usage_count" :content="t('Total views')" placement="bottom">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                        <i class="ti ti-eye text-[13px] text-gray-500 dark:text-gray-400"></i>
+                                        <i class="ti ti-player-play text-[13px] text-gray-500 dark:text-gray-400"></i>
                                         {{ formatViews(tool.usage_count || tool.views_count || 0) }}
                                     </span>
                                 </Tooltip>

@@ -159,7 +159,10 @@ class FoundationSeeder extends Seeder
                 ],
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
             ['key' => 'frontend_footer_settings', 'value' => json_encode([
-                'layout' => 'columns',
+                // Must be one of the footer styles the theme ships (see AppFooter's
+                // footerStyle list) — an unknown value falls back to 'default' when
+                // rendering but leaves the admin footer editor with no matching style.
+                'layout' => 'default',
                 'show_newsletter' => false,
                 'show_social_icons' => true,
                 'show_payment_icons' => true,

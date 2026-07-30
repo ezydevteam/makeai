@@ -458,7 +458,7 @@ watch([search, activeCategory, activeTag], () => {
 
             <section v-if="settings.archive_show_featured !== false && featured.length > 0 && activeCategory === 'all' && !search" class="mb-8">
                 <div class="mb-4 flex items-center gap-2">
-                    <i class="ti ti-carambola text-warning-500"></i>
+                    <i class="ti ti-carambola text-lg text-warning-500"></i>
                     <h2 class="font-heading text-xl font-black text-gray-900 dark:text-white">
                         <span :class="settings.archive_layout === 'modern' ? 'modern-gradient-text' : ''">
                             {{ t('Featured Tools') }}
@@ -540,7 +540,7 @@ watch([search, activeCategory, activeTag], () => {
 
             <section v-if="settings.archive_show_recently_used !== false && recentlyUsed.length > 0 && activeCategory === 'all' && !search && !activeTag" class="mb-8">
                 <div class="mb-4 flex items-center gap-2">
-                    <i class="ti ti-clock text-primary-500"></i>
+                    <i class="ti ti-history-toggle text-lg text-primary-500"></i>
                     <h2 class="font-heading text-xl font-black text-gray-900 dark:text-white">
                         <span :class="settings.archive_layout === 'modern' ? 'modern-gradient-text' : ''">
                             {{ t('Recently Used') }}
@@ -608,9 +608,9 @@ watch([search, activeCategory, activeTag], () => {
             </section>
 
             <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
+                <div class="mb-4 flex items-center gap-2">
+                    <i class="ti ti-sparkles text-lg text-primary-500"></i>
                     <h2 class="font-heading text-xl font-black text-gray-900 dark:text-white flex items-center">
-                        <i class="ti ti-folder-search mr-2 text-primary-500"></i>
                         <span :class="settings.archive_layout === 'modern' ? 'modern-gradient-text' : ''">
                             {{ t('Explore Tools') }}
                         </span>
@@ -737,7 +737,7 @@ watch([search, activeCategory, activeTag], () => {
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span v-if="item.views_count" class="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                                        <i class="ti ti-eye text-[10px]"></i>
+                                        <i class="ti ti-player-play text-[10px]"></i>
                                         {{ formatViews(item.views_count) }}
                                     </span>
                                     <span v-if="settings.archive_show_open_button !== false" class="text-primary-400 inline-flex items-center gap-1">
@@ -782,7 +782,7 @@ watch([search, activeCategory, activeTag], () => {
                                         {{ item.category.name }}
                                     </span>
                                     <span v-if="item.views_count" class="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                                        <i class="ti ti-eye text-[10px]"></i>
+                                        <i class="ti ti-player-play text-[10px]"></i>
                                         {{ formatViews(item.views_count) }}
                                     </span>
                                 </div>

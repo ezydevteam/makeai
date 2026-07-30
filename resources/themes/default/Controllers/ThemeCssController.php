@@ -117,6 +117,15 @@ class ThemeCssController extends Controller
             '  color: var(--color-heading) !important;',
             '}',
             '',
+            // Widgets that paint themselves from their own admin-configured palette — the
+            // GDPR cookie banner — opt out with .theme-paint-self. The heading rule above
+            // is !important, so it outranks even the inline colour those widgets set, and
+            // their title came out in the site heading colour on a custom banner background.
+            // Only the colour is reverted; the heading font and weight still apply.
+            '.frontend-theme .theme-paint-self :where(h1, h2, h3, h4, h5, h6, .font-heading) {',
+            '  color: inherit !important;',
+            '}',
+            '',
             '.frontend-theme input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),',
             '.frontend-theme textarea,',
             '.frontend-theme select {',
