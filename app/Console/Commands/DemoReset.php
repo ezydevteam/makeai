@@ -69,6 +69,13 @@ class DemoReset extends Command
         $this->warn('Seeding demo data...');
         Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\DemoSeeder', '--force' => true]);
 
+        // Last, because migrate:fresh dropped the live API credentials along with
+        // everything else and demo mode blocks re-entering them through the admin. Reads
+        // .env — the only thing the wipe cannot touch. No-ops when nothing is configured.
+        $this->warn('Provisioning API credentials from .env...');
+        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\DemoProvisionSeeder', '--force' => true]);
+        $this->line(rtrim(Artisan::output()));
+
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $this->info('Demo reset complete!');

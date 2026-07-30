@@ -716,7 +716,9 @@ if ($demo) {
 
     // Uncomment the DEMO_* block in place rather than appending a second copy — a
     // duplicate key later in the file would silently win over the one above it.
-    $env = preg_replace('/^# (DEMO_[A-Z_]+=)/m', '$1', $env, -1, $uncommented);
+    // Digits are part of the character class on purpose: DEMO_2CHECKOUT_* would
+    // otherwise stay commented out and that gateway would silently never provision.
+    $env = preg_replace('/^# (DEMO_[A-Z0-9_]+=)/m', '$1', $env, -1, $uncommented);
 
     if ($uncommented === 0) {
         fail('no commented DEMO_* keys found in .env.example — the demo preset cannot be applied');
