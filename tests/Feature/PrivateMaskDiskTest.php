@@ -7,11 +7,14 @@ use Tests\TestCase;
 
 /**
  * Masks / style references / img2img references are transient, user-PRIVATE uploads.
- * Both image addons store them on the `local` disk — they must never be written to, or
- * read from, the public media disk (which may be a world-readable cloud bucket).
+ * ai-image-pro stores them on the `local` disk — they must never be written to, or read
+ * from, the public media disk (which may be a world-readable cloud bucket).
  *
  * These were previously written to `local` but read back from `public`, so inpaint,
  * object-remove and style-transfer failed on EVERY driver. This pins the contract.
+ *
+ * The ai-image-editor half of this file went with the addon itself; only its assertions
+ * were dropped, since the same contract still has to hold for the addon that remains.
  */
 class PrivateMaskDiskTest extends TestCase
 {
@@ -31,33 +34,36 @@ class PrivateMaskDiskTest extends TestCase
         );
     }
 
-    public function test_image_editor_providers_read_mask_and_style_from_the_private_disk(): void
-    {
-        $stability = file_get_contents(base_path('addons/ai-image-editor/app/Services/Providers/StabilityClient.php'));
-        $clipdrop = file_get_contents(base_path('addons/ai-image-editor/app/Services/Providers/ClipdropClient.php'));
-
-        $this->assertStringContainsString("Storage::disk('local')->get(\$maskPath)", $stability);
-        $this->assertStringContainsString("Storage::disk('local')->get(\$stylePath)", $stability);
-        $this->assertStringContainsString("Storage::disk('local')->get(\$maskPath)", $clipdrop);
-
-        // The SOURCE image is a public library asset and must still come from the public disk.
-        $this->assertStringContainsString("Storage::disk('public')->get(\$imagePath)", $stability);
-    }
-
     public function test_masks_are_never_written_to_the_public_disk(): void
     {
-        foreach ([
-            'addons/ai-image-pro/app/Http/Controllers/User/StudioController.php',
-            'addons/ai-image-editor/app/Http/Controllers/User/ImageEditorController.php',
-        ] as $file) {
-            $src = file_get_contents(base_path($file));
+        $file = 'addons/ai-image-pro/app/Http/Controllers/User/StudioController.php';
+        $src = file_get_contents(base_path($file));
 
-            // Every mask/style store call must target the private disk.
-            preg_match_all("/->store\(\s*[^;]*?(masks|styles)[^;]*?'(\w+)'\s*,?\s*\)/s", $src, $m);
-            foreach ($m[2] ?? [] as $disk) {
-                $this->assertSame('local', $disk, "Masks/styles must stay on the private disk in {$file}");
-            }
+        // ai-image-pro funnels both transient uploads through one helper rather than
+        // storing inline, so the disk is pinned in exactly one place. The old version of
+        // this test scanned for a literal `masks`/`styles` inside the ->store() call — a
+        // shape only ai-image-editor ever had — so once that addon went it matched nothing
+        // and the test passed while asserting nothing at all.
+        $this->assertMatchesRegularExpression(
+            "/private function storePrivate\([^)]*\)[^{]*\{.*?->store\([^;]*,\s*'local'\s*\)/s",
+            $src,
+            "storePrivate() must write to the private `local` disk in {$file}",
+        );
+
+        // And both callers have to go through it — a direct store would bypass the pin above.
+        foreach (['mask', 'reference'] as $input) {
+            $this->assertStringContainsString(
+                "\$this->storePrivate(\$request->file('{$input}')",
+                $src,
+                "The {$input} upload must be stored via storePrivate(), not written directly.",
+            );
         }
+
+        $this->assertStringNotContainsString(
+            "->store(OperationRegistry::SLUG . '/' . \$owner . '/' . \$bucket, 'public')",
+            $src,
+            'Transient job inputs must never land on the public media disk.',
+        );
     }
 
     public function test_private_disk_is_not_web_accessible(): void

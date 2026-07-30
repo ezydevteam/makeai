@@ -13,6 +13,7 @@ use App\Models\AffiliatePayout;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateReferral;
 use App\Models\Admin;
+use App\Models\AdminNote;
 use App\Models\AdminRole;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
@@ -24,6 +25,7 @@ use App\Models\BlogPost;
 use App\Models\BlogTag;
 use App\Models\Comment;
 use App\Models\CommentReport;
+use App\Models\Coupon;
 use Addons\AiChatbot\Models\ChatMessageFeedback;
 use Addons\AiChatbot\Models\ChatProject;
 use Addons\AiChatbot\Models\ChatbotMode;
@@ -41,6 +43,7 @@ use Addons\AiKnowledgeBase\Models\KbSearch;
 use Addons\FakerAi\Models\FakerBatch;
 use App\Models\CreditTransaction;
 use App\Models\Document;
+use App\Models\ExportPreset;
 use App\Models\Favorite;
 use App\Models\GenerationHistory;
 use App\Models\LoginHistory;
@@ -49,6 +52,8 @@ use App\Models\Payment;
 use App\Models\MenuItem;
 use App\Models\Page;
 use App\Models\Plan;
+use App\Models\PlanCountryPrice;
+use App\Models\ScheduledExport;
 use App\Models\Setting;
 use App\Models\SmsCampaign;
 use App\Models\SmsCampaignRecipient;
@@ -90,6 +95,47 @@ class DemoSeeder extends Seeder
      * the numbers stay put. Change this constant only to deliberately reshuffle the demo.
      */
     private const RANDOM_SEED = 20260726;
+
+    /**
+     * The hourly shape of today's new subscriptions — hour => how many start in it.
+     *
+     * "Today" is the one dashboard range bucketed by hour rather than by day, and the
+     * Subscription Health chart plots those 24 buckets directly. The even spread the
+     * other 179 days use puts at most one subscription in any hour, so that chart drew
+     * five identical one-high bars in a 24-slot grid: technically populated, visually
+     * empty.
+     *
+     * This is a working day instead — a slow start, a mid-morning peak, the lunch dip,
+     * an afternoon run and an evening tail. Twelve rows over eight hours, against the
+     * cohort's recent-day baseline of 3-4 (dailyVolume() at scale 0.45). That keeps today
+     * the busiest day, which dailyVolume() is tuned to guarantee, without the day-bucketed
+     * 7d and 30d ranges ending in a spike — an early draft totalled 20 and drew exactly
+     * that cliff.
+     *
+     * Pair with TODAY_CHURN_HOURS: its hours are deliberately disjoint from these, so the
+     * mirrored churn bars land between the new-subscription bars rather than under them.
+     */
+    private const TODAY_SIGNUP_HOURS = [
+        8 => 1, 9 => 2, 11 => 3, 12 => 1,
+        14 => 2, 16 => 1, 18 => 1, 20 => 1,
+    ];
+
+    /**
+     * The hourly shape of today's cancellations — hour => how many land in it.
+     *
+     * Churn is the downward half of the same chart and was left to chance: a cancellation
+     * fell on today only if some earlier signup's random 14-95 day offset happened to
+     * point here, which on most resets meant an empty or single-bar churn series under a
+     * populated new-subscription one. redateTodayCancellations() moves existing
+     * cancellations onto these hours so the mirror always has something to draw.
+     *
+     * Five against the signup profile's twelve, on purpose — a demo whose churn rivals
+     * its growth is a demo of a failing business. The ratio matches the rest of the
+     * cohort, where roughly one subscription in four eventually cancels.
+     */
+    private const TODAY_CHURN_HOURS = [
+        10 => 1, 13 => 2, 17 => 1, 19 => 1,
+    ];
 
     public function run(): void
     {
@@ -135,6 +181,45 @@ class DemoSeeder extends Seeder
             'avatar' => $adminAvatar,
             'is_active' => true,
         ]);
+
+        // ─── 1b. Staff admins, one per non-super role ──────────────────
+        //
+        // Administrators listed exactly one account, so the whole RBAC half of the product
+        // — roles, per-role permissions, the role column on the list — demonstrated itself
+        // against a single super admin, which is the one row where permissions never apply.
+        //
+        // The roles are AdminSeeder's, not invented here: seeding an admin against a role
+        // slug that seeder does not create would leave role_id null and the account
+        // permissionless. Skipped individually if a slug is missing rather than failing the
+        // reset, since a buyer may have renamed or deleted a non-system role.
+        //
+        // They share the demo admin password: the sign-in page publishes it, and the point
+        // is that a buyer can sign in as each one and watch the sidebar change.
+        $staffAdmins = [
+            ['email' => 'manager@demo.com', 'name' => 'Marta Keller', 'role' => 'manager', 'hours' => 3],
+            ['email' => 'support@demo.com', 'name' => 'Devin Osei', 'role' => 'support', 'hours' => 9],
+            ['email' => 'content@demo.com', 'name' => 'Priya Raman', 'role' => 'content-manager', 'hours' => 27],
+        ];
+
+        foreach ($staffAdmins as $staff) {
+            $roleId = AdminRole::where('slug', $staff['role'])->value('id');
+
+            if (! $roleId) {
+                continue;
+            }
+
+            Admin::updateOrCreate(['email' => $staff['email']], [
+                'name' => $staff['name'],
+                'password' => Hash::make($adminPassword),
+                'role_id' => $roleId,
+                'avatar' => $this->demoAvatar($staff['name'], 'avatars/demo-admin-'.$staff['role'].'.svg'),
+                'is_active' => true,
+                // Staggered, so the list's "last login" column reads as a team that works
+                // rather than three accounts created and never used.
+                'last_login_at' => now()->subHours($staff['hours']),
+                'last_login_ip' => '203.76.120.'.(40 + $staff['hours']),
+            ]);
+        }
 
         // ─── 2. Demo User ──────────────────────────────────────────────
         User::updateOrCreate(['email' => $userEmail], [
@@ -185,6 +270,9 @@ class DemoSeeder extends Seeder
             ['id' => $freePlan->id, 'name' => 'free', 'credits' => fn () => mt_rand(10, 100)],
             ['id' => $professionalPlan->id, 'name' => 'professional', 'credits' => fn () => mt_rand(1000, 5000)],
         ];
+
+        // ─── 3b. Regional pricing for every paid plan ──────────────────
+        $this->seedPlanCountryPrices();
 
         AffiliateProgram::current()->update([
             'allow_custom_alias' => true,
@@ -1430,7 +1518,7 @@ class DemoSeeder extends Seeder
 
         // [zone, title, type, show_to, state, banner name, width, height, headline, sub]
         $adRows = [
-            ['header_banner', 'Header Leaderboard', 'image_link', 'all', 'live', 'makeai-leaderboard', 728, 90, '', ''],
+            ['header_banner', 'Header Leaderboard', 'image_link', 'all', 'expired', 'makeai-leaderboard', 728, 90, '', ''],
             ['footer_banner', 'Footer Leaderboard', 'image_link', 'all', 'live', 'makeai-leaderboard', 728, 90, '', ''],
             ['sidebar_top', 'Sidebar Rectangle', 'image_link', 'all', 'live', 'makeai-rectangle', 300, 250, '', ''],
             ['sidebar_bottom', 'Sidebar Purchase Block', 'custom_html', 'all', 'live', '', 0, 0, 'Get MakeAI for your business', 'The complete AI SaaS platform — 400+ AI tools, an intelligent AI assistant, affiliates, coupons and billing, with a full admin panel.'],
@@ -1494,92 +1582,219 @@ class DemoSeeder extends Seeder
             );
         }
 
-        // ─── 14. Sample Menu Items ──────────────────────────────────────
-        $mainMenu = Menu::firstOrCreate(['slug' => 'main'], [
-            'name' => 'Main Menu',
-        ]);
+        // ─── 14. Menus (/admin/appearance/menus) ────────────────────────
+        //
+        // Four menus, because four regions of the site each read one by slug and each was
+        // resolving to nothing:
+        //
+        //   main            the desktop header
+        //   mobile          the hamburger drawer — AppHeader falls back to this exact slug
+        //                   (`mobileHamburgerBlock.config.menu_slug || 'mobile'`), so with no
+        //                   such menu the drawer opened empty on every phone
+        //   footer          the footer link column
+        //   knowledge-base  the help centre's own nav
+        //
+        // Item `type` is one of url|page|route and `requires_auth` one of none|guest|auth|pro
+        // (MenuItemRequest). Route-type items name a route that must exist — `home`,
+        // `pricing`, `ai.tools.index`, `blog.index` — while anything belonging to an addon is
+        // url-type on purpose: the Knowledge Base is deactivatable, and a route() call for a
+        // route an inactive addon never registered throws on render.
+        $pageId = fn (string $slug) => Page::where('slug', $slug)->value('id');
 
-        $footerMenu = Menu::firstOrCreate(['slug' => 'footer'], [
-            'name' => 'Footer Menu',
-        ]);
+        // The help centre's URL prefix is admin-configurable, so it is read rather than
+        // assumed — hardcoding /help would break every KB link the moment it is renamed.
+        $kb = '/'.trim(
+            function_exists('addon_setting')
+                ? (string) (addon_setting('ai-knowledge-base', 'public_slug', 'help') ?: 'help')
+                : 'help',
+            '/'
+        );
 
-        // Canonical PageSeeder slugs (see the note in section 12).
-        $aboutPage = Page::where('slug', 'about')->first();
+        // The main menu's mega panel, built from the catalogue rather than a hardcoded list.
+        //
+        // AppHeader renders a mega item as a THREE-level tree: the flagged parent is the
+        // trigger, its children become the columns (each column's own label is drawn as the
+        // heading), and the grandchildren are the links. A column with no children collapses
+        // to a single link instead of a headed list, so an empty category would silently
+        // change the panel's shape.
+        //
+        // Four columns exactly, because MEGA_MAX_COLUMNS is 4 and `megaColumns()` slices
+        // anything beyond it — a fifth category would be written to the database, shown in
+        // the admin menu builder, and then never rendered.
+        $megaColumns = [];
 
-        MenuItem::updateOrCreate(['menu_id' => $mainMenu->id, 'label' => 'Home'], [
-            'parent_id' => null,
-            'type' => 'route',
-            'route_name' => 'home',
-            'url' => null,
-            'page_id' => null,
-            'target' => '_self',
-            'icon' => 'ti ti-home',
-            'badge_text' => null,
-            'badge_color' => null,
-            'is_active' => true,
-            'requires_auth' => 'none',
-            'sort_order' => 1,
-        ]);
+        foreach (\App\Models\Category::query()->aiTools()->orderBy('sort_order')->limit(4)->get() as $category) {
+            // Ordered by the catalogue's own sort, NOT by usage_count: this section runs
+            // before 15b writes those counts, so on a fresh database they are all 0 and on a
+            // re-seed they are not — the panel would list different tools each reset.
+            $tools = AiTool::where('category_id', $category->id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->limit(5)
+                ->get(['slug', 'name', 'description']);
 
-        MenuItem::updateOrCreate(['menu_id' => $mainMenu->id, 'label' => 'About'], [
-            'parent_id' => null,
-            'type' => 'page',
-            'url' => null,
-            'page_id' => $aboutPage?->id,
-            'route_name' => null,
-            'target' => '_self',
-            'icon' => 'ti ti-info-circle',
-            'badge_text' => 'New',
-            'badge_color' => 'green',
-            'is_active' => true,
-            'requires_auth' => 'none',
-            'sort_order' => 2,
-        ]);
+            if ($tools->isEmpty()) {
+                continue;
+            }
 
-        MenuItem::updateOrCreate(['menu_id' => $footerMenu->id, 'label' => 'Privacy'], [
-            'parent_id' => null,
-            'type' => 'page',
-            'url' => null,
-            'page_id' => Page::where('slug', 'privacy-policy')->value('id'),
-            'route_name' => null,
-            'target' => '_self',
-            'icon' => null,
-            'badge_text' => null,
-            'badge_color' => null,
-            'is_active' => true,
-            'requires_auth' => 'none',
-            'sort_order' => 1,
-        ]);
+            $megaColumns[] = [
+                'label' => $category->name,
+                'type' => 'url',
+                'url' => '/ai-tools/category/'.$category->slug,
+                'children' => $tools->map(fn ($tool) => [
+                    'label' => $tool->name,
+                    'type' => 'url',
+                    'url' => '/ai-tools/'.$tool->slug,
+                    // Rendered under the link by menuItemDescription(); trimmed because the
+                    // panel truncates to one line anyway.
+                    'description' => \Illuminate\Support\Str::limit((string) $tool->description, 60),
+                ])->all(),
+            ];
+        }
 
-        MenuItem::updateOrCreate(['menu_id' => $footerMenu->id, 'label' => 'Terms'], [
-            'parent_id' => null,
-            'type' => 'page',
-            'url' => null,
-            'page_id' => Page::where('slug', 'terms-of-service')->value('id'),
-            'route_name' => null,
-            'target' => '_self',
-            'icon' => null,
-            'badge_text' => null,
-            'badge_color' => null,
-            'is_active' => true,
-            'requires_auth' => 'none',
-            'sort_order' => 2,
-        ]);
+        $menus = [
+            'main' => ['name' => 'Main Menu', 'items' => [
+                ['label' => 'Home', 'type' => 'route', 'route_name' => 'home', 'icon' => 'ti ti-home'],
+                // Mega only once there are columns to show — flagged with an empty submenu
+                // it renders as an empty panel on hover.
+                ['label' => 'AI Tools', 'type' => 'route', 'route_name' => 'ai.tools.index', 'icon' => 'ti ti-sparkles',
+                    'mega_menu' => $megaColumns !== [], 'children' => $megaColumns],
+                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing', 'icon' => 'ti ti-tag'],
+                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index', 'icon' => 'ti ti-news'],
+                ['label' => 'Help Center', 'type' => 'url', 'url' => $kb, 'icon' => 'ti ti-lifebuoy'],
+                ['label' => 'About', 'type' => 'page', 'page' => 'about', 'icon' => 'ti ti-info-circle', 'badge_text' => 'New', 'badge_color' => 'green'],
+            ]],
 
-        MenuItem::updateOrCreate(['menu_id' => $footerMenu->id, 'label' => 'Usage Policy'], [
-            'parent_id' => null,
-            'type' => 'page',
-            'url' => null,
-            'page_id' => Page::where('slug', 'usage-policy')->value('id'),
-            'route_name' => null,
-            'target' => '_self',
-            'icon' => null,
-            'badge_text' => null,
-            'badge_color' => null,
-            'is_active' => true,
-            'requires_auth' => 'none',
-            'sort_order' => 3,
-        ]);
+            'mobile' => ['name' => 'Mobile Menu', 'items' => [
+                ['label' => 'Home', 'type' => 'route', 'route_name' => 'home', 'icon' => 'ti ti-home'],
+                ['label' => 'AI Tools', 'type' => 'route', 'route_name' => 'ai.tools.index', 'icon' => 'ti ti-sparkles'],
+                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing', 'icon' => 'ti ti-tag'],
+                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index', 'icon' => 'ti ti-news'],
+                ['label' => 'Help Center', 'type' => 'url', 'url' => $kb, 'icon' => 'ti ti-lifebuoy'],
+                // The drawer is the only nav on a phone, so it carries the account links the
+                // desktop header keeps in its avatar dropdown — split by auth state so a
+                // signed-out visitor is not shown a dashboard they cannot open.
+                ['label' => 'Dashboard', 'type' => 'url', 'url' => '/user/dashboard', 'icon' => 'ti ti-layout-dashboard', 'requires_auth' => 'auth'],
+                ['label' => 'Sign in', 'type' => 'url', 'url' => '/login', 'icon' => 'ti ti-login', 'requires_auth' => 'guest'],
+                ['label' => 'Create account', 'type' => 'url', 'url' => '/register', 'icon' => 'ti ti-user-plus', 'requires_auth' => 'guest'],
+            ]],
+
+            'footer' => ['name' => 'Footer Menu', 'items' => [
+                ['label' => 'About', 'type' => 'page', 'page' => 'about'],
+                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing'],
+                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index'],
+                ['label' => 'Privacy', 'type' => 'page', 'page' => 'privacy-policy'],
+                ['label' => 'Terms', 'type' => 'page', 'page' => 'terms-of-service'],
+                ['label' => 'Usage Policy', 'type' => 'page', 'page' => 'usage-policy'],
+            ]],
+
+            // These two slugs are not arbitrary: resolveFooterMenuSlug() in AppFooter maps
+            // the footer picker's 'company' / 'legal' options onto exactly these strings, so
+            // a menu named anything else can never be selected from that dropdown.
+            // `footer.menu_column` already defaults to 'footer-company', which until now
+            // pointed at a menu that did not exist — hence the empty footer link column.
+            'footer-company' => ['name' => 'Footer — Company', 'items' => [
+                ['label' => 'About', 'type' => 'page', 'page' => 'about'],
+                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing'],
+                ['label' => 'AI Tools', 'type' => 'route', 'route_name' => 'ai.tools.index'],
+                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index'],
+                ['label' => 'Help Center', 'type' => 'url', 'url' => $kb],
+                ['label' => 'Contact', 'type' => 'page', 'page' => 'contact'],
+            ]],
+
+            'footer-legal' => ['name' => 'Footer — Legal', 'items' => [
+                ['label' => 'Privacy Policy', 'type' => 'page', 'page' => 'privacy-policy'],
+                ['label' => 'Terms of Service', 'type' => 'page', 'page' => 'terms-of-service'],
+                ['label' => 'Usage Policy', 'type' => 'page', 'page' => 'usage-policy'],
+                ['label' => 'Cookie Policy', 'type' => 'page', 'page' => 'cookie-policy'],
+            ]],
+
+            // Only the routes the public KB actually exposes: home, the article index, and
+            // a single article. There is no /category/{slug} route — an earlier draft
+            // pointed two items at one and both would have 404'd.
+            'knowledge-base' => ['name' => 'Knowledge Base Menu', 'items' => [
+                ['label' => 'Help Center', 'type' => 'url', 'url' => $kb, 'icon' => 'ti ti-lifebuoy'],
+                ['label' => 'All Articles', 'type' => 'url', 'url' => $kb.'/articles', 'icon' => 'ti ti-article'],
+                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index', 'icon' => 'ti ti-news'],
+                ['label' => 'Contact Support', 'type' => 'url', 'url' => '/user/dashboard/support', 'icon' => 'ti ti-message-circle', 'requires_auth' => 'auth'],
+            ]],
+        ];
+
+        // Bind the menus to the regions that render them.
+        //
+        // The header exposes ONE source setting (`desktop.menu_source`) that both the
+        // desktop nav and the off-canvas drawer read, but each falls back differently when
+        // it is unset: AppHeader resolves the desktop nav with a 'main' fallback and the
+        // hamburger with a 'mobile' one. Leaving it empty is therefore not "unconfigured",
+        // it is the only way to get a DIFFERENT menu into each region — the shipped
+        // 'primary' pins both to `main`, which is why the drawer was showing desktop links.
+        // Merged into what is already stored, not passed alone: save*Settings() writes the
+        // whole blob, so a bare ['desktop' => …] would blank any mobile_top/mobile_bottom
+        // overrides already configured.
+        $themeSettings = app(\App\Services\ThemeSettingsService::class);
+
+        $storedHeader = $themeSettings->getStoredHeaderSettings();
+        $storedHeader['desktop'] = array_replace(
+            is_array($storedHeader['desktop'] ?? null) ? $storedHeader['desktop'] : [],
+            ['menu_source' => '']
+        );
+        $themeSettings->saveHeaderSettings($storedHeader);
+
+        // Footer bottom bar — the strip beside the copyright. `menu_column` (the link
+        // column higher up) is left on its own default.
+        $themeSettings->saveFooterSettings(array_replace(
+            $themeSettings->getStoredFooterSettings(),
+            ['bottom_menu' => 'footer']
+        ));
+
+        // Recursive so the mega panel's columns and their links are written by the same
+        // path as a flat item. Keyed on (menu, parent, label) rather than (menu, label):
+        // nested labels only have to be unique among their siblings, and a tool named after
+        // a top-level entry would otherwise overwrite it.
+        $writeItem = function (array $item, int $menuId, ?int $parentId, int $position) use (&$writeItem, $pageId): void {
+            // A page-type item whose Page was never seeded would render as a dead link, so
+            // it is skipped rather than written with a null page_id.
+            $page = isset($item['page']) ? $pageId($item['page']) : null;
+
+            if (isset($item['page']) && ! $page) {
+                return;
+            }
+
+            $row = MenuItem::updateOrCreate(
+                ['menu_id' => $menuId, 'parent_id' => $parentId, 'label' => $item['label']],
+                [
+                    'description' => $item['description'] ?? null,
+                    'type' => $item['type'],
+                    'url' => $item['url'] ?? null,
+                    'page_id' => $page,
+                    'route_name' => $item['route_name'] ?? null,
+                    'target' => '_self',
+                    'icon' => $item['icon'] ?? null,
+                    'badge_text' => $item['badge_text'] ?? null,
+                    'badge_color' => $item['badge_color'] ?? null,
+                    'is_active' => true,
+                    'requires_auth' => $item['requires_auth'] ?? 'none',
+                    'mega_menu' => $item['mega_menu'] ?? false,
+                    'sort_order' => $position + 1,
+                ]
+            );
+
+            foreach ($item['children'] ?? [] as $childPosition => $child) {
+                $writeItem($child, $menuId, $row->id, $childPosition);
+            }
+        };
+
+        foreach ($menus as $menuSlug => $menu) {
+            $menuRow = Menu::firstOrCreate(['slug' => $menuSlug], ['name' => $menu['name']]);
+
+            foreach ($menu['items'] as $position => $item) {
+                $writeItem($item, $menuRow->id, null, $position);
+            }
+        }
+
+        // ─── 14b. Sidebar widgets (/admin/appearance/sidebar) ───────────
+        $this->seedSidebarWidgets();
 
         // ─── 15. Sample Tool Reviews ────────────────────────────────────
         $reviewComments = [
@@ -1773,6 +1988,38 @@ class DemoSeeder extends Seeder
                 ]);
             }
         }
+
+        // ─── 15c. Output caps, so a public demo is cheap to run ─────────
+        //
+        // Every generation on the demo is paid for with real provider credits by whoever
+        // hosts it, and without an override each tool falls back to `default_max_tokens`
+        // (2000). A visitor clicking through a handful of tools burns the long-form budget
+        // for output nobody reads past the first paragraph.
+        //
+        // max_tokens_override is the lever that actually costs money: PromptBuilder sends it
+        // as the completion ceiling AND feeds it to getLengthInstruction(), so the prompt
+        // itself asks for something short rather than being cut off mid-sentence. 300 tokens
+        // is roughly 220 words — two paragraphs, still a real-looking result — against the
+        // 2000 it would otherwise request.
+        //
+        // avg_output_tokens does NOT limit anything; it is the pre-flight estimate behind the
+        // credit reservation and the quoted cost (TokenGuard::estimateCreditCost,
+        // PromptBuilder::estimateCost). Matched to the cap so the credits a visitor is
+        // charged line up with the output they actually get — left at its old figure the
+        // demo would quote and reserve for 2000 tokens it can no longer produce.
+        //
+        // One statement for the whole catalogue: this is ~410 rows, and the per-tool loop
+        // above is already the expensive part of this seeder.
+        DB::table('ai_tools')->update([
+            'max_tokens_override' => 300,
+            'avg_output_tokens' => 300,
+        ]);
+
+        // The catalogue is cached and both columns are IN that payload
+        // (ToolCatalogCacheService), while AiToolController reads the cap from the cached
+        // copy — so a direct DB write like the one above is invisible to the running site
+        // until the cache turns over. demo:reset does not flush it either.
+        \App\Services\AI\ToolCatalogCacheService::invalidateAll();
 
         // ─── 16. Sample Contact Messages ────────────────────────────────
         $contactMessages = [
@@ -2496,6 +2743,400 @@ class DemoSeeder extends Seeder
 
         // ─── 28. Spend limits for a publicly reachable demo ─────────────
         $this->seedDemoSpendLimits($showcaseUser);
+
+        // ─── 29. Admin dashboard notes (the "My Notes" card) ────────────
+        $this->seedAdminNotes($demoAdmin);
+
+        // ─── 30. Credit top-up bonus tiers + coupons ────────────────────
+        $this->seedCreditBonusTiers();
+        $this->seedCoupons($professionalPlan);
+
+        // ─── 31. Export Center (presets, schedules, recent files) ───────
+        // Last: its recent-export files are generated from the real datasets, so every
+        // section above has to have written its rows before there is anything to export.
+        $this->seedExportCenter($demoAdmin);
+    }
+
+    /**
+     * /admin/reports/export-center — saved presets, recurring schedules, and a Recent
+     * Exports list with real downloadable files in it.
+     *
+     * All three panels opened empty, which is the worst case for this screen in particular:
+     * presets and schedules are the reasons to use it over a one-off download, and with no
+     * recent files a buyer cannot tell whether an export produces anything at all.
+     *
+     * Everything is derived from the DatasetRegistry rather than hardcoded. Datasets are
+     * license-gated (isAvailable() — revenue disappears with billing off), their column keys
+     * are defined in one place each, and a preset naming a column or dataset that does not
+     * exist is quietly dropped by the page. Reading the registry means the seed can never
+     * describe a dataset this install does not have.
+     */
+    private function seedExportCenter(?Admin $admin): void
+    {
+        if (! $admin) {
+            return;
+        }
+
+        $registry = app(\App\Exports\Registry\DatasetRegistry::class);
+        $availableKeys = $registry->availableKeys();
+
+        // Only seed rows for datasets this install actually exposes.
+        $pick = fn (array $wanted) => array_values(array_intersect($wanted, $availableKeys));
+
+        // First N column keys of a dataset, so a preset carries a real column SUBSET (the
+        // point of a preset) instead of the everything-selected default.
+        $firstColumns = function (string $key, int $count) use ($registry): array {
+            return array_slice(
+                array_map(fn (\App\Exports\Registry\Column $c) => $c->key, $registry->resolve($key)->columns()),
+                0,
+                $count
+            );
+        };
+
+        // ── Saved presets ──
+        $presets = [
+            ['dataset' => 'users', 'name' => 'Active users — monthly review', 'format' => 'xlsx', 'columns' => 6],
+            ['dataset' => 'revenue', 'name' => 'Revenue for the accountant', 'format' => 'csv', 'columns' => 7],
+            ['dataset' => 'ai-usage', 'name' => 'AI spend by tool', 'format' => 'xlsx', 'columns' => 6],
+            ['dataset' => 'support-tickets', 'name' => 'Open tickets snapshot', 'format' => 'pdf', 'columns' => 5],
+            ['dataset' => 'affiliates', 'name' => 'Affiliate payouts due', 'format' => 'csv', 'columns' => 5],
+        ];
+
+        foreach ($presets as $preset) {
+            if (! in_array($preset['dataset'], $availableKeys, true)) {
+                continue;
+            }
+
+            ExportPreset::updateOrCreate(
+                ['admin_id' => $admin->id, 'name' => $preset['name']],
+                [
+                    'dataset' => $preset['dataset'],
+                    'format' => $preset['format'],
+                    // Left empty rather than invented: filter keys differ per dataset
+                    // (supportedFilters()), and a filter the dataset ignores is dead weight
+                    // that still renders as an active chip in the builder.
+                    'filters' => [],
+                    'columns' => $firstColumns($preset['dataset'], $preset['columns']),
+                ]
+            );
+        }
+
+        // ── Recurring schedules ──
+        $schedules = [
+            ['dataset' => 'revenue', 'name' => 'Monthly revenue report', 'format' => 'xlsx', 'frequency' => 'monthly', 'active' => true, 'lastDays' => 6],
+            ['dataset' => 'users', 'name' => 'Weekly signups', 'format' => 'csv', 'frequency' => 'weekly', 'active' => true, 'lastDays' => 2],
+            ['dataset' => 'ai-usage', 'name' => 'Daily AI usage digest', 'format' => 'csv', 'frequency' => 'daily', 'active' => true, 'lastDays' => 0],
+            // Paused, so the list shows the inactive state and its "next run" is blank.
+            ['dataset' => 'support-tickets', 'name' => 'Support backlog (paused)', 'format' => 'pdf', 'frequency' => 'weekly', 'active' => false, 'lastDays' => 21],
+        ];
+
+        foreach ($schedules as $schedule) {
+            if (! in_array($schedule['dataset'], $availableKeys, true)) {
+                continue;
+            }
+
+            $lastRun = now()->subDays($schedule['lastDays'])->setTime(6, 0);
+
+            ScheduledExport::updateOrCreate(
+                ['admin_id' => $admin->id, 'name' => $schedule['name']],
+                [
+                    'dataset' => $schedule['dataset'],
+                    'format' => $schedule['format'],
+                    'filters' => [],
+                    'columns' => [],
+                    'frequency' => $schedule['frequency'],
+                    'is_active' => $schedule['active'],
+                    'last_run_at' => $lastRun,
+                    // A paused schedule has nothing scheduled — the runner skips it, so a
+                    // future next_run_at would be a time it is never going to fire.
+                    'next_run_at' => $schedule['active']
+                        ? match ($schedule['frequency']) {
+                            'daily' => $lastRun->copy()->addDay(),
+                            'weekly' => $lastRun->copy()->addWeek(),
+                            default => $lastRun->copy()->addMonth(),
+                        }
+                        : null,
+                ]
+            );
+        }
+
+        // ── Recent Exports ──
+        //
+        // The list reads FILES off the local disk, not a table, and parses the dataset and
+        // format back out of the filename — so these follow exportStoragePath()'s
+        // "{dataset-key}-{Y-m-d-His}.{format}" exactly or they list as "unknown".
+        //
+        // Written with each dataset's own headings and real rows, so Download hands back a
+        // genuine export rather than a placeholder a buyer would open and find empty.
+        $disk = Storage::disk('local');
+        $exportDir = 'exports/'.$admin->id;
+
+        // Seeder-owned, and the filenames carry a timestamp — without clearing first, every
+        // reset would leave another generation of files behind for the list to accumulate.
+        $disk->deleteDirectory($exportDir);
+
+        $recent = $pick(['users', 'revenue', 'ai-usage', 'subscriptions', 'support-tickets', 'credit-ledger']);
+
+        foreach ($recent as $index => $key) {
+            $generatedAt = now()->subHours(($index * 9) + 2);
+
+            try {
+                $dataset = $registry->resolve($key);
+
+                $rows = [implode(',', array_map($this->csvCell(...), $dataset->headings()))];
+
+                foreach ($dataset->query([])->limit(50)->cursor() as $model) {
+                    $rows[] = implode(',', array_map($this->csvCell(...), $dataset->row($model)));
+                }
+
+                $disk->put(
+                    $exportDir.'/'.$key.'-'.$generatedAt->format('Y-m-d-His').'.csv',
+                    implode("\n", $rows)."\n"
+                );
+            } catch (\Throwable $e) {
+                // One dataset that cannot be queried on this install (an addon's, a schema
+                // it does not have) must not take the whole demo reset down with it.
+                continue;
+            }
+        }
+    }
+
+    /** RFC-4180 escaping for the seeded CSV exports. */
+    private function csvCell(mixed $value): string
+    {
+        $value = (string) ($value ?? '');
+
+        return str_contains($value, ',') || str_contains($value, '"') || str_contains($value, "\n")
+            ? '"'.str_replace('"', '""', $value).'"'
+            : $value;
+    }
+
+    /**
+     * Bonus Credit Tiers on /admin/premium/credit-settings.
+     *
+     * The setting ships as an empty array, so that panel opened on "no tiers yet" and the
+     * user-facing top-up page had no volume incentive to show at any amount — the one thing
+     * the screen exists to configure.
+     *
+     * Ascending, and each tier's percent must beat the one below it: calculateCredits()
+     * takes the HIGHEST bonus_percent among every tier the amount clears, not the last
+     * matching one, so a tier priced above another but paying less is silently unreachable.
+     * Quick amounts are lined up with the thresholds so the buttons on the top-up page land
+     * exactly ON a tier rather than a dollar short of one.
+     */
+    private function seedCreditBonusTiers(): void
+    {
+        settings_set('credit_topup_enabled', true, 'boolean', 'billing');
+        settings_set('credit_price_per_unit', '0.01', 'string', 'billing');
+        settings_set('credit_topup_minimum', '5', 'string', 'billing');
+
+        // $5 / $10 buy nothing extra — the first bonus starts at $25, so there is a reason
+        // to move up. At 0.01/credit these are 2,500 / 5,000 / 10,000 / 25,000 credits.
+        settings_set('credit_topup_quick_amounts', json_encode([5, 10, 25, 50, 100, 250]), 'json', 'billing');
+
+        settings_set('credit_topup_bonus_tiers', json_encode([
+            ['min_amount' => 25, 'bonus_percent' => 5],
+            ['min_amount' => 50, 'bonus_percent' => 10],
+            ['min_amount' => 100, 'bonus_percent' => 20],
+            ['min_amount' => 250, 'bonus_percent' => 35],
+        ]), 'json', 'billing');
+    }
+
+    /**
+     * Coupons for /admin/premium/coupons.
+     *
+     * Empty out of the box, which left both the admin table and the public header banner
+     * with nothing — and the banner is the only place a visitor ever sees the feature.
+     *
+     * The set covers what the list styles differently: percent and fixed, capped and
+     * uncapped, plan-restricted and global, audience-targeted, plus the states a table of
+     * live coupons always contains — one expired, one not yet started, one deactivated and
+     * one already near its usage limit. Only ONE carries show_in_header: getHeaderCoupon()
+     * reads ->first() and the controller demotes every other on publish, so seeding two
+     * would create a state the admin UI cannot produce.
+     *
+     * Gated on coupons_enabled() — Extended license plus the setting — because the whole
+     * admin page 404s without it and the rows would be unreachable.
+     */
+    private function seedCoupons(?Plan $professionalPlan): void
+    {
+        if (! function_exists('coupons_enabled') || ! coupons_enabled()) {
+            return;
+        }
+
+        $coupons = [
+            [
+                // The one on the public header banner.
+                'code' => 'WELCOME20', 'type' => 'percent', 'value' => 20, 'max_discount' => 50,
+                'max_uses' => 500, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'all',
+                'starts_at' => now()->subDays(20), 'expires_at' => now()->addDays(40),
+                'is_active' => true, 'show_in_header' => true, 'used_count' => 137,
+            ],
+            [
+                // Fixed amount, restricted to the Professional plan.
+                'code' => 'PRO15OFF', 'type' => 'fixed', 'value' => 15, 'max_discount' => null,
+                'max_uses' => 200, 'per_user_limit' => 1, 'plan' => 'professional', 'user_limit' => 'free',
+                'starts_at' => now()->subDays(10), 'expires_at' => now()->addDays(20),
+                'is_active' => true, 'show_in_header' => false, 'used_count' => 48,
+            ],
+            [
+                // Uncapped percentage, no usage ceiling — the "always on" case.
+                'code' => 'YEARLY10', 'type' => 'percent', 'value' => 10, 'max_discount' => null,
+                'max_uses' => null, 'per_user_limit' => null, 'plan_id' => null, 'user_limit' => 'all',
+                'starts_at' => now()->subMonths(3), 'expires_at' => null,
+                'is_active' => true, 'show_in_header' => false, 'used_count' => 312,
+            ],
+            [
+                // Nearly exhausted, so the list shows a usage bar close to full.
+                'code' => 'FLASH50', 'type' => 'percent', 'value' => 50, 'max_discount' => 100,
+                'max_uses' => 100, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'recent_30_days',
+                'starts_at' => now()->subDays(4), 'expires_at' => now()->addDays(3),
+                'is_active' => true, 'show_in_header' => false, 'used_count' => 94,
+            ],
+            [
+                // Scheduled — starts next week, so the table has a "not started" row.
+                'code' => 'BLACKFRIDAY', 'type' => 'percent', 'value' => 40, 'max_discount' => 200,
+                'max_uses' => 1000, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'all',
+                'starts_at' => now()->addDays(7), 'expires_at' => now()->addDays(21),
+                'is_active' => true, 'show_in_header' => false, 'used_count' => 0,
+            ],
+            [
+                // Expired last month.
+                'code' => 'SUMMER25', 'type' => 'percent', 'value' => 25, 'max_discount' => 60,
+                'max_uses' => 300, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'all',
+                'starts_at' => now()->subMonths(3), 'expires_at' => now()->subMonth(),
+                'is_active' => true, 'show_in_header' => false, 'used_count' => 268,
+            ],
+            [
+                // Switched off by hand, which is a different state from expired.
+                'code' => 'LEGACY5', 'type' => 'fixed', 'value' => 5, 'max_discount' => null,
+                'max_uses' => 50, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'inactive',
+                'starts_at' => now()->subMonths(6), 'expires_at' => now()->addMonths(6),
+                'is_active' => false, 'show_in_header' => false, 'used_count' => 11,
+            ],
+        ];
+
+        foreach ($coupons as $row) {
+            $planId = ($row['plan'] ?? null) === 'professional'
+                ? $professionalPlan?->id
+                : ($row['plan_id'] ?? null);
+
+            Coupon::updateOrCreate(
+                ['code' => $row['code']],
+                [
+                    'type' => $row['type'],
+                    'value' => $row['value'],
+                    'max_discount' => $row['max_discount'],
+                    'max_uses' => $row['max_uses'],
+                    'per_user_limit' => $row['per_user_limit'],
+                    'plan_id' => $planId,
+                    'user_limit' => $row['user_limit'],
+                    'starts_at' => $row['starts_at'],
+                    'expires_at' => $row['expires_at'],
+                    'is_active' => $row['is_active'],
+                    'show_in_header' => $row['show_in_header'],
+                    // Redemption history, so the list renders a usage bar rather than 0/500
+                    // on every row. Fillable here, but incremented by the gateway in real
+                    // use — never write to it outside a seeder.
+                    'used_count' => $row['used_count'],
+                ]
+            );
+        }
+    }
+
+    /**
+     * The five notes behind the admin dashboard's "My Notes" card.
+     *
+     * The card is one of the few panels on that dashboard with its own empty state, and an
+     * operator's private scratchpad reading "No notes yet" is the one panel that says
+     * nobody works here. Five is deliberate: the card itself renders only the two newest
+     * (`allNotes.slice(0, 2)`), so the rest exist to give the "View all notes" modal
+     * something to open onto.
+     *
+     * The set covers every state the card can render, because a demo that only shows the
+     * plain case documents nothing:
+     *
+     *   - the two newest carry a future reminder, which is the only condition under which
+     *     the amber "Reminder: …" badge appears on the card;
+     *   - one reminder is already due (past date, not yet sent), which raises the "Note
+     *     Reminders" alert above the dashboard with its snooze and dismiss actions;
+     *   - one has an auto_delete_date, the self-expiring note;
+     *   - one has reminder_sent already true — a reminder that has been and gone, so the
+     *     badge and the alert both correctly leave it alone.
+     *
+     * Notes belong to the `admins` guard, not `users`, and admin_id is a hard FK — so this
+     * no-ops rather than fataling when the demo admin is missing.
+     */
+    private function seedAdminNotes(?Admin $admin): void
+    {
+        if (! $admin) {
+            return;
+        }
+
+        $notes = [
+            [
+                'subject' => 'Review Q3 pricing before the renewal wave',
+                'description' => 'The Professional yearly cohort from last October renews in six weeks. Decide whether the credit allowance moves with the price, and give support a heads-up before anything ships.',
+                'created' => now()->subHours(3),
+                // Future: this is one of the two the card renders, and the reason it shows
+                // the reminder badge rather than a bare title.
+                'reminder_date' => now()->addDays(2)->setTime(9, 30),
+                'auto_delete_date' => null,
+                'reminder_sent' => false,
+            ],
+            [
+                'subject' => 'Rotate the OpenAI key on the first of the month',
+                'description' => 'Old key stays live for 24h so nothing in flight breaks. Update it in AI > Providers, then confirm the fallback model still resolves.',
+                'created' => now()->subDay()->setTime(16, 20),
+                'reminder_date' => now()->addDays(5)->setTime(8, 0),
+                'auto_delete_date' => null,
+                'reminder_sent' => false,
+            ],
+            [
+                'subject' => 'Follow up on the affiliate payout batch',
+                'description' => 'Two payouts are still pending PayPal confirmation. Chase them before the weekly run so the balances do not carry over again.',
+                'created' => now()->subDays(3)->setTime(11, 5),
+                // Already due, so the dashboard raises its reminder alert. Kept to exactly
+                // one — a wall of overdue reminders reads as a neglected install.
+                'reminder_date' => now()->subHours(4),
+                'auto_delete_date' => null,
+                'reminder_sent' => false,
+            ],
+            [
+                'subject' => 'Draft the changelog for the next release',
+                'description' => 'New image tools, the export scheduler and the faster assistant streaming. Publish it as an announcement once the build is tagged.',
+                'created' => now()->subDays(6)->setTime(14, 45),
+                'reminder_date' => null,
+                // The self-expiring case: this one clears itself once the release ships.
+                'auto_delete_date' => now()->addDays(21)->endOfDay(),
+                'reminder_sent' => false,
+            ],
+            [
+                'subject' => 'Check the weekly backup restore',
+                'description' => 'Restored into staging and the row counts matched. Worth repeating monthly rather than trusting the job to keep succeeding quietly.',
+                'created' => now()->subDays(12)->setTime(10, 15),
+                // Sent and done — present so the "past reminder" state is represented too.
+                'reminder_date' => now()->subDays(11)->setTime(9, 0),
+                'auto_delete_date' => null,
+                'reminder_sent' => true,
+            ],
+        ];
+
+        foreach ($notes as $note) {
+            $record = AdminNote::updateOrCreate(
+                ['admin_id' => $admin->id, 'subject' => $note['subject']],
+                [
+                    'description' => $note['description'],
+                    'reminder_date' => $note['reminder_date'],
+                    'auto_delete_date' => $note['auto_delete_date'],
+                    'reminder_sent' => $note['reminder_sent'],
+                ]
+            );
+
+            // The card orders by created_at desc, so without this the five land on the same
+            // timestamp and which two it shows comes down to insertion order.
+            $this->backdate($record, $note['created']);
+        }
     }
 
     /**
@@ -3802,9 +4443,11 @@ class DemoSeeder extends Seeder
             ['page_title', 'Help Center', 'string'],
             ['page_description', 'Answers about plans, credits, the AI tools and the API — searchable, and written by the people who built it.', 'string'],
 
-            // Menus the demo site actually has (DemoSeeder seeds both). A slug that does not
-            // resolve renders the help centre with no navigation at all.
-            ['header_menu', 'main', 'string'],
+            // Menus the demo site actually has (section 14 seeds all four). A slug that does
+            // not resolve renders the help centre with no navigation at all. The header gets
+            // the help centre's OWN menu rather than the site's — a reader inside the docs
+            // wants the other articles, not the marketing nav they arrived through.
+            ['header_menu', 'knowledge-base', 'string'],
             ['footer_menu', 'footer', 'string'],
 
             ['top_k', 5, 'integer'],
@@ -5932,6 +6575,154 @@ class DemoSeeder extends Seeder
      * conservative: a demo has to show the product working, not let anyone finish a day's
      * work on it. Raise them if the demo feels stingy — the numbers are settings, not code.
      */
+    /**
+     * Per-country prices for the paid plans, so /admin/premium/plans and the public pricing
+     * page have regional pricing to show.
+     *
+     * Country Prices sat empty on every plan, which made a headline feature look unbuilt:
+     * the admin tab was a blank table, and PlanPriceResolver fell through to `source =>
+     * 'default'` for every visitor, so nothing ever exercised the country branch.
+     *
+     * Free plans are deliberately skipped — the whole table is prices, and a second row
+     * saying a $0 plan costs ₹0 in India documents nothing. That is also what the user
+     * asked for.
+     *
+     * Prices are DERIVED from each plan's own USD figure rather than hardcoded, because the
+     * base plans come from PlanSeeder and this seeder's own firstOrCreate only wins on a
+     * fresh database; hardcoding would silently describe a plan that costs something else.
+     * The multipliers are rough FX × a regional discount — India and Brazil are priced well
+     * under a straight conversion, the UK and Germany near parity — which is what real
+     * regional pricing looks like and what makes the tab worth looking at.
+     */
+    /**
+     * The three sidebar widget areas on /admin/appearance/sidebar.
+     *
+     * Unconfigured, normalizeConfig() hands back empty `main` and `blog` areas and three
+     * placeholder blocks on `page` — so tool pages and the blog rendered a bare column and
+     * the builder itself opened with almost nothing on it. Nine of the eleven widget types
+     * are used below; the two left out are ad_zone duplicates and custom_html beyond the one
+     * example.
+     *
+     * Each area targets a different context (see SidebarBuilderRequest::AREAS), so the
+     * widgets differ per area rather than being the same list three times: the blog column
+     * gets posts, tags and blog categories; the tool column gets tool categories, popular
+     * and recently-added tools.
+     *
+     * Written straight to the setting, so it must already be in the shape
+     * SidebarBuilderRequest::sanitizedConfig() produces — id / type / config per block,
+     * `type` one of the eleven the request whitelists, and only the config keys it
+     * validates (title, placeholder, show_count, count, description, zone_id, content).
+     * Anything else is dropped the first time an admin saves the page, which would quietly
+     * change the demo.
+     */
+    private function seedSidebarWidgets(): void
+    {
+        // ad_zone points at zones this seeder actually creates (section 13's `ads` rows) —
+        // AppSidebar falls back to 'sidebar_top' for a missing zone_id, but a zone that does
+        // not exist renders nothing at all.
+        $config = ['areas' => [
+            // AI tool pages.
+            'main' => [
+                ['id' => 'main-search', 'type' => 'search_box', 'config' => ['title' => 'Search tools', 'placeholder' => 'Search 400+ AI tools...']],
+                ['id' => 'main-categories', 'type' => 'categories_list', 'config' => ['title' => 'Tool Categories', 'show_count' => true]],
+                ['id' => 'main-popular', 'type' => 'popular_tools', 'config' => ['title' => 'Most Popular', 'count' => 5]],
+                ['id' => 'main-recent', 'type' => 'recently_added', 'config' => ['title' => 'Recently Added', 'count' => 4]],
+                ['id' => 'main-ad', 'type' => 'ad_zone', 'config' => ['title' => '', 'zone_id' => 'sidebar_top']],
+                ['id' => 'main-newsletter', 'type' => 'newsletter', 'config' => ['title' => 'AI tips, monthly', 'description' => 'New tools, prompt techniques and product news. No spam, unsubscribe any time.']],
+            ],
+
+            // Blog listing and single posts.
+            'blog' => [
+                ['id' => 'blog-search', 'type' => 'search_box', 'config' => ['title' => 'Search the blog', 'placeholder' => 'Search articles...']],
+                ['id' => 'blog-categories', 'type' => 'blog_categories', 'config' => ['title' => 'Categories', 'show_count' => true]],
+                ['id' => 'blog-recent', 'type' => 'recent_posts', 'config' => ['title' => 'Recent Posts', 'count' => 5]],
+                ['id' => 'blog-tags', 'type' => 'tag_cloud', 'config' => ['title' => 'Popular Tags']],
+                ['id' => 'blog-social', 'type' => 'social_follow', 'config' => ['title' => 'Follow along']],
+                ['id' => 'blog-ad', 'type' => 'ad_zone', 'config' => ['title' => '', 'zone_id' => 'sidebar_bottom']],
+            ],
+
+            // Custom CMS pages.
+            'page' => [
+                ['id' => 'page-search', 'type' => 'search_box', 'config' => ['title' => 'Search', 'placeholder' => 'Search articles...']],
+                ['id' => 'page-categories', 'type' => 'categories_list', 'config' => ['title' => 'Browse Tools', 'show_count' => true]],
+                ['id' => 'page-recent', 'type' => 'recent_posts', 'config' => ['title' => 'From the Blog', 'count' => 3]],
+                // Only tags TiptapHtmlSanitizer::BASIC_TAGS keeps, so re-saving the builder
+                // leaves this block byte-identical instead of stripping half of it.
+                ['id' => 'page-help', 'type' => 'custom_html', 'config' => [
+                    'title' => 'Need a hand?',
+                    'content' => '<p>Answers to the common questions live in the <a href="/help">Help Center</a>.</p>'
+                        . '<p>Still stuck? <a href="/contact">Contact us</a> — we reply within one business day.</p>',
+                ]],
+                ['id' => 'page-social', 'type' => 'social_follow', 'config' => ['title' => 'Follow us']],
+            ],
+        ]];
+
+        Setting::setValue('sidebar_config', $config, 'json', 'appearance');
+    }
+
+    private function seedPlanCountryPrices(): void
+    {
+        // factor: USD price → local price. vat: shown per-country (EU sale needs it).
+        // trial: overrides the plan's own trial in that market; null leaves it off.
+        $regions = [
+            ['code' => 'IN', 'currency' => 'INR', 'factor' => 29.0, 'vat' => 18.00, 'trial' => 14],
+            ['code' => 'BR', 'currency' => 'BRL', 'factor' => 2.75, 'vat' => 0.00, 'trial' => 7],
+            ['code' => 'ZA', 'currency' => 'ZAR', 'factor' => 9.25, 'vat' => 15.00, 'trial' => null],
+            ['code' => 'GB', 'currency' => 'GBP', 'factor' => 0.79, 'vat' => 20.00, 'trial' => null],
+            ['code' => 'DE', 'currency' => 'EUR', 'factor' => 0.92, 'vat' => 19.00, 'trial' => 7],
+        ];
+
+        // Charm pricing, and never a bare 0: a plan with no lifetime price must keep NULL in
+        // that column, or the pricing page starts offering a lifetime tier for nothing.
+        $localize = function (?float $usd, float $factor): ?float {
+            if ($usd === null || $usd <= 0) {
+                return null;
+            }
+
+            $value = $usd * $factor;
+
+            return max(0.99, round($value) - 0.01);
+        };
+
+        $paidPlans = Plan::where('is_free', false)
+            ->where(fn ($query) => $query->where('price_monthly', '>', 0)->orWhere('price_yearly', '>', 0))
+            ->get();
+
+        foreach ($paidPlans as $plan) {
+            foreach ($regions as $region) {
+                $monthly = $localize((float) $plan->price_monthly, $region['factor']);
+                $yearly = $localize((float) $plan->price_yearly, $region['factor']);
+                $lifetime = $localize($plan->price_lifetime ? (float) $plan->price_lifetime : null, $region['factor']);
+
+                // A per-country trial can only be offered on a cycle that has a price.
+                $trialDays = $region['trial'];
+
+                PlanCountryPrice::updateOrCreate(
+                    ['plan_id' => $plan->id, 'country_code' => $region['code']],
+                    [
+                        'currency_code' => $region['currency'],
+                        // The struck-through "was" figure the pricing page renders next to
+                        // the live one. ~35% above, so the discount reads as a real offer.
+                        'original_price_monthly' => $monthly ? round($monthly * 1.35) - 0.01 : null,
+                        'original_price_yearly' => $yearly ? round($yearly * 1.35) - 0.01 : null,
+                        'original_price_lifetime' => $lifetime ? round($lifetime * 1.35) - 0.01 : null,
+                        'price_monthly' => $monthly,
+                        'price_yearly' => $yearly,
+                        'price_lifetime' => $lifetime,
+                        'vat_percentage' => $region['vat'],
+                        'trial_monthly_enabled' => $trialDays !== null && $monthly !== null,
+                        'trial_yearly_enabled' => $trialDays !== null && $yearly !== null,
+                        'trial_lifetime_enabled' => false,
+                        'trial_monthly_days' => $monthly !== null ? $trialDays : null,
+                        'trial_yearly_days' => $yearly !== null ? $trialDays : null,
+                        'trial_lifetime_days' => null,
+                        'is_active' => true,
+                    ]
+                );
+            }
+        }
+    }
+
     private function seedDemoSpendLimits(?User $showcaseUser): void
     {
         // 1. The hard ceiling. Roughly a few hundred short generations a day across the
@@ -5972,6 +6763,44 @@ class DemoSeeder extends Seeder
                 'monthly_limit' => round((float) $showcaseUser->credits_used_month) + 2000,
             ])->save();
         }
+
+        // 4. Document AI (/admin/ai/rag). The limits above meter generations; RAG spends on
+        //    two paths of its own that they never see — embedding a document on upload, and
+        //    the context pulled into every question afterwards. At stock settings one
+        //    visitor dropping a 25 MB, 300-page PDF embeds the lot, then each question ships
+        //    six chunks to the model. Every value below is inside the admin page's own
+        //    validation, so opening /admin/ai/rag and saving does not bounce.
+
+        // 4a. Ingest ceiling — the one-off embedding bill, and the biggest single lever.
+        //     3 MB / 25 pages still accepts a real report or whitepaper; it refuses the
+        //     500-page manual nobody is going to read in a demo anyway.
+        Setting::setValue('rag_max_file_mb', '3', 'integer', 'rag');
+        Setting::setValue('rag_max_pages', '25', 'integer', 'rag');
+        Setting::setValue('rag_max_url_fetch_mb', '2', 'integer', 'rag');
+
+        // 4b. Retrieval width — the RECURRING cost, paid again on every question. Halving
+        //     top-K halves the context tokens per answer; at 3 chunks the answers are still
+        //     grounded in the document, which is the thing being demonstrated.
+        Setting::setValue('rag_top_k', '3', 'integer', 'rag');
+
+        // 4c. Whisper transcription for YouTube sources: off. It is the most expensive path
+        //     in the product — a long video is minutes of audio billed per minute — and it
+        //     is only a FALLBACK for when the transcript API misses. Off by default already;
+        //     pinned here so a reset undoes anyone who flipped it on mid-demo.
+        Setting::setValue('rag_youtube_whisper_fallback', '0', 'boolean', 'rag');
+
+        // 4d. Price the two RAG paths so the credit ceilings in 1-3 actually bind them.
+        //     Shipped at 0, ingest is free and unbounded: the daily budget notices only once
+        //     the provider bill has already been run up. Charging brings uploads and
+        //     questions inside the same per-IP allowance as everything else — at 2 credits
+        //     per MB against the 40-credit IP limit, one visitor can embed ~20 MB a day.
+        Setting::setValue('rag_ingest_credits_per_mb', '2', 'string', 'rag');
+        Setting::setValue('rag_ingest_credits_url', '1', 'string', 'rag');
+        Setting::setValue('rag_chunks_per_credit', '10', 'integer', 'rag');
+
+        // 4e. Ephemeral uploads are disk, not tokens, but a public demo accumulates them
+        //     from strangers indefinitely. Two days is long enough to finish a session.
+        Setting::setValue('rag_ephemeral_retention_days', '2', 'integer', 'rag');
     }
 
     /**
@@ -6063,6 +6892,36 @@ class DemoSeeder extends Seeder
     }
 
     /**
+     * Moments for a day from an explicit hour => count map.
+     *
+     * spreadOverDay() divides its count evenly across the working hours, so every hourly
+     * bucket it produces holds exactly one record. That is invisible on the day-bucketed
+     * ranges, but the "Today" range on the dashboard is bucketed by hour — and a row of
+     * identical one-high bars scattered over 24 slots is not a chart. A profile lets a
+     * day carry a shape: busy mid-morning, a lunch dip, an afternoon peak, a quiet
+     * evening tail.
+     *
+     * @param  array<int, int>  $profile  hour (0-23) => number of records in that hour
+     * @return list<\Carbon\Carbon>
+     */
+    private function spreadOverDayByProfile(int $daysAgo, array $profile): array
+    {
+        $day = now()->subDays($daysAgo)->startOfDay();
+        $moments = [];
+
+        foreach ($profile as $hour => $count) {
+            for ($i = 0; $i < $count; $i++) {
+                $moments[] = $day->copy()->setTime(min(23, max(0, $hour)), mt_rand(0, 59));
+            }
+        }
+
+        // Chronological, so sequential ids still read in order within the day.
+        usort($moments, fn ($a, $b) => $a <=> $b);
+
+        return $moments;
+    }
+
+    /**
      * A day offset in [0, $max] biased toward the present — the smaller of two draws,
      * so about three quarters of the values land in the newer half of the range. Keeps
      * login sessions (and so the Active Users card) rising toward today instead of
@@ -6099,7 +6958,14 @@ class DemoSeeder extends Seeder
 
         // Oldest first, so sequential ids read chronologically in the admin lists.
         for ($day = 179; $day >= 0; $day--) {
-            foreach ($this->spreadOverDay($day, $this->dailyVolume($day, 0.45), 8, 21) as $joinedAt) {
+            // Today is the only day the dashboard draws hour by hour, so it gets an
+            // explicit shape instead of the even spread every other day uses. See
+            // TODAY_SIGNUP_HOURS for why.
+            $moments = $day === 0
+                ? $this->spreadOverDayByProfile(0, self::TODAY_SIGNUP_HOURS)
+                : $this->spreadOverDay($day, $this->dailyVolume($day, 0.45), 8, 21);
+
+            foreach ($moments as $joinedAt) {
                 $seq++;
 
                 $cycle = $cycles[$seq % count($cycles)];
@@ -6192,6 +7058,79 @@ class DemoSeeder extends Seeder
 
                 $this->backdate($payment, $joinedAt);
             }
+        }
+
+        $this->redateTodayCancellations();
+    }
+
+    /**
+     * Give today's churn series the same hourly shape the signup series has.
+     *
+     * Cancellations are dated forward from each signup, so whether any of them land on
+     * today — and at which hour — is left to the 14-95 day offset. Over a day-bucketed
+     * range that averages out; over today's 24 hourly buckets it does not, and the
+     * downward half of the Subscription Health chart came out empty or a single stray bar.
+     *
+     * This moves cancellations that already exist rather than creating new ones: the
+     * churn total over 7d/30d/90d is unchanged, no subscription changes status, and the
+     * new-subscription series is untouched (a cancelled row is already excluded from it).
+     * Only the timestamp moves, from some past date onto an hour of today.
+     *
+     * Runs last so it sees the whole cohort, and selects on id rather than on the dates it
+     * is about to rewrite. That is what makes it re-runnable: this seeder is written to be
+     * applied twice (the dashboard coverage test does exactly that), and an earlier version
+     * that filtered on `cancelled_at < today` skipped the rows it had already moved and
+     * dragged a fresh five onto today on every pass.
+     */
+    private function redateTodayCancellations(): void
+    {
+        $wanted = array_sum(self::TODAY_CHURN_HOURS);
+
+        // The 21-day floor guarantees the new date still lands after the subscription
+        // started — every candidate signed up months before today.
+        $candidates = \App\Models\GatewaySubscription::query()
+            ->where('gateway_subscription_id', 'like', 'demo-member-sub-%')
+            ->whereNotNull('cancelled_at')
+            ->where('created_at', '<=', now()->subDays(21))
+            ->orderBy('id')
+            ->get()
+            ->values();
+
+        if ($candidates->isEmpty()) {
+            return;
+        }
+
+        // Strided rather than "the first N", so the churn these dates are borrowed from is
+        // spread across the whole six months instead of being drained out of the oldest
+        // week — where, on the lifetime chart, five missing cancellations are visible.
+        $stride = max(1, intdiv($candidates->count(), $wanted));
+        $subscriptions = $candidates
+            ->filter(fn ($subscription, $index) => $index % $stride === 0)
+            ->take($wanted)
+            ->values();
+
+        $moments = $this->spreadOverDayByProfile(0, self::TODAY_CHURN_HOURS);
+        $users = User::whereIn('id', $subscriptions->pluck('user_id'))->get()->keyBy('id');
+
+        foreach ($subscriptions as $index => $subscription) {
+            $cancelledAt = $moments[$index] ?? null;
+
+            if (! $cancelledAt) {
+                break;
+            }
+
+            // current_period_end moves with it: the churn query buckets on whichever of
+            // the two it finds, so leaving the old period end behind would report the
+            // same cancellation twice, on two different days.
+            $subscription->forceFill([
+                'cancelled_at' => $cancelledAt,
+                'current_period_end' => $cancelledAt,
+                'updated_at' => $cancelledAt,
+            ])->save();
+
+            $users->get($subscription->user_id)?->forceFill([
+                'subscription_ends_at' => $cancelledAt,
+            ])->save();
         }
     }
 
@@ -6864,6 +7803,12 @@ class DemoSeeder extends Seeder
             ['at' => now()->subMonths(11)->startOfMonth()->addDays(3)->setTime(11, 0), 'amount' => 4000, 'type' => 'bonus', 'description' => 'Demo showcase: Launch bonus credits'],
             ['at' => now()->subMonths(5)->startOfMonth()->addDays(9)->setTime(14, 30), 'amount' => 6000, 'type' => 'purchase', 'description' => 'Demo showcase: Mid-year credit top-up'],
             ['at' => now()->subDays(8)->setTime(16, 20), 'amount' => 750, 'type' => 'referral', 'description' => 'Demo showcase: Partner referral payout'],
+            // The only row typed 'topup' rather than 'purchase', and deliberately so: that
+            // string is what addCredits() writes for a paid top-up and what the Usage page's
+            // top-up card sums to size itself. With none of them the card had no denominator
+            // and the whole purchased-credits half of that screen stayed dark. Backed by
+            // demo-showcase-pay-008 in seedShowcasePayments().
+            ['at' => now()->subDays(4)->setTime(13, 5), 'amount' => 2000, 'type' => 'topup', 'description' => 'Demo showcase: Credit top-up (2,000 credits)'],
         ]);
 
         $ledger = $entries->concat($topUps)->sortBy(fn (array $row) => $row['at']->getTimestamp())->values();
@@ -6892,8 +7837,19 @@ class DemoSeeder extends Seeder
             ->where('created_at', '>=', now()->startOfMonth())
             ->sum(DB::raw('ABS(amount)'));
 
+        // Purchased credits are tracked apart from the wallet: they are the user's own money
+        // and must survive every plan renewal, which is what grantPlanAllowance() reserves
+        // room for. Clamped to the balance because deductCredits() maintains exactly that
+        // invariant — a tracked top-up larger than the wallet it lives in would reserve room
+        // for credits that were already spent, handing out free ones each renewal.
+        $topupBalance = min(
+            (float) $ledger->where('type', 'topup')->sum('amount'),
+            max(0.0, $runningBalance)
+        );
+
         $user->forceFill([
             'credits' => $runningBalance,
+            'topup_credits' => $topupBalance,
             'credits_used_today' => $usedToday,
             'credits_used_month' => $usedMonth,
         ])->save();
@@ -7665,8 +8621,20 @@ class DemoSeeder extends Seeder
             }
         }
 
-        // Months 7-11 back — the 180-day loop already covers everything nearer than that.
-        for ($monthsAgo = 7; $monthsAgo <= 11; $monthsAgo++) {
+        // Months 6-11 back, filling in behind the daily loop.
+        //
+        // This started at 7, on the assumption that 180 days covers everything nearer. It
+        // does not: 179 days is a little under six months, so where the daily loop stops
+        // depends on what day of the month it is. Run it late in a month — 30 July reaches
+        // back only to 1 February — and month 6 back is left with nothing at all in it,
+        // which is a hole in the MIDDLE of the 1Y chart rather than at either end. Run it
+        // on the 10th and the daily loop reaches into that month and the gap closes on its
+        // own, which is what kept this hidden.
+        //
+        // Six is always safe: subMonths(6) is 181-184 days back, so that month always
+        // starts before the daily loop's reach. Where the two overlap the month simply
+        // gets a few more generations, which costs nothing.
+        for ($monthsAgo = 6; $monthsAgo <= 11; $monthsAgo++) {
             $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(6, 12)) as $ignored) {
                 $moments->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
@@ -7834,12 +8802,29 @@ class DemoSeeder extends Seeder
                 'gateway' => 'bank_transfer',
                 'plan' => false,
             ],
+            [
+                // The purchase behind the 2,000-credit 'topup' row in the credit ledger, and
+                // the reason users.topup_credits is non-zero. Dated in days rather than
+                // months so it stays inside the windows the recent-activity panels read.
+                'id' => 'demo-showcase-pay-008',
+                'days' => 4,
+                'amount' => 19.00,
+                'type' => 'credit_topup',
+                'status' => 'completed',
+                'gateway' => 'stripe',
+                'plan' => false,
+            ],
         ];
 
         foreach ($rows as $row) {
-            $paidAt = $row['months'] === 0
-                ? now()->subHours(6)
-                : now()->subMonths($row['months'])->startOfDay()->addHours(10);
+            // Most of this history is spaced in months; the recent top-up needs day
+            // precision, so a row may carry 'days' instead. First matching arm wins, so
+            // 'months' is never read for a row that does not define it.
+            $paidAt = match (true) {
+                isset($row['days']) => now()->subDays($row['days'])->setTime(13, 5),
+                $row['months'] === 0 => now()->subHours(6),
+                default => now()->subMonths($row['months'])->startOfDay()->addHours(10),
+            };
 
             $this->backdate(Payment::updateOrCreate(
                 ['gateway_payment_id' => $row['id']],

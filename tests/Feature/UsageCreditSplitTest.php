@@ -102,8 +102,10 @@ class UsageCreditSplitTest extends TestCase
         $stats = $this->statsFor($this->subscriber(planCredits: 2000, usedThisMonth: 3226, toppedUp: 3000));
 
         $this->assertSame(0.0, (float) $stats['topup_credits_used']);
-        // Zero total is the signal to show the plain balance instead of a ratio.
-        $this->assertSame(0.0, (float) $stats['topup_credits_total']);
+        // The denominator is everything ever purchased, so the bar renders at 0% rather
+        // than being switched off — nothing has been drawn, which is what "0 of 3,000"
+        // says. It used to be zeroed here, which hid the bar in exactly this state.
+        $this->assertSame(3000.0, (float) $stats['topup_credits_total']);
         $this->assertSame(3000.0, (float) $stats['topup_credits']);
     }
 

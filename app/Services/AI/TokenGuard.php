@@ -569,6 +569,13 @@ class TokenGuard
         $estimatedTokens = $template?->avg_output_tokens ?? 500;
         $modelSlug = $model ?? settings('default_ai_model', config('ai.fallback_model'));
 
+        // Never reserve credits for more output than the tool can produce. avg_output_tokens
+        // is an admin-entered estimate and independent of the cap, so the two can disagree in
+        // either direction; the cap is the one that decides what actually gets billed.
+        if ($template) {
+            $estimatedTokens = min($estimatedTokens, $template->effectiveMaxTokens($modelSlug));
+        }
+
         $dbModel = self::resolveModelForPricing($modelSlug);
 
         if (! $dbModel) {

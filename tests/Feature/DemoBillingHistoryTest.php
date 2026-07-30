@@ -41,7 +41,7 @@ class DemoBillingHistoryTest extends TestCase
         $user = User::where('email', config('demo.user_email'))->firstOrFail();
         $payments = Payment::where('user_id', $user->id)->get();
 
-        $this->assertCount(7, $payments, 're-seeding must not duplicate the history');
+        $this->assertCount(8, $payments, 're-seeding must not duplicate the history');
 
         // Every state the Billing page styles differently is represented.
         foreach (['completed', 'failed', 'refunded', 'pending'] as $status) {
@@ -87,7 +87,7 @@ class DemoBillingHistoryTest extends TestCase
             ->assertOk()
             ->viewData('page')['props'];
 
-        $this->assertCount(7, $props['payments']);
+        $this->assertCount(8, $props['payments']);
         $this->assertNotNull($props['payments'][0]['created_at']);
     }
 }

@@ -63,9 +63,7 @@ class PromptBuilder
 
         // 6. Max tokens — tool override or global default, then clamped to the
         // model's own output ceiling (admin-editable per-model Max Tokens; 0 = no cap).
-        $maxTokens = $template->max_tokens_override
-            ?? (int) settings('default_max_tokens', 2000);
-        $maxTokens = $this->clampToModelMaxTokens($maxTokens, $model);
+        $maxTokens = $template->effectiveMaxTokens($model);
 
         // 3. Apply dynamic length instruction based on max tokens
         $system .= $this->getLengthInstruction($fields['length'] ?? 'medium', $maxTokens);
@@ -291,6 +289,12 @@ class PromptBuilder
             $estimatedTokens = (int) round($estimatedTokens * ($multipliers[$outputLength] ?? 1));
         }
 
+        // The multiplier can ask for more than the tool is allowed to return — "very long"
+        // quadruples the estimate while max_tokens_override caps the generation itself — so
+        // the quote is clamped to what can actually come back. Without this a tool capped at
+        // 300 tokens still priced 1,200.
+        $estimatedTokens = min($estimatedTokens, $template->effectiveMaxTokens($model));
+
         $estimatedInputTokens = 200; // rough prompt overhead
         $totalTokens = $estimatedInputTokens + $estimatedTokens;
 
@@ -327,25 +331,6 @@ class PromptBuilder
     }
 
     /**
-     * Clamp a desired output-token budget to the model's own Max Tokens ceiling.
-     *
-     * The per-model Max Tokens (admin-editable) is a hard upper bound on output;
-     * a tool override or the global default must never exceed it. A model row that
-     * is unknown, or configured with max_tokens = 0 (e.g. media/embedding), imposes
-     * no cap.
-     */
-    private function clampToModelMaxTokens(int $maxTokens, string $model): int
-    {
-        $dbModel = AiModel::resolveForPricing($model);
-
-        if ($dbModel && (int) $dbModel->max_tokens > 0) {
-            return min($maxTokens, (int) $dbModel->max_tokens);
-        }
-
-        return $maxTokens;
-    }
-
-    /**
      * Build a CompletionRequest for refining/improving existing content.
      */
     public function buildRefine(AiTool $template, string $content, string $instruction, ?string $model, ?User $user): CompletionRequest
@@ -360,9 +345,7 @@ class PromptBuilder
 
         $apiKey = $this->resolveApiKey($model, $user);
 
-        $maxTokens = $template->max_tokens_override
-            ?? (int) settings('default_max_tokens', 2000);
-        $maxTokens = $this->clampToModelMaxTokens($maxTokens, $model);
+        $maxTokens = $template->effectiveMaxTokens($model);
 
         return new CompletionRequest(
             model: $model,

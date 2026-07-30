@@ -817,9 +817,9 @@ async function drawAllCharts() {
                         borderWidth: 0,
                         borderRadius: 9999,
                         borderSkipped: false,
-                        barPercentage: 0.34,
-                        categoryPercentage: 0.58,
-                        maxBarThickness: 12,
+                        barPercentage: 0.86,
+                        categoryPercentage: 0.74,
+                        maxBarThickness: 22,
                     },
                     {
                         label: t('Churn'),
@@ -829,9 +829,9 @@ async function drawAllCharts() {
                         borderWidth: 0,
                         borderRadius: 9999,
                         borderSkipped: false,
-                        barPercentage: 0.34,
-                        categoryPercentage: 0.58,
-                        maxBarThickness: 12,
+                        barPercentage: 0.86,
+                        categoryPercentage: 0.74,
+                        maxBarThickness: 22,
                     },
                 ],
             },
@@ -1476,10 +1476,10 @@ const activityTypeLabels: Record<string, string> = {
                         <div v-for="n in notesReminders" :key="n.id" class="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-blue-100/30 dark:bg-blue-950/20 px-3 py-2">
                             <span class="text-sm text-blue-700 dark:text-blue-400 font-medium">{{ n.subject }}</span>
                             <div class="flex items-center gap-3">
-                                <button @click="snoozeReminder(n.id)" class="text-xs font-bold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100 transition">
-                                    {{ t('Remind later (1h)') }}
+                                <button @click="snoozeReminder(n.id)" class="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-100 transition">
+                                    {{ t('Remind later') }}
                                 </button>
-                                <button @click="dismissReminder(n.id)" class="text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition">
+                                <button @click="dismissReminder(n.id)" class="text-xs font-bold text-blue-400 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-200 transition">
                                     {{ t('Dismiss') }}
                                 </button>
                             </div>

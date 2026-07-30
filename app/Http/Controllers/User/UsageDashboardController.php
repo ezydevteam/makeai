@@ -146,11 +146,18 @@ class UsageDashboardController extends Controller
             ->where('type', 'topup')
             ->sum('amount');
 
-        $topupUsed = max(0.0, $topupAdded - $topupCredits);
+        // The denominator is everything ever purchased, so the card reads like the plan
+        // allowance above it: used against a fixed ceiling, from the first generation to
+        // the last. This used to be zeroed whenever nothing had been drawn yet, which
+        // switched the bar off entirely — and left the one state a buyer is most likely to
+        // be in (just topped up, nothing spent) with no bar at all.
+        //
+        // max() rather than $topupAdded alone: the ledger is the normal source, but a
+        // balance carried on the column without matching 'topup' rows would otherwise give
+        // a denominator smaller than the balance it describes, i.e. negative usage.
+        $topupTotal = max($topupAdded, $topupCredits);
 
-        // Until the top-up has actually been drawn on there is no "x of y" to show, so the
-        // card falls back to the plain balance. Zero here switches the ratio and bar off.
-        $topupTotal = $topupUsed > 0 ? $topupAdded : 0.0;
+        $topupUsed = max(0.0, $topupTotal - $topupCredits);
 
         $stats = array_merge($stats, [
             'credits_remaining' => (float) $user->credits,
@@ -162,8 +169,8 @@ class UsageDashboardController extends Controller
             'plan_credits_remaining' => max(0, (float) $user->credits - $topupCredits),
             // Per-wallet usage, so each bar measures itself against its own ceiling.
             'plan_credits_used_month' => $planUsed,
-            // Both 0 until the top-up is genuinely drawn on; the card then shows only the
-            // balance rather than a ratio against a ceiling nothing has been spent from.
+            // Lifetime, not per-period: unlike the allowance these never reset, so the pair
+            // is "spent of ever purchased" and the bar only ever moves one way.
             'topup_credits_used' => $topupUsed,
             'topup_credits_total' => $topupTotal,
         ]);

@@ -8,10 +8,16 @@ import { useTranslate } from '@/Composables/useTranslate'
 
 useFlashToasts()
 
+interface DemoCredential {
+    email: string
+    password: string
+}
+
 interface PageProps {
     branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
     captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
     appearanceAdminSettings?: Record<string, string>
+    app?: { demo?: boolean; demo_credentials?: { admin?: DemoCredential | null; user?: DemoCredential | null } | null }
 }
 
 const page = usePage()
@@ -33,6 +39,12 @@ const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
 const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
 const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
 const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => (page.props as unknown as PageProps).captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+
+// Demo sign-in hint. The shared prop carries both pairs, but only the admin one belongs
+// on this screen — and it is null unless DEMO_ADMIN_PASSWORD is actually configured, so
+// there is nothing to publish on an install that never set one.
+const isDemo = computed(() => (page.props as unknown as PageProps).app?.demo ?? false)
+const demoAdmin = computed(() => (page.props as unknown as PageProps).app?.demo_credentials?.admin ?? null)
 const adminAuthStyle = computed(() => ({
     '--admin-auth-primary': appearanceAdminSettings.value.primary_color || appearanceAdminSettings.value.button_color || '',
     '--admin-auth-accent': appearanceAdminSettings.value.accent_color || appearanceAdminSettings.value.primary_color || '',
@@ -138,6 +150,14 @@ const submit = () => {
                         <span>{{ form.processing ? $t('Signing in...') : $t('Sign In') }}</span>
                     </button>
                 </form>
+
+                <div v-if="isDemo && demoAdmin" class="mt-6 rounded-xl border border-amber-200 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:text-amber-200">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <span>{{ $t('Demo') }}:</span>
+                        <code class="font-mono text-xs">{{ demoAdmin.email }}</code>
+                        <code class="font-mono text-xs">{{ demoAdmin.password }}</code>
+                    </div>
+                </div>
             </div>
 
             <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">

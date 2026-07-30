@@ -153,10 +153,14 @@ const creditBarColor = computed(() => {
  * about to reset, so the card shows both.
  *
  * The remaining figure comes from `users.topup_credits`, the column kept for exactly this
- * balance. A ratio is only shown once that column has actually gone down — the plan
- * allowance is spent first, so a month that merely exceeded its limit has not necessarily
- * touched the top-up at all (demo mode inflates usage while deducting nothing). Until it
- * has, the card shows the plain balance.
+ * balance; the denominator is everything ever purchased. The ratio reads the same way as
+ * the plan allowance above — spent against a ceiling — except this ceiling is lifetime
+ * rather than per-period, because top-ups never reset.
+ *
+ * The bar used to be hidden until the top-up had been drawn on, on the reasoning that an
+ * empty track reads as "all spent". Pairing it with a denominator is what actually settles
+ * that ("0 / 2,000" is unambiguous), and hiding it meant the state a buyer is most often in
+ * — just topped up, nothing spent yet — was the one state with no bar at all.
  *
  * Every read is coerced with `?? 0`: an older cached page without these props rendered
  * `formatNumber(undefined)` as "NaN" right next to a real figure.
@@ -167,11 +171,11 @@ const topupBalance = computed(() => Number(stats.topup_credits ?? 0))
 
 const hasTopupCredits = computed(() => topupBalance.value > 0 || topupTotal.value > 0)
 
-/** Only once credits have genuinely come out of the top-up does a ratio mean anything. */
-const showTopupUsage = computed(() => topupUsed.value > 0 && topupTotal.value > 0)
+/** A ceiling to measure against. Zero only for a wallet that never held a top-up. */
+const showTopupUsage = computed(() => topupTotal.value > 0)
 
 const topupPercent = computed(() => {
-  if (!showTopupUsage.value) return 0
+  if (topupTotal.value <= 0) return 0
 
   return Math.min(100, Math.round((topupUsed.value / topupTotal.value) * 100))
 })
@@ -378,17 +382,19 @@ onBeforeUnmount(() => {
             <i class="ti ti-wallet text-base text-sky-600 dark:text-sky-400"></i>
             <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Top-up credits') }}</span>
           </div>
-          <!-- A ratio only once the top-up has actually been spent from; otherwise the
-               balance on its own, because nothing has come out of it to be a fraction. -->
+          <!-- Spent against everything ever purchased, mirroring the allowance chip above.
+               Falls back to the bare balance only for a wallet with no purchase history to
+               measure against, where a fraction would have no denominator. -->
           <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-400">
             <template v-if="showTopupUsage">{{ formatNumber(topupUsed) }} / {{ formatNumber(topupTotal) }}</template>
             <template v-else>{{ formatNumber(topupBalance) }}</template>
-            <span class="font-normal"> {{ t('credits') }}</span>
+            <span class="font-normal ml-1">{{ t('credits') }}</span>
           </span>
         </div>
 
-        <!-- No bar while nothing has been drawn: an empty track reads as "all spent" and a
-             full one as "none left", and neither is true. -->
+        <!-- Always drawn once there is a ceiling, at 0% when none of it has been spent —
+             the chip beside it supplies the denominator that makes an empty track read as
+             "none used" rather than "all gone". -->
         <div v-if="showTopupUsage" class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
           <div
             class="h-full rounded-full bg-sky-500 transition-all duration-500"

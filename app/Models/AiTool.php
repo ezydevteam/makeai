@@ -109,6 +109,30 @@ class AiTool extends Model
         return $this->model_override ?: settings('default_ai_model', config('ai.fallback_model'));
     }
 
+    /**
+     * The most output tokens a generation from this tool can actually produce: the admin's
+     * per-tool override when set, otherwise the global default, then clamped to the model's
+     * own ceiling (admin-editable per model; 0 means uncapped).
+     *
+     * Lives here because two separate things need the same number and had each worked it out
+     * for themselves. PromptBuilder used it as the real completion limit, while the credit
+     * pre-flight and the price quoted to the user estimated from avg_output_tokens alone and
+     * multiplied it by up to 4x for "very long" output — so a tool capped at 300 tokens still
+     * quoted, and reserved credits for, four times what it was able to return.
+     */
+    public function effectiveMaxTokens(?string $model = null): int
+    {
+        $ceiling = $this->max_tokens_override ?? (int) settings('default_max_tokens', 2000);
+
+        $dbModel = $model ? AiModel::resolveForPricing($model) : null;
+
+        if ($dbModel && (int) $dbModel->max_tokens > 0) {
+            return min($ceiling, (int) $dbModel->max_tokens);
+        }
+
+        return $ceiling;
+    }
+
     public function getFieldsAttribute($value)
     {
         if (is_string($value)) {
