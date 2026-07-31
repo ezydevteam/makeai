@@ -550,12 +550,43 @@ const assistantSlotStyle = computed<CSSProperties>(() => {
     return textColor ? { color: textColor } : {}
 })
 
-const announcementHeight = ref(0)
-const updateAnnouncementHeight = () => {
+// Where the header has to start once it is taken OUT OF FLOW.
+//
+// The sticky path leaves the header in flow (position: sticky) and everything above it
+// pushes it down for free. The transparent-on-hero path does not: it switches to
+// position: fixed so the header can overlay the hero, and a fixed box ignores every
+// sibling above it. Offsetting by the announcement container alone was not enough —
+// AppLayout stacks the demo banner and a header_banner AdSection above #top-sticky-stack,
+// neither of which is in any height variable, so the header sat on top of them.
+//
+// Measured from an anchor left behind in the flow rather than summed from a list of
+// known elements: whatever AppLayout puts above the header, the anchor is below it.
+const headerFlowAnchor = ref<HTMLElement | null>(null)
+const headerAnchorTop = ref(0)
+const topStackBottom = ref(0)
+
+const measureHeaderOffsets = () => {
     if (typeof window === 'undefined') return
-    const el = document.getElementById('top-announcement-container')
-    announcementHeight.value = el ? el.offsetHeight : 0
+
+    // #top-sticky-stack pins to the viewport top, so its bottom edge is the floor the
+    // header can never rise above. Falls back to the announcement container on a layout
+    // that renders AnnouncementManager without the sticky wrapper.
+    const stack = document.getElementById('top-sticky-stack')
+        ?? document.getElementById('top-announcement-container')
+    topStackBottom.value = stack ? Math.max(0, stack.getBoundingClientRect().bottom) : 0
+
+    headerAnchorTop.value = headerFlowAnchor.value?.getBoundingClientRect().top ?? 0
 }
+
+// The header follows the page down until the anchor passes under the pinned banners,
+// then holds there. Same shape as the old max(0, height - scrollY), except the floor is
+// the real banner stack and the starting point is the header's own place in the flow.
+const overlayHeaderTop = computed(() => Math.max(topStackBottom.value, headerAnchorTop.value))
+
+// For the non-sticky overlay, which is `absolute` and so resolved against the document
+// rather than the viewport: the anchor's document offset, which does not change as the
+// page scrolls (the anchor rises by exactly scrollY).
+const anchorDocumentTop = computed(() => Math.max(0, headerAnchorTop.value + scrollY.value))
 
 const isOverlayLightBlock = (block: any) => {
     if (block?.id && String(block.id).startsWith('simple_bottom_')) {
@@ -566,18 +597,16 @@ const isOverlayLightBlock = (block: any) => {
 const mainHeaderSectionStyle = computed<CSSProperties>(() => {
     const style = { ...sectionStyle(headerConfig.value, 'main', 72) }
     const isSticky = stickyBehavior(headerConfig.value) !== 'none'
-    const topOffset = isSticky
-        ? `${Math.max(0, announcementHeight.value - scrollY.value)}px`
-        : `${announcementHeight.value}px`
+    const topOffset = isSticky ? overlayHeaderTop.value : anchorDocumentTop.value
 
     if (supportsTransparentHeroHeader.value && isSticky) {
         style.position = 'fixed'
-        style.top = topOffset
+        style.top = `${topOffset}px`
         style.left = '0px'
         style.right = '0px'
     } else if (isTransparentMainHeaderActive.value) {
         style.position = isSticky ? 'fixed' : 'absolute'
-        style.top = topOffset
+        style.top = `${topOffset}px`
         style.left = '0px'
         style.right = '0px'
     }
@@ -586,18 +615,16 @@ const mainHeaderSectionStyle = computed<CSSProperties>(() => {
 const mobileHeaderSectionStyle = computed<CSSProperties>(() => {
     const style = { ...sectionStyle(mobileHeaderConfig.value, 'mobile', 64) }
     const isSticky = mobileHeaderConfig.value?.sticky !== false
-    const topOffset = isSticky
-        ? `${Math.max(0, announcementHeight.value - scrollY.value)}px`
-        : `${announcementHeight.value}px`
+    const topOffset = isSticky ? overlayHeaderTop.value : anchorDocumentTop.value
 
     if (supportsTransparentHeroHeader.value && isSticky) {
         style.position = 'fixed'
-        style.top = topOffset
+        style.top = `${topOffset}px`
         style.left = '0px'
         style.right = '0px'
     } else if (isTransparentMainHeaderActive.value) {
         style.position = isSticky ? 'fixed' : 'absolute'
-        style.top = topOffset
+        style.top = `${topOffset}px`
         style.left = '0px'
         style.right = '0px'
     }
@@ -978,7 +1005,7 @@ const syncHeroOverlayState = () => {
     if (typeof window === 'undefined') return
 
     const heroSection = document.querySelector<HTMLElement>('[data-home-hero="true"]')
-    updateAnnouncementHeight()
+    measureHeaderOffsets()
 
     if (!supportsTransparentHeroHeader.value || !heroSection) {
         isHeroOverlayActive.value = false
@@ -1167,7 +1194,7 @@ const buttonVariantClass = (styleValue: string) => [
     styleValue === 'dark' ? 'bg-gray-900 text-white hover:bg-black dark:bg-surface-700 dark:hover:bg-surface-600' : '',
     styleValue === 'danger' ? 'bg-danger-600 text-white hover:bg-danger-700 shadow-lg shadow-danger-600/20' : '',
     styleValue === 'success' || styleValue === 'green' ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20' : '',
-    styleValue === 'warning' ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20' : '',
+    styleValue === 'warning' ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-500/20' : '',
     styleValue === 'purple' ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-600/20' : '',
     styleValue === 'gradient' || styleValue === 'gradient_sunset' ? 'bg-gradient-to-r from-orange-500 via-rose-500 to-pink-500 text-white hover:opacity-95 shadow-lg shadow-rose-500/25' : '',
     styleValue === 'gradient_ocean' ? 'bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 text-white hover:opacity-95 shadow-lg shadow-sky-500/25' : '',
@@ -1756,7 +1783,7 @@ const updateScrollState = () => {
     lastScrollY.value = currentY
     const scrollable = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1)
     scrollProgress.value = Math.min(100, Math.max(0, (currentY / scrollable) * 100))
-    updateAnnouncementHeight()
+    measureHeaderOffsets()
 }
 
 const userFirstName = computed(() => {
@@ -1797,22 +1824,37 @@ watch(mobileMenuOpen, (open) => {
     }
 })
 
+// Anything that changes the page's height moves the anchor without a scroll or a resize
+// event: dismissing the demo banner, a header_banner ad finishing its load, an
+// announcement being closed. An out-of-flow header would keep the stale offset and leave
+// a gap. Watching the body covers all of them without naming any.
+let bodyResizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
     document.addEventListener('click', close)
     document.addEventListener('keydown', closeOnEscape)
     document.addEventListener('keydown', handleKeydown)
     updateScrollState()
     window.addEventListener('scroll', updateScrollState, { passive: true })
-    window.addEventListener('announcement:change', updateAnnouncementHeight)
-    updateAnnouncementHeight()
+    window.addEventListener('resize', measureHeaderOffsets)
+    window.addEventListener('announcement:change', measureHeaderOffsets)
+    measureHeaderOffsets()
     void bindHeroOverlayState()
+
+    if (typeof ResizeObserver !== 'undefined') {
+        bodyResizeObserver = new ResizeObserver(() => measureHeaderOffsets())
+        bodyResizeObserver.observe(document.body)
+    }
 })
 onUnmounted(() => {
     document.removeEventListener('click', close)
     document.removeEventListener('keydown', closeOnEscape)
     document.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('scroll', updateScrollState)
-    window.removeEventListener('announcement:change', updateAnnouncementHeight)
+    window.removeEventListener('resize', measureHeaderOffsets)
+    window.removeEventListener('announcement:change', measureHeaderOffsets)
+    bodyResizeObserver?.disconnect()
+    bodyResizeObserver = null
     document.documentElement.classList.remove('overflow-hidden')
 })
 </script>
@@ -1829,6 +1871,13 @@ onUnmounted(() => {
             {{ secConfig.custom_css }}
         </component>
     </template>
+
+    <!-- Marks the header's place in the normal flow. The transparent-on-hero header is
+         positioned out of flow and cannot measure where it belongs, so this stays behind
+         and reports it — whatever AppLayout stacks above (demo banner, announcements,
+         a header_banner ad) is accounted for without this component knowing about any
+         of them. Zero height, so it changes nothing when the header is in flow. -->
+    <div ref="headerFlowAnchor" aria-hidden="true" class="h-0 w-full shrink-0"></div>
 
     <!-- Main Header -->
     <header :class="[
