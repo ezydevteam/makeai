@@ -1231,10 +1231,12 @@ const headerUtilityClass = (block: any, bottom = false) => {
     const roundedClass = ['icon_only', 'circular_soft_bg', 'light_bg'].includes(displayStyle) ? '!rounded-full' : '!rounded-lg'
     const iconOnlyClass = displayStyle === 'icon_only' ? 'header-soft-icon-button--icon-only' : ''
     const sizeClass = 'h-9 w-9'
+    // light_bg is the one tone that draws a raised white card rather than a wash of the
+    // header behind it, so it carries the lift to match.
     const toneClass = displayStyle === 'icon_only'
         ? 'border-transparent bg-transparent shadow-none'
         : displayStyle === 'light_bg'
-            ? 'border-gray-200 bg-white dark:border-surface-700 dark:bg-surface-700/50'
+            ? 'border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-700/50'
             : 'border'
 
     const isMobileBlock = block?.id && String(block.id).startsWith('simple_mobile_')
@@ -1247,7 +1249,11 @@ const notificationButtonClass = (block: any, bottom = false) => headerUtilityCla
 const socialIconButtonClass = (block: any) => {
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
     const sizeOverride = '!h-9 !w-9 !min-w-9'
-    return `${headerUtilityClass(block, false).join(' ')} ${sizeOverride} !justify-center !gap-0 !p-0 !shadow-none`
+    // The blanket !shadow-none flattens whatever tone headerUtilityClass picked, which
+    // would leave a light_bg social icon as the one raised control in the row without its
+    // lift. Every other tone is flat anyway, so scoping it costs nothing.
+    const shadowOverride = displayStyle === 'light_bg' ? '' : '!shadow-none'
+    return `${headerUtilityClass(block, false).join(' ')} ${sizeOverride} !justify-center !gap-0 !p-0 ${shadowOverride}`
 }
 const socialButtonWithTextClass = (block: any) => {
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
@@ -1263,7 +1269,7 @@ const socialButtonWithTextClass = (block: any) => {
     if (displayStyle === 'icon_only') {
         toneClass = 'border-transparent bg-transparent shadow-none'
     } else if (displayStyle === 'light_bg') {
-        toneClass = 'border-gray-200 bg-white dark:border-surface-700 dark:bg-surface-700/50'
+        toneClass = 'border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-700/50'
     }
 
     const isMobileBlock = block?.id && String(block.id).startsWith('simple_mobile_')
