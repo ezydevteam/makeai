@@ -59,6 +59,7 @@
                 "show_dark_mode_toggle": true,
                 "dark_mode_toggle_style": "rounded_soft_bg",
                 "command_palette_style": "hidden",
+                "show_icon_tooltip": true,
                 "auth_mode": "login_register",
                 "guest_login_text": "Login",
                 "guest_login_icon_class": "ti ti-login-2",

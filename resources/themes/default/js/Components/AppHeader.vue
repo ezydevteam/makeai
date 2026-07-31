@@ -7,6 +7,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 import LanguageSwitcher from '@/Components/Utility/LanguageSwitcher.vue'
 import CommandPalette from '@/Components/Utility/CommandPalette.vue'
 import NotificationBell from '@/Components/Utility/NotificationBell.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import SocialFollow from '@themes/default/js/Components/SocialFollow.vue'
 import { mediaUrl } from '@/lib/media'
 
@@ -67,6 +68,7 @@ type SimpleDesktopHeaderSettings = {
     show_border?: boolean
     show_shadow?: boolean
     menu_transform?: string
+    show_icon_tooltip?: boolean
 }
 type SimpleMobileTopHeaderSettings = {
     enabled?: boolean
@@ -401,6 +403,7 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
             shadow: desktop.show_shadow === true,
             show_border: desktop.show_border !== false,
             shadow_style: desktop.shadow_style || 'border_small',
+            show_icon_tooltip: desktop.show_icon_tooltip !== false,
             progressbar: false,
             background: { color: desktop.bg_color || '', image_url: '', overlay_opacity: 0 },
             text_color: desktopTextColor,
@@ -1287,6 +1290,19 @@ const socialButtonWithTextClass = (block: any) => {
 const softControlBorder = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
 const softControlSurface = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
 
+// Desktop only, and deliberately: a tooltip needs a pointer that can rest on something,
+// which a touch header does not have. Defaults on — most of these controls are a bare
+// glyph, and the label is otherwise only in the aria-label.
+const showIconTooltip = computed(() => (headerConfig.value as any)?.show_icon_tooltip !== false)
+
+// Empty content makes Tooltip render nothing, so a block with no label degrades quietly
+// rather than showing an empty bubble.
+const iconTooltipText = (block: any, fallback: string) => {
+    if (! showIconTooltip.value) return ''
+
+    return String(block?.config?.tooltip_text || fallback || '').trim()
+}
+
 // The motion half of a utility control's hover, chosen per tone — the colour half is the
 // :hover rules in the style block below, which every tone already shares.
 //
@@ -2027,8 +2043,12 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center justify-center" :class="[mainColumnGroupClass('right'), mainColFlexClass('right')]">
                 <template v-for="block in centeredMainActionBlocks" :key="block.id">
-                    <LanguageSwitcher v-if="block.type === 'language_switcher'" :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
-                    <NotificationBell v-else-if="block.type === 'notification_bell'" context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
+                    <Tooltip v-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" class="shrink-0">
+                        <LanguageSwitcher :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
+                    </Tooltip>
+                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" class="shrink-0">
+                        <NotificationBell context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
+                    </Tooltip>
                     <!-- SOCIAL ICONS DROPDOWN -->
                     <div v-else-if="block.type === 'social_icons' && socialProfiles.length" class="relative flex items-center" @click.stop>
                         <button
@@ -2068,17 +2088,21 @@ onUnmounted(() => {
                             </div>
                         </Transition>
                     </div>
-                    <button v-else-if="block.type === 'command_palette'" type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
-                        <span class="inline-flex items-center gap-2 min-w-0">
-                            <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
-                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
-                        </span>
+                    <Tooltip v-else-if="block.type === 'command_palette'" :content="iconTooltipText(block, t('Search'))" class="shrink-0">
+                        <button type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
+                            <span class="inline-flex items-center gap-2 min-w-0">
+                                <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
+                                <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
+                            </span>
                             <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
-                    </button>
-                    <button v-else-if="block.type === 'dark_mode'" @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)">
-                        <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                    </button>
+                        </button>
+                    </Tooltip>
+                    <Tooltip v-else-if="block.type === 'dark_mode'" :content="iconTooltipText(block, isDark ? t('Light mode') : t('Dark mode'))" class="shrink-0">
+                        <button @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="isDark ? t('Light mode') : t('Dark mode')">
+                            <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                        </button>
+                    </Tooltip>
                     <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" class="text-sm font-bold transition-all whitespace-nowrap shrink-0" :style="blockVisualStyle(block)" :class="[ctaShapeClass(block), isIconOnly(block) ? 'flex h-10 w-10 items-center justify-center' : 'px-5 py-2', ...buttonVariantClass(ctaStyleValue(block))]">
                         <span class="inline-flex items-center gap-1.5">
                             <i v-if="blockIconClass(block) || isIconOnly(block)" :class="[blockIconClass(block, 'ti ti-rocket'), ctaIconSizeClass()]" aria-hidden="true" />
@@ -2391,8 +2415,12 @@ onUnmounted(() => {
                             {{ t('Menu "') }}{{ block.config.menu_slug }}{{ t('" not found.') }}
                         </div>
                     </nav>
-                    <LanguageSwitcher v-else-if="block.type === 'language_switcher'" :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
-                    <NotificationBell v-else-if="block.type === 'notification_bell'" context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
+                    <Tooltip v-else-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" class="shrink-0">
+                        <LanguageSwitcher :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
+                    </Tooltip>
+                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" class="shrink-0">
+                        <NotificationBell context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
+                    </Tooltip>
                     <!-- SOCIAL ICONS DROPDOWN -->
                     <div v-else-if="block.type === 'social_icons' && socialProfiles.length" class="relative flex items-center" @click.stop>
                         <button

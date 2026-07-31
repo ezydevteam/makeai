@@ -58,6 +58,7 @@ type HeaderDesktopSettings = {
     show_dark_mode_toggle?: boolean
     dark_mode_toggle_style?: string
     command_palette_style?: string
+    show_icon_tooltip?: boolean
     auth_mode?: string
     guest_login_text?: string
     guest_login_icon_class?: string
@@ -1122,6 +1123,7 @@ const headerForm = useForm({
                 ? 'hide'
                 : (resolvedHeaderDefaults.value.desktop?.dark_mode_toggle_style ?? 'rounded_soft_bg'),
             command_palette_style: resolvedHeaderDefaults.value.desktop?.command_palette_style ?? 'hidden',
+            show_icon_tooltip: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_icon_tooltip, true),
             auth_mode: resolvedHeaderDefaults.value.desktop?.auth_mode ?? 'login_register',
             guest_login_text: resolvedHeaderDefaults.value.desktop?.guest_login_text ?? 'Login',
             guest_login_icon_class: resolvedHeaderDefaults.value.desktop?.guest_login_icon_class ?? 'ti ti-login-2',
@@ -2816,6 +2818,15 @@ watch(() => [
                                         </div>
                                         <AppSelect v-model="headerForm.settings.desktop.command_palette_style" :label="t('Search Box Style')" :options="headerCommandPaletteStyleOptions" class="mt-4" />
                                     </div>
+                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800 sm:col-span-2">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Icon Tooltips') }}</p>
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Name each header icon on hover — search, notifications, language and dark mode. Desktop only; a touch header has no pointer to rest on one.') }}</p>
+                                            </div>
+                                            <AppSwitch v-model="headerForm.settings.desktop.show_icon_tooltip" class="shrink-0" />
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
@@ -2855,7 +2866,7 @@ watch(() => [
                                             :label="t('Register Button Style')"
                                             :options="headerButtonStyleOptions"
                                         />
-                                        <AppSelect v-model="headerForm.settings.desktop.guest_button_shape" :label="t('Guest Button Style')" :options="headerButtonShapeOptions" />
+                                        <AppSelect v-model="headerForm.settings.desktop.guest_button_shape" :label="t('Auth Button Shape')" :options="headerButtonShapeOptions" />
                                         <AppSelect v-model="headerForm.settings.desktop.account_avatar_style" :label="t('Logged-in User Button')" :options="headerAccountAvatarStyleOptions" />
                                     </template>
                                 </div>
