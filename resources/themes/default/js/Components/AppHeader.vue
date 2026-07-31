@@ -2043,10 +2043,10 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center justify-center" :class="[mainColumnGroupClass('right'), mainColFlexClass('right')]">
                 <template v-for="block in centeredMainActionBlocks" :key="block.id">
-                    <Tooltip v-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" class="shrink-0">
+                    <Tooltip v-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" placement="bottom" class="shrink-0">
                         <LanguageSwitcher :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
                     </Tooltip>
-                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" class="shrink-0">
+                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" placement="bottom" class="shrink-0">
                         <NotificationBell context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                     </Tooltip>
                     <!-- SOCIAL ICONS DROPDOWN -->
@@ -2088,7 +2088,7 @@ onUnmounted(() => {
                             </div>
                         </Transition>
                     </div>
-                    <Tooltip v-else-if="block.type === 'command_palette'" :content="iconTooltipText(block, t('Search'))" class="shrink-0">
+                    <Tooltip v-else-if="block.type === 'command_palette'" :content="iconTooltipText(block, t('Search'))" placement="bottom" class="shrink-0">
                         <button type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
                             <span class="inline-flex items-center gap-2 min-w-0">
                                 <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
@@ -2097,7 +2097,7 @@ onUnmounted(() => {
                             <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
                         </button>
                     </Tooltip>
-                    <Tooltip v-else-if="block.type === 'dark_mode'" :content="iconTooltipText(block, isDark ? t('Light mode') : t('Dark mode'))" class="shrink-0">
+                    <Tooltip v-else-if="block.type === 'dark_mode'" :content="iconTooltipText(block, isDark ? t('Light mode') : t('Dark mode'))" placement="bottom" class="shrink-0">
                         <button @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="isDark ? t('Light mode') : t('Dark mode')">
                             <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                             <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
@@ -2415,10 +2415,10 @@ onUnmounted(() => {
                             {{ t('Menu "') }}{{ block.config.menu_slug }}{{ t('" not found.') }}
                         </div>
                     </nav>
-                    <Tooltip v-else-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" class="shrink-0">
+                    <Tooltip v-else-if="block.type === 'language_switcher'" :content="iconTooltipText(block, t('Language'))" placement="bottom" class="shrink-0">
                         <LanguageSwitcher :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
                     </Tooltip>
-                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" class="shrink-0">
+                    <Tooltip v-else-if="block.type === 'notification_bell'" :content="iconTooltipText(block, t('Notifications'))" placement="bottom" class="shrink-0">
                         <NotificationBell context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                     </Tooltip>
                     <!-- SOCIAL ICONS DROPDOWN -->
@@ -2460,18 +2460,22 @@ onUnmounted(() => {
                             </div>
                         </Transition>
                     </div>
-                    <button v-else-if="block.type === 'command_palette'" type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
-                        <span class="inline-flex items-center gap-2 min-w-0">
-                            <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
-                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
-                        </span>
-                        <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
-                    </button>
+                    <Tooltip v-else-if="block.type === 'command_palette'" :content="iconTooltipText(block, t('Search'))" placement="bottom" class="shrink-0">
+                        <button type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
+                            <span class="inline-flex items-center gap-2 min-w-0">
+                                <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
+                                <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
+                            </span>
+                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
+                        </button>
+                    </Tooltip>
 
-                    <button v-else-if="block.type === 'dark_mode'" @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)">
-                        <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                    </button>
+                    <Tooltip v-else-if="block.type === 'dark_mode'" :content="iconTooltipText(block, isDark ? t('Light mode') : t('Dark mode'))" placement="bottom" class="shrink-0">
+                        <button @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="isDark ? t('Light mode') : t('Dark mode')">
+                            <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                        </button>
+                    </Tooltip>
 
                     <!-- CTA BUTTON -->
                     <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" class="text-sm font-bold transition-all whitespace-nowrap shrink-0" :style="blockVisualStyle(block)" :class="[
