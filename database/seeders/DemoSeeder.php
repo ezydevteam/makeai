@@ -332,7 +332,7 @@ class DemoSeeder extends Seeder
                 // AccessLevelService both guard for a null plan, so this is safe.
                 'plan_id' => $isFree ? null : $plan['id'],
                 'subscription_status' => $isFree ? 'none' : 'active',
-                'subscription_ends_at' => $isFree ? null : now()->addMonths(mt_rand(1, 12)),
+                'subscription_ends_at' => $isFree ? null : now()->addMonthsNoOverflow(mt_rand(1, 12)),
                 'credits_used_month' => $creditsUsedMonth,
                 'credits_used_today' => min($creditsUsedMonth, mt_rand(0, 320)),
                 'country' => $profile['country'],
@@ -474,8 +474,15 @@ class DemoSeeder extends Seeder
 
         // Months 7-13 ago — volume per month so the lifetime (monthly) chart is continuous.
         // Starts past the daily loop above so the two never stack on the same days.
+        //
+        // subMonthsNoOverflow, here and everywhere else in this seeder, because plain
+        // subMonths() rolls FORWARD past a short month: seeded on the 31st, subMonths(1)
+        // is "June 31st" → July 1st, so the row lands in the month it started in. Every
+        // monthly bucket built that way skipped a month and doubled another on the three
+        // days at the end of a long month — a demo whose charts had a hole in them, and
+        // only between the 29th and the 31st.
         for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(8, 15)) as $ignored) {
                 $createUsage(
                     $pickUser(),
@@ -531,7 +538,7 @@ class DemoSeeder extends Seeder
             }
         }
         for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(4, 8)) as $ignored) {
                 $createInternalUsage($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(0, 23), mt_rand(0, 59)));
             }
@@ -819,7 +826,7 @@ class DemoSeeder extends Seeder
 
         // Months 7-13 ago: several sales per month for continuous lifetime revenue.
         for ($monthsAgo = 7; $monthsAgo <= 13; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(4, 9)) as $ignored) {
                 $makeRevenue($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
@@ -858,7 +865,7 @@ class DemoSeeder extends Seeder
             };
 
             $createdAt = now()->subDays($daysAgo)->setTime(mt_rand(8, 20), mt_rand(0, 59));
-            $periodEnd = $cycle === 'yearly' ? $createdAt->copy()->addYear() : $createdAt->copy()->addMonth();
+            $periodEnd = $cycle === 'yearly' ? $createdAt->copy()->addYear() : $createdAt->copy()->addMonthNoOverflow();
             $cancelledAt = $status === 'cancelled'
                 ? $createdAt->copy()->addDays(mt_rand(3, 20))
                 : null;
@@ -2333,7 +2340,7 @@ class DemoSeeder extends Seeder
         }
 
         for ($monthsAgo = 4; $monthsAgo <= 13; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, 3) as $ignored) {
                 $subscriberDates[] = $monthStart->copy()
                     ->addDays(mt_rand(0, $monthStart->daysInMonth - 1))
@@ -2847,7 +2854,7 @@ class DemoSeeder extends Seeder
                         ? match ($schedule['frequency']) {
                             'daily' => $lastRun->copy()->addDay(),
                             'weekly' => $lastRun->copy()->addWeek(),
-                            default => $lastRun->copy()->addMonth(),
+                            default => $lastRun->copy()->addMonthNoOverflow(),
                         }
                         : null,
                 ]
@@ -2977,7 +2984,7 @@ class DemoSeeder extends Seeder
                 // Uncapped percentage, no usage ceiling — the "always on" case.
                 'code' => 'YEARLY10', 'type' => 'percent', 'value' => 10, 'max_discount' => null,
                 'max_uses' => null, 'per_user_limit' => null, 'plan_id' => null, 'user_limit' => 'all',
-                'starts_at' => now()->subMonths(3), 'expires_at' => null,
+                'starts_at' => now()->subMonthsNoOverflow(3), 'expires_at' => null,
                 'is_active' => true, 'show_in_header' => false, 'used_count' => 312,
             ],
             [
@@ -2998,14 +3005,14 @@ class DemoSeeder extends Seeder
                 // Expired last month.
                 'code' => 'SUMMER25', 'type' => 'percent', 'value' => 25, 'max_discount' => 60,
                 'max_uses' => 300, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'all',
-                'starts_at' => now()->subMonths(3), 'expires_at' => now()->subMonth(),
+                'starts_at' => now()->subMonthsNoOverflow(3), 'expires_at' => now()->subMonthNoOverflow(),
                 'is_active' => true, 'show_in_header' => false, 'used_count' => 268,
             ],
             [
                 // Switched off by hand, which is a different state from expired.
                 'code' => 'LEGACY5', 'type' => 'fixed', 'value' => 5, 'max_discount' => null,
                 'max_uses' => 50, 'per_user_limit' => 1, 'plan_id' => null, 'user_limit' => 'inactive',
-                'starts_at' => now()->subMonths(6), 'expires_at' => now()->addMonths(6),
+                'starts_at' => now()->subMonthsNoOverflow(6), 'expires_at' => now()->addMonthsNoOverflow(6),
                 'is_active' => false, 'show_in_header' => false, 'used_count' => 11,
             ],
         ];
@@ -6992,7 +6999,7 @@ class DemoSeeder extends Seeder
                 $periodEnd = $cancelledAt ? $cancelledAt->copy() : $joinedAt->copy();
 
                 while (! $cancelledAt && $periodEnd->isPast()) {
-                    $cycle === 'yearly' ? $periodEnd->addYear() : $periodEnd->addMonth();
+                    $cycle === 'yearly' ? $periodEnd->addYear() : $periodEnd->addMonthNoOverflow();
                 }
 
                 $trialEndsAt = $status === 'trialing' ? now()->addDays(mt_rand(3, 12)) : null;
@@ -7176,7 +7183,7 @@ class DemoSeeder extends Seeder
             'affiliate_custom_slug' => 'demo-creator-affiliate',
             'plan_id' => $plan->id,
             'subscription_status' => 'active',
-            'subscription_ends_at' => now()->addMonths(11),
+            'subscription_ends_at' => now()->addMonthsNoOverflow(11),
             'daily_limit' => 1200,
             'monthly_limit' => 15000,
             'referral_earnings' => 1200.75,
@@ -7208,7 +7215,7 @@ class DemoSeeder extends Seeder
         // to match its active status — without it the admin Subscriptions screen listed it as
         // a synthetic row (cycle "Not set", amount "Not available") and its own billing page
         // had no subscription to manage.
-        $showcaseStartedAt = now()->subMonths(1)->startOfDay()->addHours(10);
+        $showcaseStartedAt = now()->subMonthsNoOverflow(1)->startOfDay()->addHours(10);
 
         $showcaseSubscription = \App\Models\GatewaySubscription::updateOrCreate(
             ['gateway_subscription_id' => 'demo-sub-showcase'],
@@ -7222,7 +7229,7 @@ class DemoSeeder extends Seeder
                 'currency' => 'USD',
                 'trial_ends_at' => null,
                 'current_period_start' => $showcaseStartedAt,
-                'current_period_end' => $user->subscription_ends_at ?? now()->addMonths(11),
+                'current_period_end' => $user->subscription_ends_at ?? now()->addMonthsNoOverflow(11),
                 'cancelled_at' => null,
             ]
         );
@@ -7631,7 +7638,7 @@ class DemoSeeder extends Seeder
 
         // Months 2-11 back — the 30-day loop already covers this month and last.
         for ($monthsAgo = 2; $monthsAgo <= 11; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(4, 8)) as $ignored) {
                 $clickTimes->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(7, 22), mt_rand(0, 59)));
             }
@@ -7663,7 +7670,7 @@ class DemoSeeder extends Seeder
                 ->map(fn (int $day) => now()->subDays($day)->setTime(mt_rand(8, 21), mt_rand(0, 59))));
 
         for ($monthsAgo = 2; $monthsAgo <= 11; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             $signupTimes->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
         }
 
@@ -7686,7 +7693,7 @@ class DemoSeeder extends Seeder
                     'credits' => mt_rand(40, 900),
                     'plan_id' => $plan?->id,
                     'subscription_status' => $plan ? 'active' : 'none',
-                    'subscription_ends_at' => $plan ? now()->addMonths(mt_rand(1, 11)) : null,
+                    'subscription_ends_at' => $plan ? now()->addMonthsNoOverflow(mt_rand(1, 11)) : null,
                     'referred_by' => $user->id,
                     'avatar' => $this->demoAvatar($name, 'avatars/demo-referred-' . ($index + 1) . '.svg'),
                     'is_active' => true,
@@ -7793,9 +7800,9 @@ class DemoSeeder extends Seeder
         // plus the affiliate payout taken as credits (mirrors the 180.00 credits payout in
         // seedShowcaseAffiliateExperience).
         $topUps = collect([
-            ['at' => now()->subMonths(11)->startOfMonth()->addDays(2)->setTime(10, 15), 'amount' => 12000, 'type' => 'purchase', 'description' => 'Demo showcase: Annual Studio access'],
-            ['at' => now()->subMonths(11)->startOfMonth()->addDays(3)->setTime(11, 0), 'amount' => 4000, 'type' => 'bonus', 'description' => 'Demo showcase: Launch bonus credits'],
-            ['at' => now()->subMonths(5)->startOfMonth()->addDays(9)->setTime(14, 30), 'amount' => 6000, 'type' => 'purchase', 'description' => 'Demo showcase: Mid-year credit top-up'],
+            ['at' => now()->subMonthsNoOverflow(11)->startOfMonth()->addDays(2)->setTime(10, 15), 'amount' => 12000, 'type' => 'purchase', 'description' => 'Demo showcase: Annual Studio access'],
+            ['at' => now()->subMonthsNoOverflow(11)->startOfMonth()->addDays(3)->setTime(11, 0), 'amount' => 4000, 'type' => 'bonus', 'description' => 'Demo showcase: Launch bonus credits'],
+            ['at' => now()->subMonthsNoOverflow(5)->startOfMonth()->addDays(9)->setTime(14, 30), 'amount' => 6000, 'type' => 'purchase', 'description' => 'Demo showcase: Mid-year credit top-up'],
             ['at' => now()->subDays(8)->setTime(16, 20), 'amount' => 750, 'type' => 'referral', 'description' => 'Demo showcase: Partner referral payout'],
             // The only row typed 'topup' rather than 'purchase', and deliberately so: that
             // string is what addCredits() writes for a paid top-up and what the Usage page's
@@ -8629,7 +8636,7 @@ class DemoSeeder extends Seeder
         // starts before the daily loop's reach. Where the two overlap the month simply
         // gets a few more generations, which costs nothing.
         for ($monthsAgo = 6; $monthsAgo <= 11; $monthsAgo++) {
-            $monthStart = now()->subMonths($monthsAgo)->startOfMonth();
+            $monthStart = now()->subMonthsNoOverflow($monthsAgo)->startOfMonth();
             foreach (range(1, mt_rand(6, 12)) as $ignored) {
                 $moments->push($monthStart->copy()->addDays(mt_rand(0, $monthStart->daysInMonth - 1))->setTime(mt_rand(8, 21), mt_rand(0, 59)));
             }
@@ -8814,10 +8821,15 @@ class DemoSeeder extends Seeder
             // Most of this history is spaced in months; the recent top-up needs day
             // precision, so a row may carry 'days' instead. First matching arm wins, so
             // 'months' is never read for a row that does not define it.
+            //
+            // NoOverflow is load-bearing: on the 31st, plain subMonths() pushed four of
+            // these eight charges into the following month — including the renewal that
+            // has to reconcile with the subscription period — collapsing a year of
+            // history into five distinct months.
             $paidAt = match (true) {
                 isset($row['days']) => now()->subDays($row['days'])->setTime(13, 5),
                 $row['months'] === 0 => now()->subHours(6),
-                default => now()->subMonths($row['months'])->startOfDay()->addHours(10),
+                default => now()->subMonthsNoOverflow($row['months'])->startOfDay()->addHours(10),
             };
 
             $this->backdate(Payment::updateOrCreate(
