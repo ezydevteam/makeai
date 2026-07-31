@@ -276,6 +276,133 @@ class SettingBlobTest extends TestCase
         $this->assertSame(0, Setting::where('group', 'social')->where('key', 'not like', 'group:%')->count());
     }
 
+    public function test_open_ended_key_families_blob_by_prefix(): void
+    {
+        // Three families whose key sets are generated, not enumerable: external services
+        // (`external_{integration}_{provider}_{field}`), per-theme config/update state
+        // (`theme_{slug}_{key}`), and the ads toggles. Each must blob by prefix.
+        settings_set('external_captcha_provider', 'recaptcha', 'string', 'external_apis');
+        settings_set('external_captcha_recaptcha_secret_key', 'rc-secret', 'encrypted', 'external_apis');
+        settings_set('theme_default_update_available', true, 'boolean', 'theme');
+        settings_set('theme_default_primary_color', '#fff', 'string', 'theme');
+        settings_set('ads_enabled', true, 'boolean', 'ads');
+        settings_set('adsense_publisher_id', 'ca-pub-42', 'string', 'ads'); // misses `ads_` → registry
+
+        $this->assertSame('recaptcha', settings('external_captcha_provider'));
+        $this->assertSame('rc-secret', settings('external_captcha_recaptcha_secret_key'));
+        $this->assertSame(true, settings('theme_default_update_available'));
+        $this->assertSame('#fff', settings('theme_default_primary_color'));
+        $this->assertSame(true, settings('ads_enabled'));
+        $this->assertSame('ca-pub-42', settings('adsense_publisher_id'));
+
+        // One row per group, no flat rows, and the secret is still ciphertext at rest.
+        $raw = json_decode(Setting::where('key', 'group:external_apis')->value('value'), true);
+        $this->assertNotSame('rc-secret', $raw['external_captcha_recaptcha_secret_key']['v']);
+        foreach (['external_apis', 'theme', 'ads'] as $group) {
+            $this->assertSame(1, Setting::where('key', "group:{$group}")->count());
+        }
+        $this->assertSame(0, Setting::where('key', 'not like', 'group:%')->count());
+    }
+
+    public function test_late_registered_stragglers_route_to_their_group(): void
+    {
+        // Keys that had a live writer but no routing entry, so every save left a flat row.
+        settings_set('active_theme_preset', 'creative', 'string', 'appearance');
+        settings_set('default_language', 'en', 'string', 'general');
+        settings_set('registration_default_plan', 'none', 'string', 'pricing');
+        settings_set('credits_month_last_reset', '2026-07', 'string', 'ai');
+        settings_set('last_queue_worker_run', '2026-07-31 09:00:00', 'string', 'system');
+
+        $this->assertSame('creative', Setting::getByGroup('appearance')['active_theme_preset']);
+        $this->assertSame('en', Setting::getByGroup('general')['default_language']);
+        $this->assertSame('none', Setting::getByGroup('pricing')['registration_default_plan']);
+        $this->assertSame('2026-07', Setting::getByGroup('ai')['credits_month_last_reset']);
+        $this->assertSame('2026-07-31 09:00:00', Setting::getByGroup('system')['last_queue_worker_run']);
+        $this->assertSame(0, Setting::where('key', 'not like', 'group:%')->count());
+    }
+
+    public function test_app_version_routes_to_system_not_general(): void
+    {
+        // It was registered in BOTH groups; PHP kept the last (system) while the seeder
+        // wrote group=general, so the row could never be collapsed. One entry now.
+        settings_set('app_version', '2.1.0', 'string', 'general'); // legacy caller arg
+
+        $this->assertSame('2.1.0', settings('app_version'));
+        $this->assertSame('2.1.0', Setting::getByGroup('system')['app_version']);
+        $this->assertArrayNotHasKey('app_version', Setting::getByGroup('general'));
+        $this->assertSame(0, Setting::where('key', 'app_version')->count());
+    }
+
+    public function test_fold_sweep_absorbs_rows_whose_group_column_disagrees_with_routing(): void
+    {
+        // The exact shape the per-group collapse could never fix: the `group` column says
+        // one thing, the key routes somewhere else. collapseGroupToBlob(column) misses it
+        // from both sides; the key-routed sweep gets it.
+        Setting::create(['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'general']);
+        Setting::create(['key' => 'tickets_enabled', 'value' => '1', 'type' => 'boolean', 'group' => 'support']);
+        Setting::create(['key' => 'legacy_unrouted_widget', 'value' => 'keep', 'type' => 'string', 'group' => 'appearance']);
+
+        Setting::collapseGroupToBlob('general');
+        Setting::collapseGroupToBlob('support');
+        $this->assertSame(2, Setting::whereIn('key', ['app_version', 'tickets_enabled'])->count()); // still flat
+
+        $absorbed = Setting::foldFlatRowsIntoBlobs();
+
+        $this->assertSame(2, $absorbed);
+        $this->assertSame('1.0.0', Setting::getByGroup('system')['app_version']);
+        $this->assertSame(true, Setting::getByGroup('features')['tickets_enabled']);
+        $this->assertSame(0, Setting::whereIn('key', ['app_version', 'tickets_enabled'])->count());
+        // A key that routes nowhere is left alone — the sweep is not a blanket delete.
+        $this->assertSame('keep', settings('legacy_unrouted_widget'));
+    }
+
+    public function test_fold_sweep_never_clobbers_an_existing_blob_value(): void
+    {
+        settings_set('blog_posts_per_page', 25, 'integer', 'blog');  // operator value, in the blob
+        Setting::create(['key' => 'blog_posts_per_page', 'value' => '9', 'type' => 'integer', 'group' => 'blog']);
+
+        Setting::foldFlatRowsIntoBlobs();
+
+        $this->assertSame(25, settings('blog_posts_per_page'));
+        $this->assertSame(0, Setting::where('key', 'blog_posts_per_page')->count());
+    }
+
+    public function test_seeding_leaves_no_flat_settings_rows(): void
+    {
+        // The regression guard for the whole class of bugs this file describes: the settings
+        // seeders must end with every row a `group:*` blob. SupportSeeder/ContactSeeder run
+        // AFTER FoundationSeeder's collapse, so anything they write must route itself.
+        $this->seed(\Database\Seeders\FoundationSeeder::class);
+        $this->seed(\Database\Seeders\SupportSeeder::class);
+        $this->seed(\Database\Seeders\ContactSeeder::class);
+
+        $flat = Setting::where('key', 'not like', 'group:%')->pluck('key')->all();
+
+        $this->assertSame([], $flat, 'Seeded settings left flat rows: '.implode(', ', $flat));
+        $this->assertGreaterThan(0, Setting::count());
+
+        // Spot-check that the seeded values actually survived the routing.
+        $this->assertSame('1.0.0', settings('app_version'));
+        $this->assertSame(24, settings('sla_first_response_hours'));
+        $this->assertSame(true, settings('tickets_enabled'));
+        $this->assertSame(true, settings('contact_enabled'));
+        $this->assertSame('text', settings('contact_subject_mode'));
+    }
+
+    public function test_reseeding_does_not_overwrite_operator_edited_values(): void
+    {
+        $this->seed(\Database\Seeders\SupportSeeder::class);
+        settings_set('sla_first_response_hours', 99, 'integer', 'support');
+
+        $this->seed(\Database\Seeders\SupportSeeder::class);
+
+        // isPersisted() is blob-aware, so the re-seed sees the key as present and skips it.
+        // The old Setting::firstOrCreate() guard checked the flat `key` column, which a
+        // blobbed key no longer has — it re-inserted the default as a flat row every run.
+        $this->assertSame(99, settings('sla_first_response_hours'));
+        $this->assertSame(0, Setting::where('key', 'sla_first_response_hours')->count());
+    }
+
     public function test_expand_reverses_collapse(): void
     {
         settings_set('gdpr_banner_title', 'Hi', 'string', 'gdpr');

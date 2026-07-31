@@ -45,11 +45,13 @@ class SupportSeeder extends Seeder
             ['key' => 'ai_reply_suggestion', 'value' => '1', 'type' => 'boolean'],
         ];
 
+        // Seed through the blob shim — see the note in ContactSeeder: Setting::firstOrCreate
+        // matches on the flat `key` column, which a blobbed key no longer has, so it kept
+        // re-inserting flat rows after FoundationSeeder's collapse had already run.
         foreach ($settings as $setting) {
-            Setting::firstOrCreate(
-                ['key' => $setting['key']],
-                [...$setting, 'group' => 'support']
-            );
+            if (! Setting::isPersisted($setting['key'])) {
+                settings_set($setting['key'], $setting['value'], $setting['type'], 'support');
+            }
         }
     }
 }

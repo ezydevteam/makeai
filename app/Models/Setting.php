@@ -87,6 +87,18 @@ class Setting extends Model
         'pricing_'       => 'pricing',
         'social_'        => 'social',
         'rl_'            => 'rate_limits',
+        // Third-party integrations (AI Settings › External Services). Open-ended like the
+        // cron keys: AiManagementController builds `external_{integration}_{provider}_{field}`
+        // from config('external-tools.integrations'), so a prefix — not a registry list — is
+        // the only thing that can keep up with the catalog.
+        'external_'      => 'external_apis',
+        // Per-theme config + update bookkeeping: `theme_{slug}_{key}`, written by
+        // ThemeService::setSetting/saveThemeSettings and ThemeLicenseService. Also
+        // open-ended (one key set per installed theme).
+        'theme_'         => 'theme',
+        // AdSense/ads toggles from Marketing › Ads. `adsense_publisher_id` misses this
+        // prefix by one character, so it is a registry entry below.
+        'ads_'           => 'ads',
         // newsletter group: both provider (mailchimp_) and popup/driver (newsletter_) keys.
         // `mailchimp_` does NOT collide with `mail_` — str_starts_with needs the underscore
         // at offset 4 ('mail_'), and 'mailchimp_' has 'c' there.
@@ -136,6 +148,10 @@ class Setting extends Model
         // ThrottleAiRequests, which ignores it unless demo.enabled.
         'demo_generation_rate_limit_per_min'     => 'ai',
         'demo_ip_daily_credit_limit'             => 'ai',
+        // Bookkeeping written by TokenGuard when it rolls the monthly credit window
+        // (group 'ai' at the call site); `credit_` prefix routing misses it — the key is
+        // `credits_`, plural.
+        'credits_month_last_reset'               => 'ai',
 
         // support — ticketing/SLA/attachment config
         'ai_reply_suggestion'                    => 'support',
@@ -152,7 +168,6 @@ class Setting extends Model
         // general — site-wide runtime/currency/maintenance config
         'active_theme'                           => 'general',
         'app_timezone'                           => 'general',
-        'app_version'                            => 'general',
         'currency_decimals'                      => 'general',
         'currency_position'                      => 'general',
         'currency_symbol'                        => 'general',
@@ -161,6 +176,14 @@ class Setting extends Model
         'maintenance_estimated_restoration_time' => 'general',
         'maintenance_mode'                       => 'general',
         'site_url'                               => 'general',
+        // Saved by General Settings alongside the currency keys above (same loop, same
+        // `general` group) — it was simply never registered.
+        'default_language'                       => 'general',
+        // NB: `app_version` is NOT a general key — it belongs to the `system` group below.
+        // It was listed here AND there; PHP silently keeps the LAST duplicate, so routing
+        // already resolved to `system` while FoundationSeeder seeded it with group=general,
+        // which left a permanent stray flat row (no collapse pass matched both). Do not
+        // re-add it here.
         // NB: the timezone setting is `app_timezone` (above). A separate `timezone` key was
         // a mis-named dead seed (zero readers) purged by 2026_07_09_000002 but re-seeded by
         // FoundationSeeder; removed from the seed + blob by 2026_07_17_000011. Do not re-add.
@@ -215,17 +238,27 @@ class Setting extends Model
         'update_last_checked'                    => 'system',
         'update_test_latest_version'             => 'system',
         'update_version'                         => 'system',
+        // Heartbeat stamped by AppServiceProvider so the admin shell can flag a dead
+        // queue worker; same group arg at the call site.
+        'last_queue_worker_run'                  => 'system',
 
         // NB: no `security` group — its only keys (login_throttle_*, require_email_verification,
         // two_factor_admin) were dead seeds (0 readers), purged 2026_07_09 and removed from the
         // blob by 2026_07_17_000012. The live email-verification toggle is
         // email_verification_enabled (features, above). Do not re-add.
 
-        // pricing — the one prefix-less key in an otherwise pricing_-prefixed blob group
+        // pricing — the prefix-less keys in an otherwise pricing_-prefixed blob group.
+        // registration_default_plan is saved by PlanController's pricing loop.
         'default_pricing_country'                => 'pricing',
+        'registration_default_plan'              => 'pricing',
 
-        // appearance — sidebar_config has no frontend_ prefix but belongs to the blob group
+        // appearance — neither key has the frontend_ prefix but both belong to the group.
+        // active_theme_preset is written by ThemePresetService::apply (group 'appearance').
         'sidebar_config'                         => 'appearance',
+        'active_theme_preset'                    => 'appearance',
+
+        // ads — the one key that misses the `ads_` prefix (`adsense_`, not `ads_`).
+        'adsense_publisher_id'                   => 'ads',
     ];
 
     /**
@@ -510,6 +543,60 @@ class Setting extends Model
         foreach ($keys as $key) {
             Cache::forget(self::CACHE_PREFIX.$key);
         }
+    }
+
+    /**
+     * Fold EVERY flat row that routes to a blob into that blob, whatever its `group`
+     * column says. Returns the number of rows absorbed.
+     *
+     * collapseGroupToBlob() is keyed on the group COLUMN, so it can only ever absorb a
+     * row whose column already matches its routed group. Rows written with a mismatched
+     * group — `app_version` seeded as `general` but registered `system`, `tickets_enabled`
+     * seeded as `support` but registered `features` — were invisible to every collapse
+     * pass and stayed flat forever. This sweep routes by KEY, so no mismatch can hide a
+     * row from it.
+     *
+     * Same semantics as collapseGroupToBlob otherwise: idempotent, and an existing blob
+     * value always wins over the flat row (a re-seeded default never clobbers an operator
+     * edit). Keys that route nowhere are left alone as flat rows.
+     */
+    public static function foldFlatRowsIntoBlobs(): int
+    {
+        $rows = static::where('key', 'not like', 'group:%')->get(['key', 'value', 'type']);
+
+        $byGroup = [];
+        foreach ($rows as $row) {
+            if ($group = self::blobGroupFor($row->key)) {
+                $byGroup[$group][] = $row;
+            }
+        }
+
+        $absorbed = 0;
+
+        foreach ($byGroup as $group => $groupRows) {
+            $blob = self::loadBlob($group);
+
+            foreach ($groupRows as $row) {
+                if (! array_key_exists($row->key, $blob)) {
+                    $blob[$row->key] = ['v' => $row->value, 't' => $row->type ?: 'string'];
+                }
+            }
+
+            static::updateOrCreate(
+                ['key' => self::blobRowKey($group)],
+                ['value' => json_encode($blob), 'type' => 'json', 'group' => $group],
+            );
+
+            $keys = array_map(fn ($row) => $row->key, $groupRows);
+            $absorbed += static::whereIn('key', $keys)->delete();
+
+            Cache::forget(self::CACHE_PREFIX.self::blobRowKey($group));
+            foreach ($keys as $key) {
+                Cache::forget(self::CACHE_PREFIX.$key);
+            }
+        }
+
+        return $absorbed;
     }
 
     /**

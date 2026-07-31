@@ -54,8 +54,12 @@ class AppHeadComposer
     private function themeCssTimestamp(): int
     {
         try {
+            // Both keys carry the `frontend_` prefix, so they live inside the appearance
+            // group blob — there are no rows of their own to read an updated_at from.
+            // Querying them by key returned null on every request, which fell through to
+            // time() and busted the stylesheet URL every second instead of on change.
             return Setting::query()
-                ->whereIn('key', ['frontend_theme_settings', 'frontend_custom_code'])
+                ->where('key', 'group:appearance')
                 ->max('updated_at')?->timestamp ?? time();
         } catch (\Throwable) {
             // Unlike every other lookup in this composer, which degrades to

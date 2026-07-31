@@ -22,11 +22,15 @@ class ContactSeeder extends Seeder
             ['key' => 'contact_auto_reply_message', 'value' => "Hi {name},\n\nThanks for reaching out. We've received your message and our team will get back to you shortly.\n\nBest regards", 'type' => 'string'],
         ];
 
+        // Seed through the blob shim, not Setting::firstOrCreate(). firstOrCreate matches on
+        // the flat `key` column, which no longer exists once a key lives inside its group
+        // blob — so it saw every key as missing and re-inserted it as a flat row, on every
+        // run, after FoundationSeeder had already collapsed. isPersisted() is blob-aware and
+        // keeps the "never overwrite an operator's value" guarantee.
         foreach ($settings as $setting) {
-            Setting::firstOrCreate(
-                ['key' => $setting['key']],
-                [...$setting, 'group' => 'contact']
-            );
+            if (! Setting::isPersisted($setting['key'])) {
+                settings_set($setting['key'], $setting['value'], $setting['type'], 'contact');
+            }
         }
     }
 }

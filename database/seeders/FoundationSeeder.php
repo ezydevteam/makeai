@@ -33,22 +33,12 @@ class FoundationSeeder extends Seeder
      */
     private function collapseBlobbedGroups(): void
     {
-        $groups = [
-            'blog', 'gdpr', 'notifications',
-            'pricing', 'branding', 'appearance', 'rag', 'billing',
-            'license', 'storage', 'mail', 'comments', 'contact', 'social',
-            // Phase 6 — heterogeneous groups routed via the explicit BLOB_GROUP_KEYS registry.
-            'ai', 'support', 'general', 'features',
-            // Phase 7 — rate_limits (pricing re-collapse folds in default_pricing_country).
-            // (security dropped — its keys were all dead seeds, removed 2026_07_17_000012.)
-            'rate_limits',
-            // Phase 9 — newsletter (missed by the original sweep; no-op if operator never configured it).
-            'newsletter',
-        ];
-
-        foreach ($groups as $group) {
-            Setting::collapseGroupToBlob($group);
-        }
+        // One key-routed sweep instead of a hand-maintained group list: every flat row
+        // whose key routes to a blob is folded into it, so a group added to the routing
+        // tables later needs no edit here — and a row seeded with a group that does not
+        // match its registry entry (which the old per-group collapse silently skipped)
+        // still lands in the right blob.
+        Setting::foldFlatRowsIntoBlobs();
     }
 
     /**
@@ -95,7 +85,10 @@ class FoundationSeeder extends Seeder
             // NB: no `timezone` seed — that was a mis-named dead duplicate of `app_timezone`
             // (the key the app actually reads via display_tz()); purged 2026_07_09, do not re-add.
             ['key' => 'maintenance_mode', 'value' => '0', 'type' => 'boolean', 'group' => 'general'],
-            ['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'general'],
+            // `system`, not `general` — that is the group UpdateService writes it with and
+            // the group its registry entry routes to. Seeding it as `general` is what left a
+            // stray flat row on every install (see Setting::BLOB_GROUP_KEYS).
+            ['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'system'],
             ['key' => 'active_theme', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
             ['key' => 'homepage_template', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
             ['key' => 'frontend_theme_settings', 'value' => json_encode([
