@@ -1272,6 +1272,14 @@ const socialButtonWithTextClass = (block: any) => {
 
     return iconSurfaceClass(block, `${base} ${shapeClass} ${toneClass} ${colorClass}`)
 }
+// The neutral border every bordered header control shares when the operator has not set
+// a colour of their own. Named rather than repeated, because Tailwind v4 made the default
+// border colour `currentColor`: any control carrying a bare `border` class and no explicit
+// colour draws its border in the TEXT colour. That is what set the search box apart —
+// a hard gray-700 outline standing next to everything else's 8% black.
+const softControlBorder = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
+const softControlSurface = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+
 const softIconSurfaceStyle = (block: any): HeaderStyle => {
     const style: HeaderStyle = {}
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
@@ -1325,8 +1333,8 @@ const softIconSurfaceStyle = (block: any): HeaderStyle => {
         }
     } else {
         if (!['icon_only', 'light_bg'].includes(displayStyle)) {
-            const bgVal = isDark.value ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
-            const borderVal = isDark.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
+            const bgVal = softControlSurface(isDark.value)
+            const borderVal = softControlBorder(isDark.value)
             style.background = bgVal
             style.borderColor = borderVal
             style['--header-soft-icon-bg'] = bgVal
@@ -1436,9 +1444,9 @@ const commandPaletteButtonStyle = (block: any): HeaderStyle => {
     const hoverColor = configString(block.config, 'hover_color') || (isDark.value ? '' : textColor)
 
     if (isDark.value) {
-        style.borderColor = 'rgba(255, 255, 255, 0.08)'
+        style.borderColor = softControlBorder(true)
         style.background = commandPaletteDisplayStyle(block) === 'search_light'
-            ? 'rgba(255, 255, 255, 0.05)'
+            ? softControlSurface(true)
             : 'transparent'
 
         if (hoverColor) {
@@ -1454,6 +1462,11 @@ const commandPaletteButtonStyle = (block: any): HeaderStyle => {
         if (commandPaletteDisplayStyle(block) === 'search_transparent') {
             style.background = `color-mix(in srgb, ${textColor} 5%, transparent)`
         }
+    } else {
+        // The gap this whole helper had: light mode with no operator colour set nothing at
+        // all, so the bare `border` class fell through to currentColor. Dark mode above
+        // always set it, which is why only the light header showed the mismatch.
+        style.borderColor = softControlBorder(false)
     }
 
     if (hoverColor) {
