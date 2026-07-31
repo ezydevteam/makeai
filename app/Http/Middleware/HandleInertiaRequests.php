@@ -497,8 +497,10 @@ class HandleInertiaRequests extends Middleware
 
     /**
      * Fold the demo nav groups into the header's menu (slug 'main'). If a real 'main'
-     * menu exists the demo parents are appended to it; otherwise a synthetic 'main'
-     * menu is added so the header has something to render. Never cached / persisted.
+     * menu exists the demo parents are prepended to it — the demo switcher is what a
+     * buyer is meant to try first, so it leads the header rather than trailing the
+     * operator's own links; otherwise a synthetic 'main' menu is added so the header
+     * has something to render. Never cached / persisted.
      *
      * @param  array<int, array<string, mixed>>  $menus
      * @return array<int, array<string, mixed>>
@@ -513,7 +515,7 @@ class HandleInertiaRequests extends Middleware
 
         foreach ($menus as &$menu) {
             if (($menu['slug'] ?? null) === 'main') {
-                $menu['items'] = array_merge($menu['items'] ?? [], $items);
+                $menu['items'] = array_merge($items, $menu['items'] ?? []);
 
                 return $menus;
             }
@@ -550,7 +552,9 @@ class HandleInertiaRequests extends Middleware
         ];
 
         $items = [];
-        $sort = 9000;
+        // Negative so any surface that re-sorts by sort_order keeps the demo groups
+        // ahead of the operator's own items, matching the injected array order.
+        $sort = -9000;
 
         foreach ($groups as $group) {
             if ($group['items'] === []) {
