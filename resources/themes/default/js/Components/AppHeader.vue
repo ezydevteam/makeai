@@ -1146,12 +1146,20 @@ const sharedButtonStyleValue = (value: unknown) => {
 const ctaStyleValue = (block: any) => {
     return sharedButtonStyleValue(block.config?.style)
 }
+// Important, or the shape is silently ignored by whichever button is set to `primary`
+// or `filled`. buttonVariantClass() gives those `btn-primary-admin`, which sets its own
+// border-radius in app.css — and that rule is UNLAYERED while Tailwind's utilities live
+// in a cascade layer, so it wins regardless of source order and despite the identical
+// specificity. Nothing short of !important reaches it.
+//
+// So "pill" applied to one guest button and not the other purely because they were on
+// different styles, and the same silence hit any cta_button on a primary style.
 const buttonShapeClass = (shapeValue: unknown) => {
     const shape = String(shapeValue || 'rounded_xl')
-    if (shape === 'sharp') return 'rounded-none'
-    if (shape === 'rounded') return 'rounded-md'
-    if (shape === 'pill') return 'rounded-full'
-    return 'rounded-xl'
+    if (shape === 'sharp') return '!rounded-none'
+    if (shape === 'rounded') return '!rounded-md'
+    if (shape === 'pill') return '!rounded-full'
+    return '!rounded-xl'
 }
 const ctaShapeClass = (block: any) => buttonShapeClass(block.config?.shape)
 const buttonVariantClass = (styleValue: string) => [
@@ -1190,7 +1198,10 @@ const headerUtilityClass = (block: any, bottom = false) => {
     }
 
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
-    const roundedClass = ['icon_only', 'circular_soft_bg', 'light_bg'].includes(displayStyle) ? 'rounded-full' : 'rounded-lg'
+    // Important for the same reason as buttonShapeClass: iconSurfaceClass() below adds
+    // btn-primary-admin on bg_style `filled`, and its unlayered border-radius would
+    // otherwise square off a button the operator asked to be circular.
+    const roundedClass = ['icon_only', 'circular_soft_bg', 'light_bg'].includes(displayStyle) ? '!rounded-full' : '!rounded-lg'
     const iconOnlyClass = displayStyle === 'icon_only' ? 'header-soft-icon-button--icon-only' : ''
     const sizeClass = 'h-9 w-9'
     const toneClass = displayStyle === 'icon_only'
@@ -1215,9 +1226,10 @@ const socialButtonWithTextClass = (block: any) => {
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
     const base = 'header-soft-icon-button flex items-center gap-2 px-3 py-1.5 text-sm font-semibold transition-all duration-200'
 
-    let shapeClass = 'rounded-xl'
+    // Important — see headerUtilityClass above; this one also ends in iconSurfaceClass.
+    let shapeClass = '!rounded-xl'
     if (displayStyle === 'circular_soft_bg' || displayStyle === 'icon_only') {
-        shapeClass = 'rounded-full'
+        shapeClass = '!rounded-full'
     }
 
     let toneClass = 'border'
