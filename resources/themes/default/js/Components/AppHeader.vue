@@ -1238,12 +1238,13 @@ const headerUtilityClass = (block: any, bottom = false) => {
         : displayStyle === 'light_bg'
             ? 'border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-700/50'
             : 'border'
+    const hoverClass = utilityHoverClass(displayStyle)
 
     const isMobileBlock = block?.id && String(block.id).startsWith('simple_mobile_')
     const hasMobileColor = isMobileBlock && mobileHeaderConfig.value?.text_color
     const colorClass = hasMobileColor ? 'text-current' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
 
-    return iconSurfaceClass(block, `header-soft-icon-button ${iconOnlyClass} relative flex ${sizeClass} items-center justify-center ${roundedClass} ${toneClass} ${colorClass} transition-all duration-200`)
+    return iconSurfaceClass(block, `header-soft-icon-button ${iconOnlyClass} relative flex ${sizeClass} items-center justify-center ${roundedClass} ${toneClass} ${hoverClass} ${colorClass} transition-all duration-200`)
 }
 const notificationButtonClass = (block: any, bottom = false) => headerUtilityClass(block, bottom)
 const socialIconButtonClass = (block: any) => {
@@ -1276,7 +1277,7 @@ const socialButtonWithTextClass = (block: any) => {
     const hasMobileColor = isMobileBlock && mobileHeaderConfig.value?.text_color
     const colorClass = hasMobileColor ? 'text-current' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
 
-    return iconSurfaceClass(block, `${base} ${shapeClass} ${toneClass} ${colorClass}`)
+    return iconSurfaceClass(block, `${base} ${shapeClass} ${toneClass} ${utilityHoverClass(displayStyle)} ${colorClass}`)
 }
 // The neutral border every bordered header control shares when the operator has not set
 // a colour of their own. Named rather than repeated, because Tailwind v4 made the default
@@ -1285,6 +1286,28 @@ const socialButtonWithTextClass = (block: any) => {
 // a hard gray-700 outline standing next to everything else's 8% black.
 const softControlBorder = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
 const softControlSurface = (dark: boolean) => dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+
+// The motion half of a utility control's hover, chosen per tone — the colour half is the
+// :hover rules in the style block below, which every tone already shares.
+//
+// One effect for all three would read wrong, because they are not the same object at rest:
+//   icon_only          bare glyph, no surface at all → nothing to raise or deepen, so it
+//                      grows instead, alongside the background wash that fades in.
+//   *_soft_bg          a tinted patch of the header → a small grow keeps it feeling part
+//                      of the bar. No shadow: socialIconButtonClass forces !shadow-none on
+//                      these tones, so one would be silently dropped on social icons.
+//   light_bg           a raised white card → it lifts and its shadow deepens, the one
+//                      tone where "picked up" is the honest metaphor.
+//
+// motion-safe so the transform is dropped entirely for prefers-reduced-motion; the colour
+// and shadow changes still land there. The controls already carry transition-all
+// duration-200, so nothing extra is needed to animate these.
+const utilityHoverClass = (displayStyle: string) => {
+    if (displayStyle === 'icon_only') return 'motion-safe:hover:scale-110'
+    if (displayStyle === 'light_bg') return 'hover:shadow-md motion-safe:hover:-translate-y-0.5'
+
+    return 'motion-safe:hover:scale-105'
+}
 
 const softIconSurfaceStyle = (block: any): HeaderStyle => {
     const style: HeaderStyle = {}
