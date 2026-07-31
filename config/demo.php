@@ -337,10 +337,15 @@ return [
         //
         // A missing or blank entry is skipped and the setting is left as seeded (empty),
         // which falls back to the site-name wordmark in the header.
+        // favicon_ico is blank on purpose: app.blade.php renders the PNG as the primary
+        // <link rel="icon"> and the .ico only as `rel="alternate icon"`, which no browser
+        // in use reaches. Point DEMO_FAVICON_ICO at a file in public/demo-assets/ if you
+        // ever want one; leaving it blank skips the slot silently rather than warning
+        // about a file that does not need to exist.
         'branding' => [
-            'logo_light' => env('DEMO_LOGO_LIGHT', 'logo-light.svg'),
-            'logo_dark' => env('DEMO_LOGO_DARK', 'logo-dark.svg'),
-            'favicon_ico' => env('DEMO_FAVICON_ICO', 'favicon.ico'),
+            'logo_light' => env('DEMO_LOGO_LIGHT', 'logo-light.png'),
+            'logo_dark' => env('DEMO_LOGO_DARK', 'logo-dark.png'),
+            'favicon_ico' => env('DEMO_FAVICON_ICO', ''),
             'favicon_png' => env('DEMO_FAVICON_PNG', 'favicon.png'),
         ],
     ],

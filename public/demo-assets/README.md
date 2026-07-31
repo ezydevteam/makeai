@@ -5,10 +5,10 @@ this directory.
 
 | File | Setting it fills | Notes |
 |---|---|---|
-| `logo-light.svg` | `site_logo_light` | Shown on light backgrounds. `svg`, `png`, `webp` all work. |
-| `logo-dark.svg` | `site_logo_dark` | Shown on dark backgrounds; the header falls back to the light one if absent. |
-| `favicon.ico` | `site_favicon_ico` | |
-| `favicon.png` | `site_favicon_png` | |
+| `logo-light.png` | `site_logo_light` | Shown on light backgrounds. `png`, `svg`, `webp` all work. |
+| `logo-dark.png` | `site_logo_dark` | Shown on dark backgrounds; the header falls back to the light one if absent. |
+| `favicon.png` | `site_favicon_png` | The primary `<link rel="icon">`. |
+| — | `site_favicon_ico` | Optional and unset. `app.blade.php` renders the `.ico` only as `rel="alternate icon"`, which nothing current falls back to. Set `DEMO_FAVICON_ICO` to a filename here if you want one. |
 
 `DemoProvisionSeeder` copies each file onto the public disk and points the branding
 setting at the copy, on every `demo:reset`. A file that is not here is skipped with a

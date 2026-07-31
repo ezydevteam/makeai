@@ -467,13 +467,26 @@ class DemoProvisionSeederTest extends TestCase
         $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
-    /** The filenames config ships as defaults must be the ones the README documents. */
-    public function test_the_shipped_branding_defaults_match_the_documented_filenames(): void
+    /**
+     * Every filename the config ships must name a file that is actually in the directory,
+     * and be documented. A rename on either side breaks the demo silently — the reset just
+     * warns and the demo comes up with no logo — so it is caught here instead.
+     *
+     * A blank default is a deliberately unused slot (favicon_ico) and is skipped.
+     */
+    public function test_the_shipped_branding_defaults_name_files_that_exist(): void
     {
         $readme = file_get_contents(base_path('public/demo-assets/README.md'));
 
         foreach (config('demo.provisioning.branding') as $slot => $filename) {
-            $this->assertNotEmpty($filename, "demo.provisioning.branding.{$slot} has no default filename");
+            if ($filename === '') {
+                continue;
+            }
+
+            $this->assertFileExists(
+                base_path('public/demo-assets/'.$filename),
+                "demo.provisioning.branding.{$slot} points at {$filename}, which is not in public/demo-assets"
+            );
             $this->assertStringContainsString(
                 $filename,
                 $readme,
