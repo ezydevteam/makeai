@@ -320,6 +320,29 @@ return [
             'site_key' => env('DEMO_RECAPTCHA_SITE_KEY'),
             'secret_key' => env('DEMO_RECAPTCHA_SECRET_KEY'),
         ],
+
+        // The demo host's own logo and favicon, written to the site_* branding settings.
+        //
+        // These cannot be uploaded through the admin panel: DemoMode blocks every write
+        // that is not on its allowlist, and Appearance › Branding is not. Setting them by
+        // hand does not survive either — demo:reset runs migrate:fresh (wiping settings)
+        // and demo:sweep-uploads (wiping the storage trees) before this seeder runs.
+        //
+        // Each value is a FILENAME inside public/demo-assets/, not a path: that directory
+        // is part of the release rather than the writable storage tree, so it is the one
+        // place a source image survives a reset. DemoProvisionSeeder copies each file onto
+        // the public disk and points the setting at the copy — storing the source path
+        // directly would break, since media_url() resolves stored keys against the public
+        // disk and would rewrite it to /storage/demo-assets/…
+        //
+        // A missing or blank entry is skipped and the setting is left as seeded (empty),
+        // which falls back to the site-name wordmark in the header.
+        'branding' => [
+            'logo_light' => env('DEMO_LOGO_LIGHT', 'logo-light.svg'),
+            'logo_dark' => env('DEMO_LOGO_DARK', 'logo-dark.svg'),
+            'favicon_ico' => env('DEMO_FAVICON_ICO', 'favicon.ico'),
+            'favicon_png' => env('DEMO_FAVICON_PNG', 'favicon.png'),
+        ],
     ],
 
 ];

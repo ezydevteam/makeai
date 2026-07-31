@@ -701,6 +701,25 @@ if (! $demo) {
     info(sprintf('%d addons bundled, %d files', count(DEMO_ADDONS), $addonFiles));
 }
 
+// The demo host's logo and favicon. ALLOW_DIRS deliberately omits public/ — the buyer
+// package's webroot is assembled file by file — so this one directory has to be carried
+// over explicitly, and only for a demo build. It lands in core/public/demo-assets, which
+// the web server denies; DemoProvisionSeeder reads it from disk and copies each image
+// onto the public disk on every demo:reset. Without this step the demo would come up
+// with no logo, and no way to set one (the admin write is blocked in demo mode).
+if ($demo) {
+    step('Bundling demo branding assets');
+
+    $assetSource = $srcDir . '/public/demo-assets';
+
+    if (! is_dir($assetSource)) {
+        fail('public/demo-assets is missing — the demo host has no logo or favicon source');
+    }
+
+    $assetFiles = copyTree($assetSource, $appRoot . '/public/demo-assets', null, 'public/demo-assets');
+    info("{$assetFiles} files copied");
+}
+
 // The shipped .env.example keeps the whole demo block commented out so a buyer cannot
 // enable a data-destroying reset by accident. The demo host needs the opposite default,
 // and asking the operator to hand-edit it is exactly the step that gets skipped.

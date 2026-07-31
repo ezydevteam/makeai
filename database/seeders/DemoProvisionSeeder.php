@@ -6,6 +6,7 @@ use App\Models\AiKey;
 use App\Models\AiModel;
 use App\Models\PaymentGateway;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Restores the demo site's live API credentials after demo:reset.
@@ -39,6 +40,70 @@ class DemoProvisionSeeder extends Seeder
         $this->provisionOauth();
         $this->provisionExtensions();
         $this->provisionCaptcha();
+        $this->provisionBranding();
+    }
+
+    /**
+     * The demo host's logo and favicon.
+     *
+     * Same reason as the credentials above: the admin panel cannot set these on a demo
+     * (DemoMode blocks the branding save) and nothing set by hand survives demo:reset,
+     * which wipes both the settings table and the storage trees before this runs. The
+     * source images therefore live in public/demo-assets/ — part of the release, not the
+     * writable tree — and are copied onto the public disk on every reset.
+     *
+     * The setting stores the COPY's relative key, never the source path: media_url()
+     * resolves stored keys against the public disk, so a value of 'demo-assets/logo.svg'
+     * would render as '/storage/demo-assets/logo.svg' and 404.
+     */
+    private function provisionBranding(): void
+    {
+        // Setting key => config entry under demo.provisioning.branding.
+        $map = [
+            'site_logo_light' => 'logo_light',
+            'site_logo_dark' => 'logo_dark',
+            'site_favicon_ico' => 'favicon_ico',
+            'site_favicon_png' => 'favicon_png',
+        ];
+
+        $sourceDir = base_path('public/demo-assets');
+        $provisioned = [];
+        $missing = [];
+
+        foreach ($map as $settingKey => $configKey) {
+            // basename() rather than the raw value: these come from .env on a public host,
+            // and a filename is all this is ever meant to be.
+            $file = basename(trim((string) config("demo.provisioning.branding.{$configKey}", '')));
+
+            if ($file === '' || $file === '.') {
+                continue;
+            }
+
+            $source = $sourceDir.DIRECTORY_SEPARATOR.$file;
+
+            if (! is_file($source)) {
+                $missing[] = $file;
+
+                continue;
+            }
+
+            $key = 'branding/'.$file;
+            Storage::disk('public')->put($key, (string) file_get_contents($source));
+            settings_set($settingKey, $key, 'string', 'branding');
+            $provisioned[] = $file;
+        }
+
+        if ($provisioned !== []) {
+            $this->note('branding: '.implode(', ', $provisioned).' copied to the public disk');
+        }
+
+        if ($missing !== []) {
+            $this->note(
+                'branding: not found in public/demo-assets — '.implode(', ', $missing)
+                .' (that slot stays empty; the header falls back to the site name)',
+                true
+            );
+        }
     }
 
     /**

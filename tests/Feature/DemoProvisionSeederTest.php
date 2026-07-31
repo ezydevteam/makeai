@@ -7,6 +7,7 @@ use App\Models\AiModel;
 use App\Models\PaymentGateway;
 use Database\Seeders\DemoProvisionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -358,6 +359,7 @@ class DemoProvisionSeederTest extends TestCase
             'DEMO_AI_KEY_OPENROUTER', 'DEMO_AI_KEY_GOOGLE',
             'DEMO_AI_DEFAULT_MODEL', 'DEMO_AI_FALLBACK_MODEL',
             'DEMO_RECAPTCHA_ENABLED',
+            'DEMO_LOGO_LIGHT', 'DEMO_LOGO_DARK', 'DEMO_FAVICON_ICO', 'DEMO_FAVICON_PNG',
         ];
 
         foreach (array_keys(config('payment-gateways')) as $slug) {
@@ -402,6 +404,95 @@ class DemoProvisionSeederTest extends TestCase
         $this->assertSame('sk_test_1', PaymentGateway::firstWhere('slug', 'stripe')->getCredential('secret_key'));
         $this->assertSame('gsecret', settings('social_login_google_client_secret'));
         $this->assertSame('sk-or-v1-demo', AiKey::firstWhere('provider', 'openrouter')->api_key);
+    }
+
+    /**
+     * Branding is the one thing here whose source is a FILE rather than an env string, so
+     * these cover the copy as well as the setting: the demo cannot upload a logo through
+     * the admin panel (DemoMode blocks the write) and demo:sweep-uploads deletes the
+     * storage trees on every reset, so the copy has to happen again each time.
+     */
+    public function test_it_copies_branding_images_onto_the_public_disk_and_points_the_settings_at_them(): void
+    {
+        Storage::fake('public');
+        $logo = $this->writeDemoAsset('logo-light-'.getmypid().'.svg', '<svg/>');
+        $icon = $this->writeDemoAsset('favicon-'.getmypid().'.png', 'PNG');
+
+        $this->provision(['branding' => [
+            'logo_light' => basename($logo),
+            'favicon_png' => basename($icon),
+        ]]);
+
+        // The setting stores the COPY's key, not the source path — media_url() resolves
+        // stored keys against the public disk, so 'demo-assets/…' would 404.
+        $this->assertSame('branding/'.basename($logo), settings('site_logo_light'));
+        $this->assertSame('branding/'.basename($icon), settings('site_favicon_png'));
+        Storage::disk('public')->assertExists('branding/'.basename($logo));
+        $this->assertSame('<svg/>', Storage::disk('public')->get('branding/'.basename($logo)));
+
+        // Untouched slots stay empty rather than pointing at a file that is not there.
+        $this->assertBlank(settings('site_logo_dark'));
+    }
+
+    public function test_a_branding_filename_with_no_file_behind_it_is_skipped(): void
+    {
+        Storage::fake('public');
+
+        $this->provision(['branding' => ['logo_light' => 'does-not-exist-'.getmypid().'.svg']]);
+
+        $this->assertBlank(settings('site_logo_light'));
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    public function test_a_branding_value_cannot_escape_the_demo_assets_directory(): void
+    {
+        Storage::fake('public');
+
+        // A demo host's .env is the least trusted config in the product; the value is
+        // reduced to a filename, so a traversal resolves to a name that does not exist.
+        $this->provision(['branding' => ['logo_light' => '../../.env']]);
+
+        $this->assertBlank(settings('site_logo_light'));
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    public function test_branding_is_not_provisioned_when_demo_mode_is_off(): void
+    {
+        Storage::fake('public');
+        $logo = $this->writeDemoAsset('logo-off-'.getmypid().'.svg', '<svg/>');
+
+        $this->provision(['branding' => ['logo_light' => basename($logo)]], demoEnabled: false);
+
+        $this->assertBlank(settings('site_logo_light'));
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    /** The filenames config ships as defaults must be the ones the README documents. */
+    public function test_the_shipped_branding_defaults_match_the_documented_filenames(): void
+    {
+        $readme = file_get_contents(base_path('public/demo-assets/README.md'));
+
+        foreach (config('demo.provisioning.branding') as $slot => $filename) {
+            $this->assertNotEmpty($filename, "demo.provisioning.branding.{$slot} has no default filename");
+            $this->assertStringContainsString(
+                $filename,
+                $readme,
+                "public/demo-assets/README.md does not document {$filename}"
+            );
+        }
+    }
+
+    /**
+     * Written into the real directory (the seeder resolves it from base_path) and removed
+     * again, so a failed run cannot leave an image behind that a later demo build ships.
+     */
+    private function writeDemoAsset(string $name, string $contents): string
+    {
+        $path = base_path('public/demo-assets/'.$name);
+        file_put_contents($path, $contents);
+        $this->beforeApplicationDestroyed(fn () => @unlink($path));
+
+        return $path;
     }
 
     private function assertBlank(mixed $value): void
