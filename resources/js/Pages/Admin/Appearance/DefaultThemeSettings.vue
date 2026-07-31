@@ -419,17 +419,22 @@ const headerCommandPaletteStyleOptions = computed(() => [
 // (v-show, not v-if) and are submitted by the same form, so switching cards can never drop
 // edits made on the other device.
 const headerDevice = ref<'desktop' | 'mobile'>('desktop')
+// The viewport width the theme swaps headers at — Tailwind's `md`, as used by the
+// `hidden md:block` / `md:hidden` pair in AppHeader.vue. Named here so the two card
+// descriptions cannot drift from the actual cutover if it ever moves.
+const HEADER_BREAKPOINT = '768px'
+
 const headerDeviceOptions = computed(() => [
     {
         value: 'desktop' as const,
         label: t('Desktop Header'),
-        description: t('Menu, search, account and CTA on wide screens.'),
+        description: t('Shown at :width and wider', { width: HEADER_BREAKPOINT }),
         icon: 'ti ti-device-desktop',
     },
     {
         value: 'mobile' as const,
         label: t('Mobile Header'),
-        description: t('The compact top bar and the fixed bottom nav.'),
+        description: t('Shown below :width', { width: HEADER_BREAKPOINT }),
         icon: 'ti ti-device-mobile',
     },
 ])
