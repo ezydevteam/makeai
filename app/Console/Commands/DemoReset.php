@@ -53,6 +53,15 @@ class DemoReset extends Command
         $this->warn('Dropping and rebuilding schema...');
         Artisan::call('migrate:fresh', ['--force' => true]);
 
+        // Before any seeder, because migrate:fresh drops the rows that pointed at the
+        // previous window's uploads but leaves the files themselves on disk — and this is the
+        // only step that runs while the tree is guaranteed to hold nothing the demo still
+        // needs. Everything DemoSeeder owns down there (avatars, ad creatives, ImagePro
+        // artwork, the seeded CSV exports) is written back below.
+        $this->warn('Sweeping orphaned uploads...');
+        Artisan::call('demo:sweep-uploads');
+        $this->line(rtrim(Artisan::output()));
+
         $this->warn('Seeding base data...');
         Artisan::call('db:seed', ['--force' => true]);
 

@@ -1655,15 +1655,11 @@ class DemoSeeder extends Seeder
 
         $menus = [
             'main' => ['name' => 'Main Menu', 'items' => [
-                ['label' => 'Home', 'type' => 'route', 'route_name' => 'home', 'icon' => 'ti ti-home'],
                 // Mega only once there are columns to show — flagged with an empty submenu
                 // it renders as an empty panel on hover.
                 ['label' => 'AI Tools', 'type' => 'route', 'route_name' => 'ai.tools.index', 'icon' => 'ti ti-sparkles',
                     'mega_menu' => $megaColumns !== [], 'children' => $megaColumns],
                 ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing', 'icon' => 'ti ti-tag'],
-                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index', 'icon' => 'ti ti-news'],
-                ['label' => 'Help Center', 'type' => 'url', 'url' => $kb, 'icon' => 'ti ti-lifebuoy'],
-                ['label' => 'About', 'type' => 'page', 'page' => 'about', 'icon' => 'ti ti-info-circle', 'badge_text' => 'New', 'badge_color' => 'green'],
             ]],
 
             'mobile' => ['name' => 'Mobile Menu', 'items' => [
@@ -1682,8 +1678,6 @@ class DemoSeeder extends Seeder
 
             'footer' => ['name' => 'Footer Menu', 'items' => [
                 ['label' => 'About', 'type' => 'page', 'page' => 'about'],
-                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing'],
-                ['label' => 'Blog', 'type' => 'route', 'route_name' => 'blog.index'],
                 ['label' => 'Privacy', 'type' => 'page', 'page' => 'privacy-policy'],
                 ['label' => 'Terms', 'type' => 'page', 'page' => 'terms-of-service'],
                 ['label' => 'Usage Policy', 'type' => 'page', 'page' => 'usage-policy'],

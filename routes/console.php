@@ -207,11 +207,6 @@ Schedule::command('updates:check')
     ->dailyAt('03:00')
     ->withoutOverlapping();
 
-Schedule::command('demo:reset --force')
-    ->everySixHours()
-    ->withoutOverlapping()
-    ->when(fn () => config('demo.enabled'));
-
 Schedule::command('rag:cleanup-ephemeral')
     ->daily()
     ->withoutOverlapping();
@@ -264,3 +259,8 @@ Schedule::command('demo:horizon-activity')
     ->everyFiveMinutes()
     ->when(fn () => config('demo.enabled') && config('queue.default') === 'redis')
     ->withoutOverlapping();
+
+Schedule::command('demo:reset --force')
+    ->everySixHours()
+    ->withoutOverlapping()
+    ->when(fn () => config('demo.enabled'));
