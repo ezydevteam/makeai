@@ -1707,6 +1707,14 @@ const userMenuAvatarClass = (block: any) => {
     return `flex ${sizeClass} items-center justify-center ${bgClass} text-sm font-bold text-white shrink-0 overflow-hidden ${shapeClass}`
 }
 const showUserMenuArrow = (block: any) => block.config?.show_arrow_icon !== false && authDisplayMode(block) !== 'avatar_only'
+
+// Only the avatar-only styles (rounded and circle alike) get one: those are the two that
+// drop the username, leaving a bare initial or photo with no indication of whose account
+// it is. The avatar_name styles already print it, so a bubble repeating it is noise —
+// empty content makes Tooltip render nothing at all.
+const userMenuTooltipText = (block: any) => authDisplayMode(block) === 'avatar_only'
+    ? iconTooltipText(block, String(user.value?.name || t('Account')))
+    : ''
 const authButtonStyle = (value: unknown) => {
     return sharedButtonStyleValue(value)
 }
@@ -2111,14 +2119,16 @@ onUnmounted(() => {
                     </Link>
                     <template v-else-if="block.type === 'user_menu'">
                         <div v-if="user" class="relative flex items-center" @click.stop>
-                            <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
-                                <div :class="userMenuAvatarClass(block)">
-                                    <img v-if="userMenuAvatarUrl && !avatarLoadError" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" @error="handleAvatarError" />
-                                    <span v-else>{{ userMenuInitial }}</span>
-                                </div>
-                                <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
-                                <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                            </button>
+                            <Tooltip :content="userMenuTooltipText(block)" placement="bottom" class="shrink-0">
+                                <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
+                                    <div :class="userMenuAvatarClass(block)">
+                                        <img v-if="userMenuAvatarUrl && !avatarLoadError" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" @error="handleAvatarError" />
+                                        <span v-else>{{ userMenuInitial }}</span>
+                                    </div>
+                                    <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
+                                    <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                </button>
+                            </Tooltip>
                             <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0 scale-95">
                                 <div v-if="isUserMenuOpen('main')" class="header-user-dropdown absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
                                     <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
@@ -2492,14 +2502,16 @@ onUnmounted(() => {
                     <!-- USER MENU -->
                     <template v-else-if="block.type === 'user_menu'">
                         <div v-if="user" class="relative flex items-center" @click.stop>
-                            <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
-                                <div :class="userMenuAvatarClass(block)">
-                                    <img v-if="userMenuAvatarUrl && !avatarLoadError" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" @error="handleAvatarError" />
-                                    <span v-else>{{ userMenuInitial }}</span>
-                                </div>
-                                <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
-                                <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                            </button>
+                            <Tooltip :content="userMenuTooltipText(block)" placement="bottom" class="shrink-0">
+                                <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
+                                    <div :class="userMenuAvatarClass(block)">
+                                        <img v-if="userMenuAvatarUrl && !avatarLoadError" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" @error="handleAvatarError" />
+                                        <span v-else>{{ userMenuInitial }}</span>
+                                    </div>
+                                    <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
+                                    <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                </button>
+                            </Tooltip>
                             <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0 scale-95">
                                 <div v-if="isUserMenuOpen('main')" class="header-user-dropdown absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
                                     <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
