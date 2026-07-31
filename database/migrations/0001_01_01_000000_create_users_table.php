@@ -34,6 +34,12 @@ return new class extends Migration
             $table->string('password');
             $table->timestamp('password_changed_at')->nullable();
             $table->decimal('credits', 12, 4)->default('0.0000');
+            // How much of the wallet was bought separately rather than granted by the plan.
+            // Plan credits are an allowance — each renewal tops the wallet back up to the
+            // plan figure so it cannot compound — which was silently absorbing purchased
+            // top-ups. The renewal target is `plan credits + topup_credits`, so a top-up
+            // survives every renewal after it.
+            $table->decimal('topup_credits', 12, 4)->default(0);
             $table->decimal('credits_used_today', 12, 4)->default('0.0000');
             $table->decimal('credits_used_month', 12, 4)->default('0.0000');
             $table->decimal('daily_limit', 12, 4)->nullable();
