@@ -415,8 +415,26 @@ const headerCommandPaletteStyleOptions = computed(() => [
     { value: 'search_transparent', label: t('Searchbox Pill') },
     { value: 'search_light', label: t('Searchbox Light') },
 ])
+// Which half of the header tab is on screen. Presentation only — both halves stay mounted
+// (v-show, not v-if) and are submitted by the same form, so switching cards can never drop
+// edits made on the other device.
+const headerDevice = ref<'desktop' | 'mobile'>('desktop')
+const headerDeviceOptions = computed(() => [
+    {
+        value: 'desktop' as const,
+        label: t('Desktop Header'),
+        description: t('Menu, search, account and CTA on wide screens.'),
+        icon: 'ti ti-device-desktop',
+    },
+    {
+        value: 'mobile' as const,
+        label: t('Mobile Header'),
+        description: t('The compact top bar and the fixed bottom nav.'),
+        icon: 'ti ti-device-mobile',
+    },
+])
 const headerAccountAvatarStyleOptions = computed(() => [
-    { value: 'avatar_only_rounded', label: t('Avatar Only') },
+    { value: 'avatar_only_rounded', label: t('Avatar Rounded') },
     { value: 'avatar_only_circle', label: t('Avatar Circle') },
     { value: 'avatar_name', label: t('Avatar + Username') },
     { value: 'avatar_name_arrow', label: t('Avatar + Username + Dropdown') },
@@ -2719,7 +2737,47 @@ watch(() => [
                 </div>
 
                 <div v-else-if="activeTab === 'header'" class="space-y-6">
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <!-- The tab used to stack all three headers on one page, so the mobile
+                         settings sat a long scroll below the desktop ones and were easy to
+                         miss entirely. One card per device, both halves still saved by the
+                         same form — switching here only changes what is on screen. -->
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <button
+                            v-for="option in headerDeviceOptions"
+                            :key="option.value"
+                            type="button"
+                            role="radio"
+                            :aria-checked="headerDevice === option.value"
+                            class="flex items-center gap-4 rounded-2xl border p-4 text-left transition"
+                            :class="headerDevice === option.value
+                                ? 'border-primary-300 bg-primary-50 shadow-sm dark:border-primary-500/40 dark:bg-primary-500/10'
+                                : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-primary-50/50 dark:border-surface-700 dark:bg-surface-900 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/5'"
+                            @click="headerDevice = option.value"
+                        >
+                            <span
+                                class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl"
+                                :class="headerDevice === option.value
+                                    ? 'border-primary-200 bg-white text-primary-600 dark:border-primary-500/40 dark:bg-surface-900 dark:text-primary-300'
+                                    : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-400'"
+                            >
+                                <i :class="option.icon"></i>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ option.label }}</span>
+                                <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{ option.description }}</span>
+                            </span>
+                            <span
+                                class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]"
+                                :class="headerDevice === option.value
+                                    ? 'border-primary-500 bg-primary-500 text-white'
+                                    : 'border-gray-300 text-transparent dark:border-surface-600'"
+                            >
+                                <i class="ti ti-check"></i>
+                            </span>
+                        </button>
+                    </div>
+
+                    <section v-show="headerDevice === 'desktop'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="space-y-1">
                             <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('Desktop Header') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set up the main desktop navigation area that visitors see first.') }}</p>
@@ -2893,7 +2951,7 @@ watch(() => [
                         </section>
                     </section>
 
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section v-show="headerDevice === 'mobile'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
                             <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">{{ t('Mobile Top Header') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the compact header shown at the top on mobile devices.') }}</p>
@@ -2931,7 +2989,7 @@ watch(() => [
                         </div>
                     </section>
 
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section v-show="headerDevice === 'mobile'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
                             <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">{{ t('Mobile Bottom Header') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose which quick navigation items appear in the fixed bottom mobile bar.') }}</p>
