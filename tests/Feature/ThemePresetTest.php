@@ -148,7 +148,7 @@ class ThemePresetTest extends TestCase
             'homepage_config' => $settings->getResolvedFrontendHomepageConfig(),
         ];
 
-        $presets->applyPreset('default', 'creative-studio');
+        $presets->applyPreset('default', 'midnight');
         $this->assertSame('dark', $settings->getResolvedFrontendTheme()['theme_default_mode']);
 
         $summary = $presets->backupSummary();
@@ -249,7 +249,7 @@ class ThemePresetTest extends TestCase
         $settings = app(ThemeSettingsService::class);
         $presets = app(ThemePresetService::class);
 
-        $presets->applyPreset('default', 'creative-studio');
+        $presets->applyPreset('default', 'midnight');
         $this->assertSame('dark', $settings->getResolvedFrontendTheme()['theme_default_mode']);
 
         $presets->applyPreset('default', 'default');

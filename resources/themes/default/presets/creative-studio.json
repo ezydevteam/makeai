@@ -128,7 +128,7 @@
             "social_multi_color": true,
             "contact_title": "Work with us",
             "menu_title": "Studio",
-            "menu_secondary_title": "Legal",
+            "secondary_menu_title": "Legal",
             "secondary_menu_column": "footer",
             "tool_categories_title": "playground",
             "footer_heading_text_case": "lowercase",

@@ -87,7 +87,7 @@ class ThemeSettingTypesTest extends TestCase
 
         $this->assertIsBool($header['desktop']['sticky']);
         $this->assertIsBool($header['mobile_bottom']['enabled']);
-        $this->assertSame(72, $header['desktop']['height']);
+        $this->assertSame(60, $header['desktop']['height']);
         $this->assertIsBool($footer['show_newsletter']);
         $this->assertSame(['desktop', 'mobile_top', 'mobile_bottom'], array_keys($header));
     }
