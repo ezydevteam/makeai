@@ -6,7 +6,7 @@ import { useSectionStyle } from '../composables/useSectionStyle'
 import FavoriteButton from '@themes/default/js/Components/FavoriteButton.vue'
 import { useTheme } from '@/Composables/useTheme'
 
-const { sectionBgClass, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, sectionPaddingStyle, cardBgClass, cardWrapperClass: sectionCardWrapperClass, sectionIconClass, sectionHeaderClass, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
+const { sectionBgClass, sectionBgIsDark, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, sectionPaddingStyle, cardBgClass, cardWrapperClass: sectionCardWrapperClass, sectionIconClass, sectionHeaderClass, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
 const { isDark } = useTheme()
 
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
@@ -43,18 +43,18 @@ const asString = (v: SectionConfigValue | undefined, fallback = ''): string => t
 const heroButtonClass = (style: string): string => {
     const isDarkTheme = isDark.value
     const map: Record<string, string> = {
-        primary: 'bg-primary-600 !text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all',
-        primary_filled: 'bg-primary-600 !text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all',
+        primary: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-lg shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500 transition-all',
+        primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-lg shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500 transition-all',
         dark: isDarkTheme
             ? 'bg-white text-gray-950 hover:bg-gray-100 transition-all'
-            : 'bg-gray-900 !text-white hover:bg-gray-800 transition-all',
-        purple: 'bg-violet-600 !text-white shadow-lg shadow-violet-600/20 hover:bg-violet-700 transition-all',
+            : 'bg-gradient-to-r from-gray-800 to-gray-900 !text-white hover:from-gray-900 hover:to-gray-800 transition-all',
+        purple: 'bg-gradient-to-r from-violet-500 to-violet-600 !text-white shadow-lg shadow-violet-600/20 hover:from-violet-600 hover:to-violet-500 transition-all',
         gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-lg hover:opacity-95 transition-all',
-        red: 'bg-red-600 !text-white hover:bg-red-700 transition-all',
-        danger: 'bg-red-600 !text-white hover:bg-red-700 transition-all',
-        green: 'bg-success-600 !text-white hover:bg-success-700 transition-all',
-        success: 'bg-emerald-600 !text-white hover:bg-emerald-700 transition-all',
-        warning: 'bg-amber-500 !text-white hover:bg-amber-600 transition-all',
+        red: 'bg-gradient-to-r from-red-500 to-red-600 !text-white hover:from-red-600 hover:to-red-500 transition-all',
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 !text-white hover:from-red-600 hover:to-red-500 transition-all',
+        green: 'bg-gradient-to-r from-success-500 to-success-600 !text-white hover:from-success-600 hover:to-success-500 transition-all',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 !text-white hover:from-emerald-600 hover:to-emerald-500 transition-all',
+        warning: 'bg-gradient-to-r from-amber-500 to-amber-600 !text-white hover:from-amber-600 hover:to-amber-500 transition-all',
         gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-lg hover:opacity-95 transition-all',
         gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-lg hover:opacity-95 transition-all',
         gradient_royal: 'bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 !text-white shadow-lg hover:opacity-95 transition-all',
@@ -112,6 +112,9 @@ const activeCardStyle = computed(() => {
 // State
 const selectedCategory = ref('all')
 const searchQuery = ref('')
+// Mobile keeps its own tighter cut of 3 inline; this is the desktop one. Shared expand
+// state on purpose — someone who opens the full list then narrows the window keeps it open.
+const DESKTOP_CATEGORY_LIMIT = 14
 const categoriesExpanded = ref(false)
 
 const uniqueCategories = computed(() => {
@@ -127,9 +130,20 @@ const isGradientCardBg = computed(() => {
     return ['gradient-1', 'gradient-2', 'gradient-3', 'gradient-4'].includes(bg)
 })
 
+// The search field and the category pills sit on the SECTION background, not inside a card,
+// so their light/dark treatment has to consider section_bg as well. Keying it off the card
+// background alone left both unreadable on a dark section: with section_bg 'gradient4' the
+// active pill measured 1.09:1 (rose-600 on blue-600 → purple-600) and the search placeholder
+// 1.32:1, because the light-surface classes were painted straight onto a dark gradient.
+const onDarkSectionSurface = computed(() => isGradientCardBg.value
+    || sectionBgIsDark(asString(props.section.config.section_bg, 'default')))
+
+// Only a gradient wrapper forces white — the section heading sits on the section
+// background, which card_style says nothing about. style-2 used to force white here
+// too, which erased the heading on any light section.
 const titleClass = computed(() => {
     const size = titleSizeClass(asString(props.section.config.title_size, 'md'))
-    if (isGradientCardBg.value || activeCardStyle.value === 'style-2') {
+    if (isGradientCardBg.value) {
         return `mb-4 font-black ${size} !text-white`
     }
     const colorVal = asString(props.section.config.title_color, 'dark')
@@ -139,7 +153,7 @@ const titleClass = computed(() => {
 
 const subtitleClass = computed(() => {
     let color = ''
-    if (isGradientCardBg.value || activeCardStyle.value === 'style-2') {
+    if (isGradientCardBg.value) {
         color = '!text-white/80'
     } else {
         const colorVal = asString(props.section.config.title_color, 'dark')
@@ -151,17 +165,19 @@ const subtitleClass = computed(() => {
 })
 
 const searchInputClass = computed(() => {
-    if (isGradientCardBg.value) {
-        return 'w-full !rounded-full border !border-white/20 !bg-white/10 backdrop-blur-md pl-10 pr-10 py-3 text-sm !text-white !placeholder-white/60 focus:!bg-white/20 focus:!border-white/25 focus:outline-none focus:ring-0'
+    if (onDarkSectionSurface.value) {
+        return 'w-full !rounded-full border !border-white/30 !bg-white/10 backdrop-blur-md pl-10 pr-10 py-3 text-sm !text-white !placeholder-white/75 focus:!bg-white/20 focus:!border-white/40 focus:outline-none focus:ring-0 dark:!border-white/30'
     }
     if (activeCardStyle.value === 'style-2') {
-        return 'w-full !rounded-full border !border-gray-200/50 !bg-white/30 backdrop-blur-md pl-10 pr-10 py-3 text-sm !text-gray-950 !placeholder-gray-500 focus:!bg-white/60 focus:!border-primary-500 focus:outline-none dark:!border-white/10 dark:!bg-white/5 dark:!text-white dark:!placeholder-white/60 dark:focus:!bg-white/10 shadow-lg shadow-gray-950/5'
+        // Full-strength border: at gray-200/50 over a white section the field edge measured
+        // 1.11:1 against its own fill, so the input read as floating text with no box.
+        return 'w-full !rounded-full border !border-gray-300 !bg-white/30 backdrop-blur-md pl-10 pr-10 py-3 text-sm !text-gray-950 !placeholder-gray-500 focus:!bg-white/60 focus:!border-primary-500 focus:outline-none dark:!border-white/30 dark:!bg-white/5 dark:!text-white dark:!placeholder-white/60 dark:focus:!bg-white/10 shadow-lg shadow-gray-950/5'
     }
-    return 'w-full rounded-2xl border !border-gray-50 !bg-white/60 pl-10 pr-10 py-3 text-sm !text-gray-900 !placeholder-gray-400 focus:!bg-white focus:!border-primary-500 focus:outline-none dark:!border-surface-800 dark:!bg-surface-900/60 dark:!text-white dark:!placeholder-white/40 shadow-sm'
+    return 'w-full !rounded-full border !border-gray-200/60 !bg-white/60 pl-10 pr-10 py-3 text-sm !text-gray-900 !placeholder-gray-400 focus:!border-primary-500 focus:outline-none dark:!border-surface-800/80 dark:!bg-surface-900/60 dark:!text-white dark:!placeholder-white/40 focus:!border-primary-800/80'
 })
 
 const searchIconClass = computed(() => {
-    if (isGradientCardBg.value) {
+    if (onDarkSectionSurface.value) {
         return '!text-white/60'
     }
     if (activeCardStyle.value === 'style-2') {
@@ -171,7 +187,7 @@ const searchIconClass = computed(() => {
 })
 
 const searchClearBtnClass = computed(() => {
-    if (isGradientCardBg.value) {
+    if (onDarkSectionSurface.value) {
         return '!text-white/60 hover:!text-white'
     }
     if (activeCardStyle.value === 'style-2') {
@@ -183,31 +199,41 @@ const searchClearBtnClass = computed(() => {
 const categoryBtnClass = (cat: string) => {
     const isActive = selectedCategory.value === cat
     const base = 'px-5 py-2 text-xs font-semibold transition-all duration-200 rounded-full border'
-    if (isGradientCardBg.value) {
+    if (onDarkSectionSurface.value) {
         return isActive
             ? `${base} !bg-white !border-white !text-gray-900 shadow-lg`
-            : `${base} !bg-white/10 !border-white/10 backdrop-blur-md !text-white/80 hover:!bg-white/20 hover:!text-white`
+            : `${base} !bg-white/10 !border-white/20 backdrop-blur-md !text-white/90 hover:!bg-white/20 hover:!text-white`
     }
     if (activeCardStyle.value === 'style-2') {
+        // primary-600 rather than -500: the pill is filled with the site's own accent and
+        // carries white text, so a light primary (e.g. #d946ef) fell under 3.5:1 at -500.
         return isActive
-            ? `${base} !bg-primary-500 !border-primary-500 !text-white shadow-lg`
+            ? `${base} !bg-primary-600 !border-primary-600 !text-white shadow-lg`
             : `${base} !bg-white/40 !border-gray-200/50 backdrop-blur-md !text-gray-700 hover:!bg-white/60 hover:!text-gray-900 dark:!bg-white/5 dark:!border-white/10 dark:!text-white/80 dark:hover:!bg-white/10`
     }
     return isActive
         ? `${base} !bg-primary-500/10 !border-primary-500/10 !text-primary-600 dark:!bg-primary-500/20 dark:!border-primary-500/30 dark:!text-primary-400 shadow-md shadow-primary-600/10`
-        : `${base} !bg-white !border-gray-200 !text-gray-500 hover:!bg-gray-50 hover:!text-gray-700 dark:!bg-surface-900 dark:!border-surface-800 dark:!text-gray-400 dark:hover:!bg-surface-850`
+        : `${base} !bg-white !border-gray-200 !text-gray-500 hover:!bg-gray-50 hover:!text-gray-700 dark:!bg-surface-900 dark:!border-surface-800 dark:!text-gray-400 dark:hover:!bg-surface-800/80 dark:hover:!text-gray-300`
 }
 
 const textTitleClass = computed(() => {
-    if (isGradientCardBg.value || activeCardStyle.value === 'style-2') {
+    if (isGradientCardBg.value) {
         return '!text-white group-hover:!text-white/90'
+    }
+    // style-2 cards are bg-white/40 in light mode and surface-900 in dark, so the card
+    // text has to follow the theme like every other style-2 branch in this file.
+    if (activeCardStyle.value === 'style-2') {
+        return '!text-gray-900 dark:!text-white group-hover:!text-primary-600 dark:group-hover:!text-white/90'
     }
     return 'text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
 })
 
 const textDescClass = computed(() => {
-    if (isGradientCardBg.value || activeCardStyle.value === 'style-2') {
+    if (isGradientCardBg.value) {
         return '!text-white/70'
+    }
+    if (activeCardStyle.value === 'style-2') {
+        return '!text-gray-500 dark:!text-white/70'
     }
     return 'text-gray-500 dark:text-gray-400'
 })
@@ -486,7 +512,7 @@ onUnmounted(() => gsapCtx?.revert())
                         <div :class="['flex items-center gap-3', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
                             <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'left'" :class="[
                                 sectionIconClass(asString(section.config.icon_style, 'primary')),
-                                'h-9 w-9 text-lg shrink-0'
+                                'h-9 h-12 w-12 text-xl shrink-0 -mt-3'
                             ]">
                                 <i :class="asString(section.config.icon)"></i>
                             </div>
@@ -514,15 +540,26 @@ onUnmounted(() => gsapCtx?.revert())
 
                 <!-- Category Filters -->
                 <div v-if="showCategoryFilter && uniqueCategories.length > 1">
-                    <!-- Desktop Filter -->
-                    <div class="hidden sm:flex flex-wrap items-center justify-center gap-2 mb-10 overflow-x-auto py-1 whitespace-nowrap">
+                    <!-- Desktop Filter — same collapse as mobile, just a higher cut. A catalog
+                         with 30+ categories filled the width with four rows of pills and pushed
+                         the tools themselves below the fold. -->
+                    <div class="hidden sm:flex flex-wrap items-center justify-center gap-2 mb-10 py-1">
                         <button
-                            v-for="cat in uniqueCategories"
+                            v-for="cat in (categoriesExpanded ? uniqueCategories : uniqueCategories.slice(0, DESKTOP_CATEGORY_LIMIT))"
                             :key="cat"
                             @click="selectedCategory = cat"
                             :class="categoryBtnClass(cat)"
                         >
                             {{ cat === 'all' ? t('All categories') : t(cat) }}
+                        </button>
+                        <button
+                            v-if="uniqueCategories.length > DESKTOP_CATEGORY_LIMIT"
+                            @click="categoriesExpanded = !categoriesExpanded"
+                            :class="categoryBtnClass('')"
+                            class="inline-flex items-center gap-1.5"
+                        >
+                            <span>{{ categoriesExpanded ? t('Less') : t('More') }}</span>
+                            <i :class="['ti', categoriesExpanded ? 'ti-chevron-up' : 'ti-chevron-down', 'text-[10px]']"></i>
                         </button>
                     </div>
 
@@ -650,15 +687,16 @@ onUnmounted(() => gsapCtx?.revert())
                     </Link>
                 </div>
                 <div v-else :class="['p-10 text-center text-sm', isGradientCardBg ? '!text-white/80' : 'text-gray-500 dark:text-gray-400']">
-                    <i class="ti ti-tools-off text-5xl mb-4 block text-xl"></i>
+                    <i class="ti ti-search-off text-5xl mb-4 block text-2xl"></i>
                     {{ t('No tools found matching your selection.') }}
                 </div>
 
                 <!-- Button -->
                 <div v-if="asString(section.config.primary_text) && asString(section.config.primary_link)" :class="['mt-12 flex flex-col gap-4 sm:flex-row', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'items-center justify-center' : 'items-start justify-start']">
                     <Link :href="asString(section.config.primary_link, '/ai-tools')" :class="[heroButtonClass(asString(section.config.primary_style, 'primary')), heroButtonShapeClass(asString(section.config.primary_shape, 'rounded_xl'))]" class="inline-flex w-full items-center justify-center gap-3 px-8 py-4 font-black transition-colors sm:w-auto">
-                        <i v-if="asString(section.config.primary_icon)" :class="[asString(section.config.primary_icon), 'block shrink-0 text-lg leading-none']"></i>
+                        <i v-if="asString(section.config.primary_icon) && asString(section.config.primary_icon_position, 'left') !== 'right'" :class="[asString(section.config.primary_icon), 'block shrink-0 text-lg leading-none']"></i>
                         {{ asString(section.config.primary_text) }}
+                        <i v-if="asString(section.config.primary_icon) && asString(section.config.primary_icon_position, 'left') === 'right'" :class="[asString(section.config.primary_icon), 'block shrink-0 text-lg leading-none']"></i>
                     </Link>
                 </div>
             </div>

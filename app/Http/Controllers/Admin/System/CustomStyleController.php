@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin\System;
 use App\Http\Controllers\Controller;
 use App\Models\AppearanceSetting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class CustomStyleController extends Controller
@@ -100,8 +99,6 @@ class CustomStyleController extends Controller
                 ['value' => $value]
             );
         }
-
-        Cache::forget('theme-variables-css');
 
         return back()->with('success', translate('Appearance settings updated.'));
     }

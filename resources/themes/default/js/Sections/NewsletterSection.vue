@@ -26,16 +26,16 @@ const newsletterBgClass = (style: string): string => ({
 }[style] ?? '')
 
 const heroButtonClass = (style: string): string => ({
-    primary: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    primary_filled: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    dark: 'bg-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:bg-gray-800',
-    purple: 'bg-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:bg-violet-700',
+    primary: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+    primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+    dark: 'bg-gradient-to-r from-gray-800 to-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:from-gray-900 hover:to-gray-800',
+    purple: 'bg-gradient-to-r from-violet-500 to-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:from-violet-600 hover:to-violet-500',
     gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
-    red: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    danger: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    green: 'bg-success-600 !text-white shadow-2xl shadow-success-600/20 hover:bg-success-700',
-    success: 'bg-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700',
-    warning: 'bg-amber-50 !text-white shadow-2xl shadow-amber-50/20 hover:bg-amber-600',
+    red: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+    danger: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+    green: 'bg-gradient-to-r from-success-500 to-success-600 !text-white shadow-2xl shadow-success-600/20 hover:from-success-600 hover:to-success-500',
+    success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:from-emerald-600 hover:to-emerald-500',
+    warning: 'bg-gradient-to-r from-amber-500 to-amber-600 !text-white shadow-2xl shadow-amber-600/20 hover:from-amber-600 hover:to-amber-500',
     gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-2xl hover:opacity-95',
     gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-2xl hover:opacity-95',
     gradient_royal: 'bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 !text-white shadow-2xl hover:opacity-95',
@@ -193,7 +193,7 @@ onUnmounted(() => gsapCtx?.revert())
                                 :placeholder="asString(section.config.placeholder_text, t('Enter your email address'))"
                                 :class="[
                                     isGradientBg(backgroundStyle)
-                                        ? 'text-white placeholder-white/50'
+                                        ? '!text-white !placeholder-white/50'
                                         : 'text-gray-900 dark:text-white placeholder-gray-400',
                                     'w-full !bg-transparent border-none focus:outline-none focus:!ring-0 focus:!bg-transparent focus:!shadow-none active:!bg-transparent active:!shadow-none py-3.5 pl-0 pr-4 outline-none text-sm !shadow-none inline-pill-input'
                                 ]"
@@ -221,9 +221,9 @@ onUnmounted(() => gsapCtx?.revert())
                                 :placeholder="asString(section.config.placeholder_text, t('Enter your email address'))"
                                 :class="[
                                     isGradientBg(backgroundStyle)
-                                        ? 'bg-white/10 border-white/20 text-white placeholder-white/50 focus:!border-white focus:!bg-white/15 focus:!ring-0 focus:!shadow-none active:!bg-white/15'
+                                        ? 'bg-white/10 border-white/20 text-white placeholder-white/50 focus:!border-white focus:!bg-white/15 focus:!text-white focus:!placeholder-white/40 focus:!ring-0 focus:!shadow-none active:!bg-white/15'
                                         : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-primary-400 focus:!ring-primary-400 focus:!bg-gray-50 dark:bg-surface-800 dark:border-surface-700 dark:text-white dark:focus:!bg-surface-800 placeholder-gray-400',
-                                    'w-full rounded-2xl border px-5 py-4 text-sm outline-none transition'
+                                    'w-full rounded-2xl border px-5 py-4 text-sm text-center outline-none transition'
                                 ]"
                             >
                             <button type="submit"

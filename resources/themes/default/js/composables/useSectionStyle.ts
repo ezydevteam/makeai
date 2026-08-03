@@ -27,10 +27,32 @@ export const TITLE_COLOR_MAP: Record<string, { title: string; subtitle: string }
     success: { title: '!text-emerald-600 dark:!text-emerald-400', subtitle: 'text-emerald-500/70 dark:text-emerald-400/60' },
     warning: { title: '!text-amber-600 dark:!text-amber-400', subtitle: 'text-amber-500/70 dark:text-amber-400/60' },
     dark: { title: '!text-gray-900 dark:!text-white', subtitle: 'text-gray-500 dark:text-gray-400' },
+    // For sections on a dark or image background, where `dark` resolves to near-black in
+    // light mode and disappears. Stays white in both themes on purpose — the background it
+    // is picked for does not change with the theme.
+    light: { title: '!text-white', subtitle: 'text-white/70' },
     gradient1: { title: 'bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text !text-transparent', subtitle: 'text-primary-500/70 dark:text-primary-400/60' },
     gradient2: { title: 'bg-gradient-to-r from-purple-500 to-pink-400 bg-clip-text !text-transparent', subtitle: 'text-purple-500/70 dark:text-pink-400/60' },
     gradient3: { title: 'bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text !text-transparent', subtitle: 'text-blue-500/70 dark:text-cyan-400/60' },
     gradient4: { title: 'bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text !text-transparent', subtitle: 'text-blue-500/70 dark:text-purple-400/60' },
+}
+
+// One entry per TITLE_COLOR_MAP key, written out in full. These used to be built by
+// interpolation (`border-${color}-200`), which produces class names Tailwind never sees
+// at build time — so every badge outside the `dark` tone rendered with no fill and a
+// hairline border in the inherited text colour. The gradient tones get a two-stop chip
+// that echoes the heading gradient above them.
+export const BADGE_TONES: Record<string, string> = {
+    dark: 'border-gray-200 text-gray-600 bg-gray-100 dark:border-surface-700 dark:text-gray-400 dark:bg-surface-800',
+    light: 'border-white/25 text-white bg-white/10',
+    primary: 'border-primary-200 text-primary-700 bg-primary-50 dark:border-primary-500/30 dark:text-primary-300 dark:bg-primary-500/10',
+    danger: 'border-danger-200 text-danger-700 bg-danger-50 dark:border-danger-500/30 dark:text-danger-300 dark:bg-danger-500/10',
+    success: 'border-success-200 text-success-700 bg-success-50 dark:border-success-500/30 dark:text-success-300 dark:bg-success-500/10',
+    warning: 'border-warning-200 text-warning-700 bg-warning-50 dark:border-warning-500/30 dark:text-warning-300 dark:bg-warning-500/10',
+    gradient1: 'border-primary-200/80 text-primary-700 bg-gradient-to-r from-primary-100 to-primary-50 shadow-sm dark:border-primary-500/25 dark:text-primary-200 dark:from-primary-500/15 dark:to-primary-500/5',
+    gradient2: 'border-purple-200/80 text-purple-700 bg-gradient-to-r from-purple-100 to-pink-100 shadow-sm dark:border-purple-500/25 dark:text-purple-200 dark:from-purple-500/15 dark:to-pink-500/15',
+    gradient3: 'border-blue-200/80 text-blue-700 bg-gradient-to-r from-blue-100 to-cyan-100 shadow-sm dark:border-blue-500/25 dark:text-blue-200 dark:from-blue-500/15 dark:to-cyan-500/15',
+    gradient4: 'border-blue-200/80 text-blue-700 bg-gradient-to-r from-blue-100 to-purple-100 shadow-sm dark:border-blue-500/25 dark:text-blue-200 dark:from-blue-500/15 dark:to-purple-500/15',
 }
 
 export const TITLE_SIZE_MAP: Record<string, string> = {
@@ -79,9 +101,7 @@ export function useSectionStyle() {
         const color = titleColor || 'dark'
         const borderClasses = isDarkBg
             ? 'border-white/20 text-white bg-white/10'
-            : color === 'dark'
-                ? 'border-gray-200 text-gray-600 bg-gray-100 dark:border-surface-700 dark:text-gray-400 dark:bg-surface-800'
-                : `border-${color}-200 text-${color}-700 bg-${color}-100 dark:border-${color}-800 dark:text-${color}-300 dark:bg-${color}-900/20`
+            : BADGE_TONES[color] ?? BADGE_TONES.dark
         return `mb-4 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider ${borderClasses}`
     }
 

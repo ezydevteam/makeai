@@ -20,7 +20,7 @@ class NotificationController extends Controller
         $status = in_array($status, ['read', 'unread'], true) ? $status : null;
 
         return Inertia::render('Admin/Notifications', [
-            'notifications' => $notifications->paginate(auth('admin')->user(), $status),
+            'notificationList' => $notifications->paginate(auth('admin')->user(), $status),
             'filters' => ['status' => $status],
         ]);
     }

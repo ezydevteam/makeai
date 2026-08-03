@@ -24,9 +24,10 @@ through the UI afterwards: `DemoMode` blocks every write that is not on its allo
 Appearance › Branding is not on it. This directory ships as part of the release and is
 never written to at runtime, which is what makes it survive.
 
-In the distribution layout it lands at `core/public/demo-assets/`, which the web server
-denies — that is fine and intended. The seeder reads it from disk; only the copies it
-writes to the public disk are ever served.
+In the distribution layout it lands at `core/public/assets/image/demo-assets/logo/`. The
+seeder reads the files from disk and copies them onto the public disk; those copies are what
+the site renders. The sources sit under the served webroot too, so they are directly
+reachable — harmless for a logo, but do not put anything private in here.
 
 ## Renaming the files
 

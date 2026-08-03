@@ -57,6 +57,7 @@ use App\Models\ScheduledExport;
 use App\Models\Setting;
 use App\Models\SmsCampaign;
 use App\Models\SmsCampaignRecipient;
+use App\Models\SocialFollowCount;
 use App\Models\SupportDepartment;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketReply;
@@ -67,6 +68,7 @@ use App\Models\User;
 use App\Models\UserCollection;
 use App\Models\UserCollectionTool;
 use App\Services\AffiliateService;
+use App\Services\BlogService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -681,6 +683,8 @@ class DemoSeeder extends Seeder
                     . '<blockquote><p>' . $this->loremSentence() . '</p></blockquote>'
                     . '<p>' . $this->loremParagraph() . '</p>',
                 'excerpt' => $this->loremSentence(),
+                'featured_image' => $this->demoBlogCover($title, 'blog/' . Str::slug($title) . '.svg'),
+                'featured_image_alt' => $title,
                 'status' => 'published',
                 'is_featured' => $i < 6,
                 'published_at' => now()->subDays(365 - ($i * 12)),
@@ -702,6 +706,13 @@ class DemoSeeder extends Seeder
             $post->categories()->sync([$catModels[array_rand($catModels)]->id, $catModels[array_rand($catModels)]->id]);
             $post->tags()->sync([$tagModels[array_rand($tagModels)]->id, $tagModels[array_rand($tagModels)]->id, $tagModels[array_rand($tagModels)]->id]);
         }
+
+        // blog_categories.posts_count and blog_tags.posts_count are denormalised counters,
+        // and the sidebar, the blog page and live search all filter on `posts_count > 0`
+        // rather than counting the pivot. Writing posts straight through the model skips
+        // BlogService::save(), which is what normally refreshes them — so every category and
+        // tag sat at 0 and the sidebar reported "No categories yet" on a blog with 30 posts.
+        app(BlogService::class)->refreshCounters();
 
         // ─── 9. Dashboard Demo Data ───────────────────────────────────
         $generalDepartment = SupportDepartment::where('slug', 'general')->first();
@@ -1536,10 +1547,8 @@ class DemoSeeder extends Seeder
             ['tool_page_bottom', 'Before Tabs Leaderboard', 'image_link', 'all', 'live', 'makeai-leaderboard', 728, 90, '', ''],
             ['chat_banner', 'Chat Purchase Block', 'custom_html', 'free_users', 'live', '', 0, 0, 'Launch your own AI chat', 'Streaming chat, credits and BYOK come ready to sell.'],
             ['dashboard_top', 'Dashboard Leaderboard', 'image_link', 'logged_in', 'live', 'makeai-leaderboard', 728, 90, '', ''],
-            // A configured AdSense unit and a retired campaign, so both paths and the
-            // scheduled / expired states are represented in the admin list.
-            ['custom_zone_1', 'AdSense Display Unit', 'adsense', 'all', 'scheduled', '', 0, 0, '', ''],
-            ['custom_zone_2', 'Retired Launch Campaign', 'image_link', 'paid_users', 'expired', 'makeai-rectangle', 300, 250, '', ''],
+            ['custom_zone_1', 'Header Leaderboard', 'image_link', 'all', 'live', 'makeai-leaderboard', 728, 90, '', ''],
+            ['custom_zone_1', 'Header Leaderboard', 'image_link', 'all', 'live', 'makeai-leaderboard', 728, 90, '', '']
         ];
 
         $bannerKeys = [];
@@ -1666,7 +1675,7 @@ class DemoSeeder extends Seeder
                 // it renders as an empty panel on hover.
                 ['label' => 'AI Tools', 'type' => 'route', 'route_name' => 'ai.tools.index', 'icon' => 'ti ti-sparkles',
                     'mega_menu' => $megaColumns !== [], 'children' => $megaColumns],
-                ['label' => 'Pricing', 'type' => 'route', 'route_name' => 'pricing', 'icon' => 'ti ti-tag'],
+                ['label' => 'Pricing', 'type' => 'url', 'url' => '#home_pricing', 'icon' => 'ti ti-tag'],
             ]],
 
             'mobile' => ['name' => 'Mobile Menu', 'items' => [
@@ -1738,7 +1747,15 @@ class DemoSeeder extends Seeder
         $storedHeader = $themeSettings->getStoredHeaderSettings();
         $storedHeader['desktop'] = array_replace(
             is_array($storedHeader['desktop'] ?? null) ? $storedHeader['desktop'] : [],
-            ['menu_source' => '']
+            [
+                'menu_source' => '',
+                // Off in the shipped defaults, so the demo header showed no social icons
+                // even once seedSocialFollowProfiles() had given it somewhere to link.
+                // A real boolean, not '1': AppHeader gates the block on
+                // `show_social_icons === true` and a string would silently fail the check.
+                'show_social_icons' => true,
+                'social_icon_style' => 'circular_soft_bg',
+            ]
         );
         $themeSettings->saveHeaderSettings($storedHeader);
 
@@ -1796,6 +1813,9 @@ class DemoSeeder extends Seeder
 
         // ─── 14b. Sidebar widgets (/admin/appearance/sidebar) ───────────
         $this->seedSidebarWidgets();
+
+        // ─── 14c. Social follow profiles (header, footer, sidebar) ──────
+        $this->seedSocialFollowProfiles();
 
         // ─── 15. Sample Tool Reviews ────────────────────────────────────
         $reviewComments = [
@@ -6616,6 +6636,47 @@ class DemoSeeder extends Seeder
      * Anything else is dropped the first time an admin saves the page, which would quietly
      * change the demo.
      */
+    /**
+     * The social accounts the header, footer and sidebar link out to.
+     *
+     * SocialService::activeFollowProfiles() drops any row with a null profile_url, so an
+     * unseeded demo showed no social icons anywhere — the header's social_icons block and
+     * the footer's follow row both rendered empty and looked unfinished.
+     *
+     * Counts are `manual` on purpose: count_source 'api' would have the scheduler hitting
+     * live endpoints with no credentials on a demo host, blanking the numbers on the first
+     * refresh. Manual values just sit there.
+     *
+     * Platform keys must be in SocialService::FOLLOW_PLATFORMS or the row is filtered out
+     * after being written; the URLs point at the real product accounts.
+     */
+    private function seedSocialFollowProfiles(): void
+    {
+        $profiles = [
+            ['platform' => 'facebook', 'profile_url' => 'https://facebook.com/ezydevteam', 'manual_count' => 18400],
+            ['platform' => 'x', 'profile_url' => 'https://x.com/ezydevteam', 'manual_count' => 12750],
+            ['platform' => 'instagram', 'profile_url' => 'https://instagram.com/ezydevteam', 'manual_count' => 24300],
+            ['platform' => 'linkedin', 'profile_url' => 'https://linkedin.com/company/ezydevteam', 'manual_count' => 8600],
+            ['platform' => 'youtube', 'profile_url' => 'https://youtube.com/@ezydevteam', 'manual_count' => 31200],
+            ['platform' => 'github', 'profile_url' => 'https://github.com/ezydevteam', 'manual_count' => 2400],
+        ];
+
+        foreach ($profiles as $index => $profile) {
+            SocialFollowCount::updateOrCreate(
+                ['platform' => $profile['platform']],
+                [
+                    'profile_url' => $profile['profile_url'],
+                    'manual_count' => $profile['manual_count'],
+                    'count' => $profile['manual_count'],
+                    'count_source' => 'manual',
+                    'fetch_enabled' => false,
+                    'sort_order' => $index,
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
     private function seedSidebarWidgets(): void
     {
         // ad_zone points at zones this seeder actually creates (section 13's `ads` rows) —
@@ -6639,7 +6700,6 @@ class DemoSeeder extends Seeder
                 ['id' => 'blog-recent', 'type' => 'recent_posts', 'config' => ['title' => 'Recent Posts', 'count' => 5]],
                 ['id' => 'blog-tags', 'type' => 'tag_cloud', 'config' => ['title' => 'Popular Tags']],
                 ['id' => 'blog-social', 'type' => 'social_follow', 'config' => ['title' => 'Follow along']],
-                ['id' => 'blog-ad', 'type' => 'ad_zone', 'config' => ['title' => '', 'zone_id' => 'sidebar_bottom']],
             ],
 
             // Custom CMS pages.
@@ -7133,6 +7193,59 @@ class DemoSeeder extends Seeder
                 'subscription_ends_at' => $cancelledAt,
             ])->save();
         }
+    }
+
+    /**
+     * A 16:9 cover for a blog post, generated the same way as the avatars above: an SVG
+     * written to the public disk, no external service, nothing to 404 and nothing with
+     * licensing attached to a redistributed product.
+     *
+     * Every post had a null featured_image, so Blog/Index.vue fell back to its empty
+     * gradient placeholder for the whole grid and the blog read as unfinished.
+     *
+     * Palette and shape placement are derived from the title, so a given post always gets
+     * the same cover and no two neighbours look alike. 1200x675 matches the aspect the card
+     * and the single-post header both crop to.
+     */
+    private function demoBlogCover(string $title, string $key): string
+    {
+        $seed = abs(crc32($title));
+
+        $palettes = [
+            ['#6366f1', '#8b5cf6', '#c4b5fd'], ['#0ea5e9', '#22d3ee', '#a5f3fc'],
+            ['#10b981', '#34d399', '#a7f3d0'], ['#f59e0b', '#f97316', '#fed7aa'],
+            ['#ec4899', '#f472b6', '#fbcfe8'], ['#8b5cf6', '#d946ef', '#f5d0fe'],
+            ['#0891b2', '#06b6d4', '#a5f3fc'], ['#f43f5e', '#fb7185', '#fecdd3'],
+        ];
+        $pair = $palettes[$seed % count($palettes)];
+        $id = substr(md5($key), 0, 6);
+
+        // Deterministic jitter so the blobs sit differently on each cover.
+        $cx1 = 240 + ($seed % 420);
+        $cy1 = 140 + (($seed >> 3) % 260);
+        $cx2 = 700 + (($seed >> 5) % 380);
+        $cy2 = 420 + (($seed >> 7) % 200);
+
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">'
+            . '<defs>'
+            . '<linearGradient id="g' . $id . '" x1="0" y1="0" x2="1" y2="1">'
+            . '<stop offset="0" stop-color="' . $pair[0] . '"/><stop offset="1" stop-color="' . $pair[1] . '"/>'
+            . '</linearGradient>'
+            . '<radialGradient id="r' . $id . '"><stop offset="0" stop-color="' . $pair[2] . '" stop-opacity="0.55"/>'
+            . '<stop offset="1" stop-color="' . $pair[2] . '" stop-opacity="0"/></radialGradient>'
+            . '</defs>'
+            . '<rect width="1200" height="675" fill="url(#g' . $id . ')"/>'
+            . '<circle cx="' . $cx1 . '" cy="' . $cy1 . '" r="300" fill="url(#r' . $id . ')"/>'
+            . '<circle cx="' . $cx2 . '" cy="' . $cy2 . '" r="240" fill="url(#r' . $id . ')"/>'
+            . '<g fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="2">'
+            . '<circle cx="' . $cx2 . '" cy="' . $cy1 . '" r="130"/>'
+            . '<circle cx="' . $cx1 . '" cy="' . $cy2 . '" r="90"/>'
+            . '</g>'
+            . '</svg>';
+
+        Storage::disk('public')->put($key, $svg);
+
+        return $key;
     }
 
     /**

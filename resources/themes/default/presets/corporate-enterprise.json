@@ -1,0 +1,615 @@
+{
+    "name": "Corporate Enterprise",
+    "description": "Restrained B2B layout — royal blue and teal, no gradients, left-aligned enterprise hero, uppercase nav and a wide split-band footer.",
+    "preview": {
+        "mode": "light",
+        "primary": "#1d4ed8",
+        "secondary": "#0f766e",
+        "accent": "#b45309",
+        "bg": "#f8fafc",
+        "heading": "#0f172a",
+        "text": "#334155"
+    },
+    "settings": {
+        "theme": {
+            "theme_default_mode": "light",
+            "theme_allow_user_toggle": true,
+            "page_loading_animation": "skeleton",
+            "smooth_scroll": false,
+            "nav_progress_bar": false,
+            "show_back_to_top": true,
+            "hide_scroll_top_mobile": false,
+            "primary_color": "#1d4ed8",
+            "secondary_color": "#0f766e",
+            "accent_color": "#b45309",
+            "bg_color": "#f8fafc",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#0f172a",
+            "body_text_color": "#334155",
+            "muted_text_color": "#64748b",
+            "border_color": "#dbe2ea",
+            "font_body": "Open Sans",
+            "heading_font": "Montserrat",
+            "base_font_size": "15px",
+            "heading_weight": "700",
+            "line_height": "1.625",
+            "letter_spacing": "normal",
+            "container_width": "1536px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "always",
+                "shadow_style": "border_small",
+                "menu_position": "left",
+                "menu_hover_style": "simple",
+                "show_notification_bell": true,
+                "notification_button_style": "icon_only",
+                "show_social_icons": false,
+                "social_icon_style": "rounded_soft_bg",
+                "show_language_switcher": true,
+                "language_switcher_style": "icon_only",
+                "show_dark_mode_toggle": true,
+                "dark_mode_toggle_style": "icon_only",
+                "command_palette_style": "icon_only",
+                "show_icon_tooltip": true,
+                "auth_mode": "register_only",
+                "guest_login_text": "Sign in",
+                "guest_login_icon_class": "ti ti-login-2",
+                "guest_login_style": "outline",
+                "guest_register_text": "Create account",
+                "guest_register_icon_class": "",
+                "guest_register_style": "dark",
+                "guest_button_shape": "rounded",
+                "account_avatar_style": "avatar_name",
+                "show_cta_button": true,
+                "cta_text": "Request a demo",
+                "cta_link": "/contact",
+                "cta_icon": "ti ti-presentation",
+                "cta_style": "primary",
+                "cta_shape": "rounded",
+                "cta_access_level": "all",
+                "menu_source": "primary",
+                "height": 72,
+                "container_width": "1536px",
+                "bg_color": "",
+                "transparent_on_hero": false,
+                "text_color": "#111111",
+                "menu_hover_color": "#1d4ed8",
+                "show_border": true,
+                "show_shadow": false,
+                "menu_transform": "uppercase"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "compact",
+                "height": 64,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "small",
+                "sticky_behavior": "always",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": false,
+                "show_search_icon": true,
+                "show_notification_bell": true,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": false
+            },
+            "mobile_bottom": {
+                "enabled": true,
+                "hide_menu_labels": false,
+                "show_glassmorphism": false,
+                "show_home": true,
+                "show_search_icon": false,
+                "show_tools": true,
+                "show_notification_bell": false,
+                "show_hamburger": false,
+                "show_dark_mode_toggle": true,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "split_band",
+            "logo_mode": "light",
+            "footer_bg_color": "#ffffff",
+            "footer_text_color": "#334155",
+            "footer_heading_color": "#111111",
+            "show_newsletter": true,
+            "newsletter_title": "Industry briefings",
+            "newsletter_description": "Quarterly research on AI governance, cost control and deployment patterns.",
+            "newsletter_placeholder": "Work email address",
+            "newsletter_button_label": "Subscribe",
+            "newsletter_button_style": "primary",
+            "show_social_icons": true,
+            "social_title": "Connect",
+            "social_multi_color": false,
+            "contact_title": "Contact",
+            "menu_title": "Company",
+            "menu_column": "footer-company",
+            "secondary_menu_title": "Legal",
+            "secondary_menu_column": "footer-legal",
+            "tool_categories_title": "Capabilities",
+            "footer_heading_text_case": "uppercase",
+            "container_width": "1536px",
+            "show_logo_about": true,
+            "enable_card_style": false,
+            "hide_categories_count": true,
+            "footer_vertical_padding": 72,
+            "show_bottom_social_icons": false,
+            "show_bottom_language_selector": false,
+            "show_back_to_top": false,
+            "bottom_menu": "",
+            "show_payment_icons": true,
+            "payment_icons": "/assets/image/demo-assets/payment-icons.png",
+            "bottom_bar_show_border": true,
+            "bottom_bar_border_width": 1,
+            "bottom_bar_padding": 24,
+            "bottom_bar_centered": false,
+            "brand_description": "Approved AI models deployed across every department, with the audit trail and cost controls your reviewers expect.",
+            "contact_email": "enterprise@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0110",
+            "contact_address": "1200 Corporate Drive, Suite 900, Chicago, IL 60601",
+            "contact_details": "Mon to Sat, 10am to 6pm PT. Email reply within one business day.",
+            "copyright_text": "© {year} {site_name}. All rights reserved.",
+            "tool_categories_items": [
+                "blog-content",
+                "social-media",
+                "advertising",
+                "email-marketing",
+                "development",
+                "website-seo"
+            ]
+        },
+        "homepage": {
+            "hero_variant": "enterprise",
+            "show_hero": true,
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": true,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": false,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": true,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": true
+        },
+        "homepage_config": {
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "enterprise",
+                        "headline": "Enterprise AI, under your governance",
+                        "subheadline": "Deploy approved models across every department with the audit trail, cost controls and access policies your security team already asked for.",
+                        "trust_badge_text": "Deployed across 60+ regulated organisations",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Request a demo",
+                        "primary_cta_link": "/contact",
+                        "primary_cta_style": "primary_filled",
+                        "primary_cta_icon": "ti ti-presentation",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "rounded",
+                        "primary_cta_size": "lg",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "Read the security brief",
+                        "secondary_cta_link": "/blog",
+                        "secondary_cta_style": "outline",
+                        "secondary_cta_icon": "ti ti-file-text",
+                        "secondary_cta_icon_position": "left",
+                        "secondary_cta_shape": "rounded",
+                        "secondary_cta_size": "lg",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "96",
+                        "hero_heading_size": "lg",
+                        "hero_heading_color": "dark",
+                        "show_stats": true,
+                        "show_stats_separator": false,
+                        "hero_gradient_enabled": false,
+                        "hero_gradient_palette": "light_glow",
+                        "hero_gradient_direction": "to bottom",
+                        "show_hero_background": false,
+                        "show_search_box": false,
+                        "visibility": "all",
+                        "stats": [
+                            {
+                                "number": "60+",
+                                "label": "Enterprise deployments"
+                            },
+                            {
+                                "number": "99.95%",
+                                "label": "Contractual uptime"
+                            },
+                            {
+                                "number": "ISO 27001",
+                                "label": "Aligned controls"
+                            },
+                            {
+                                "number": "EU / US",
+                                "label": "Data residency"
+                            }
+                        ],
+                        "sort_order": 0
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "Controls before capabilities",
+                        "subtitle": "Everything procurement, security and finance need before a single prompt is run.",
+                        "badge_text": "Capabilities",
+                        "layout": "4-column",
+                        "card_style": "bordered",
+                        "enable_card_style": true,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "icon": "ti ti-shield-check",
+                                "title": "Policy-based access",
+                                "description": "Which teams reach which models, with approvals and expiry dates on every grant."
+                            },
+                            {
+                                "icon": "ti ti-report-money",
+                                "title": "Cost attribution",
+                                "description": "Spend broken down by department, project and user, exportable to your finance stack."
+                            },
+                            {
+                                "icon": "ti ti-file-certificate",
+                                "title": "Full audit trail",
+                                "description": "Every prompt, output and configuration change retained and searchable for compliance."
+                            },
+                            {
+                                "icon": "ti ti-server-cog",
+                                "title": "Your infrastructure",
+                                "description": "Self-hosted or private cloud, with regional data residency and your own model keys."
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "A vetted tool catalog",
+                        "subtitle": "Publish only the tools your organisation has approved, department by department.",
+                        "badge_text": "Catalog",
+                        "layout": "4-column",
+                        "card_style": "style-3",
+                        "source": "all",
+                        "max_items": 8,
+                        "section_bg": "light",
+                        "card_bg_style": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "show_rating": false,
+                        "show_favorite": false,
+                        "show_category": true,
+                        "show_category_filter": true,
+                        "show_search": true,
+                        "primary_text": "View full catalog",
+                        "primary_link": "/ai-tools",
+                        "primary_style": "outline",
+                        "primary_shape": "rounded",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_icon_position": "right",
+                        "width": "contained",
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "title": "Inside the platform",
+                        "subtitle": "Screens from a live enterprise deployment.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "hide_captions": true,
+                        "section_bg": "light",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "A rollout your security team signs off on",
+                        "subheading": "From pilot to organisation-wide in a single quarter.",
+                        "section_anchor": "rollout",
+                        "icon": "ti ti-checklist",
+                        "icon_style": "primary",
+                        "icon_position": "left",
+                        "step_card_style": "bordered",
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "items": [
+                            {
+                                "icon": "ti ti-clipboard-check",
+                                "title": "Scoped pilot",
+                                "description": "One department, defined budget, measurable outcomes agreed before kickoff."
+                            },
+                            {
+                                "icon": "ti ti-lock-check",
+                                "title": "Security review",
+                                "description": "Architecture docs, SSO, retention policy and access controls handed to your reviewers."
+                            },
+                            {
+                                "icon": "ti ti-building-arch",
+                                "title": "Organisation rollout",
+                                "description": "Templates, training and per-team budgets pushed out from one admin console."
+                            }
+                        ],
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "Measured across every deployment",
+                        "subheading": "Averages from the last twelve months of enterprise rollouts.",
+                        "icon": "ti ti-chart-bar",
+                        "icon_style": "dark",
+                        "icon_position": "left",
+                        "section_bg": "light",
+                        "title_align": "left",
+                        "title_size": "sm",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "stats_style": "dark",
+                        "show_stats": true,
+                        "show_stats_separator": true,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "31%",
+                                "label": "Lower model spend"
+                            },
+                            {
+                                "number": "9 days",
+                                "label": "Median time to pilot"
+                            },
+                            {
+                                "number": "4,200",
+                                "label": "Seats under management"
+                            },
+                            {
+                                "number": "0",
+                                "label": "Reportable incidents"
+                            }
+                        ],
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "What our customers report",
+                        "subheading": "From CIOs, heads of operations and platform leads.",
+                        "icon": "ti ti-building-bank",
+                        "icon_style": "primary",
+                        "icon_position": "left",
+                        "source": "all",
+                        "card_style": "bordered",
+                        "slider_columns": "3",
+                        "autoplay_enabled": "0",
+                        "hide_controls": "0",
+                        "max_items": 6,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "pricing",
+                    "config": {
+                        "heading": "Transparent commercial terms",
+                        "subheading": "Per-seat or consumption based, with annual agreements available.",
+                        "badge_text": "Commercials",
+                        "section_anchor": "pricing",
+                        "icon": "ti ti-file-invoice",
+                        "icon_style": "primary",
+                        "icon_position": "left",
+                        "source": "all",
+                        "section_bg": "light",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Procurement questions",
+                        "subheading": "The answers your legal and security reviewers will ask for.",
+                        "icon": "ti ti-help-circle",
+                        "icon_style": "primary",
+                        "icon_position": "left",
+                        "category_tabs_style": "sidebar",
+                        "max_items": 10,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Bring your reviewers to the first call",
+                        "subheadline": "We will walk security, finance and the business through the same session.",
+                        "primary_text": "Request a demo",
+                        "primary_link": "/contact",
+                        "primary_style": "primary",
+                        "primary_shape": "rounded",
+                        "primary_icon": "ti ti-presentation",
+                        "primary_access_level": "all",
+                        "secondary_text": "Download the brief",
+                        "secondary_link": "/blog",
+                        "secondary_style": "dark",
+                        "secondary_shape": "rounded",
+                        "secondary_icon": "ti ti-download",
+                        "secondary_access_level": "all",
+                        "background_style": "light",
+                        "card_bg_style": "default",
+                        "width": "contained",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "vertical_padding": "96",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "Research and briefings",
+                        "subtitle": "Deployment patterns, governance frameworks and cost benchmarks.",
+                        "icon": "ti ti-file-analytics",
+                        "icon_style": "primary",
+                        "icon_position": "left",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "bordered",
+                        "max_items": 3,
+                        "show_description": true,
+                        "show_button": true,
+                        "button_text": "All research",
+                        "button_link": "/blog",
+                        "button_style": "outline",
+                        "button_icon": "ti ti-arrow-right",
+                        "section_bg": "light",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "sort_order": 11
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "default",
+            "hide_breadcrumbs": false,
+            "hide_rating": true,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": false,
+            "global_tools_embeddable_enabled": false,
+            "show_tool_credit_costs": true,
+            "archive_layout": "default",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "numbered",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": false,
+            "category_pagination": "numbered"
+        }
+    }
+}

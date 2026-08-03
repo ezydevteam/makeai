@@ -79,7 +79,7 @@ class NotificationController extends Controller
             })->values()->all();
 
         return Inertia::render('User/Notifications', [
-            'notifications' => $notifications->paginate($user, $status),
+            'notificationList' => $notifications->paginate($user, $status),
             'unreadCount' => $user->unreadNotifications()->count(),
             'filters' => ['status' => $status],
             'notificationGroups' => $groups,

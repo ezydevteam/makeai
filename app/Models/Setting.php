@@ -257,6 +257,14 @@ class Setting extends Model
         'sidebar_config'                         => 'appearance',
         'active_theme_preset'                    => 'appearance',
 
+        // preset_backup — the snapshot ThemePresetService takes before a preset overwrites
+        // the live look, so "Restore previous look" has something to put back. Given its own
+        // group rather than routed to `appearance` by the frontend_ prefix: it is cold data
+        // (written on apply, read to render one banner) and roughly the size of the whole
+        // appearance blob, which every theme save would otherwise rewrite for nothing.
+        // The row only exists once a preset has been applied, so a fresh install is unaffected.
+        'theme_preset_backup'                    => 'preset_backup',
+
         // ads — the one key that misses the `ads_` prefix (`adsense_`, not `ads_`).
         'adsense_publisher_id'                   => 'ads',
     ];

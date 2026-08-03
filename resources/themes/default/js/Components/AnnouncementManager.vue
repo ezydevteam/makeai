@@ -373,7 +373,7 @@ onUnmounted(() => {
                 <span v-if="headerCouponEndingDate" class="text-xs font-medium text-white/85">
                     {{ t('Ends :date', { date: headerCouponEndingDate }) }}
                 </span>
-                <a :href="headerCoupon.pricing_url" class="group inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-bold text-primary-700 transition hover:bg-primary-50">
+                <a :href="headerCoupon.pricing_url" class="group inline-flex items-center gap-1.5 rounded-full !bg-white px-3 py-1 text-xs font-bold text-primary-700 transition hover:bg-primary-50">
                     <span>{{ t('Choose plan') }}</span>
                     <i class="ti ti-arrow-right text-sm transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
                 </a>

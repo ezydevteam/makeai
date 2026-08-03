@@ -31,7 +31,11 @@ interface NotificationGroup {
 }
 
 const props = defineProps<{
-    notifications: {
+    // Deliberately NOT `notifications`: HandleInertiaRequests shares a global prop by that
+    // name holding the bell's enabled flag, unread count and latest items. A page prop of
+    // the same name shadows it, so the header bell would compute shouldRender=false and
+    // vanish — on this page only, which is the one page it should obviously be visible on.
+    notificationList: {
         data: NotificationItem[]
         links: Array<{ url: string | null, label: string, active: boolean }>
         current_page: number
@@ -147,7 +151,7 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
                     <button type="button" class="rounded-full px-3 py-1 text-sm font-semibold transition" :class="props.filters.status === 'read' ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'" @click="setStatus('read')">{{ t('Read') }}</button>
                 </div>
             </div>
-            <div v-for="item in notifications.data" :key="item.id" class="flex gap-4 border-b border-gray-100 p-5 last:border-b-0 dark:border-surface-800">
+            <div v-for="item in notificationList.data" :key="item.id" class="flex gap-4 border-b border-gray-100 p-5 last:border-b-0 dark:border-surface-800">
                 <div :class="levelClass(item.level)" class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm">
                     <i :class="[resolveNotificationIconClass(item), 'text-lg']"></i>
                 </div>
@@ -173,7 +177,7 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
                     </div>
                 </div>
             </div>
-            <div v-if="notifications.data.length === 0" class="px-6 py-16 text-center text-sm text-gray-500">
+            <div v-if="notificationList.data.length === 0" class="px-6 py-16 text-center text-sm text-gray-500">
                 {{ t('No notifications found.') }}
             </div>
         </section>
@@ -181,13 +185,13 @@ const togglePreference = (group: NotificationGroup, channel: 'in_app' | 'email')
         <!-- from/to/total drive the component's "showing X to Y of Z" row; with only :links
              it rendered the page buttons and an empty count line. -->
         <Pagination
-            v-if="notifications.last_page > 1"
-            :links="notifications.links"
-            :from="notifications.from"
-            :to="notifications.to"
-            :total="notifications.total"
-            :current-page="notifications.current_page"
-            :last-page="notifications.last_page"
+            v-if="notificationList.last_page > 1"
+            :links="notificationList.links"
+            :from="notificationList.from"
+            :to="notificationList.to"
+            :total="notificationList.total"
+            :current-page="notificationList.current_page"
+            :last-page="notificationList.last_page"
         />
     </div>
 

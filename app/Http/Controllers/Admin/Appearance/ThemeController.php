@@ -234,6 +234,7 @@ class ThemeController extends Controller
                 'homepageTemplate' => settings('homepage_template', 'default'),
                 'themePresets' => $this->themePresetService->listPresets($slug),
                 'activePreset' => settings('active_theme_preset'),
+                'presetBackup' => $this->themePresetService->backupSummary(),
                 'frontendCustomCodeSettings' => $this->frontendPresetService->getStoredCustomCodeSettings(),
                 'frontendToolPageSettings' => $this->frontendPresetService->getStoredToolPageSettings(),
                 'menus' => $menus,
@@ -319,7 +320,6 @@ class ThemeController extends Controller
             $settings = $this->handleBrandingUploads($request, $settings);
             $this->persistBrandingSettings($settings);
             $this->frontendPresetService->saveThemeSettings($settings);
-            Cache::forget('theme-variables-css');
         } elseif ($section === 'header') {
             $this->frontendPresetService->saveHeaderSettings($settings);
         } elseif ($section === 'footer') {
@@ -434,7 +434,8 @@ class ThemeController extends Controller
 
     /**
      * Apply a bundled theme preset. Overwrites the stored settings for whichever
-     * sections the preset defines; sections it omits are left untouched.
+     * sections the preset defines; sections it omits are left untouched. The look it
+     * replaces is snapshotted first, so restoreThemePreset() can put it back.
      */
     public function applyThemePreset(Request $request, string $slug): RedirectResponse
     {
@@ -448,7 +449,21 @@ class ThemeController extends Controller
             return back()->with('error', translate('That preset could not be applied.'));
         }
 
-        return back()->with('success', translate('Preset applied. Your theme settings were updated.'));
+        return back()->with('success', translate('Preset applied. You can undo this from the Presets tab.'));
+    }
+
+    /**
+     * Undo the last preset apply, putting back the look that was live before it.
+     */
+    public function restoreThemePreset(string $slug): RedirectResponse
+    {
+        $this->ensureThemeExists($slug);
+
+        if (! $this->themePresetService->restoreBackup()) {
+            return back()->with('error', translate('There is no previous look to restore.'));
+        }
+
+        return back()->with('success', translate('Your previous look has been restored.'));
     }
 
     /**
@@ -465,10 +480,6 @@ class ThemeController extends Controller
         $this->frontendPresetService->restoreDefaults($validated['section']);
 
         Setting::flushCache();
-
-        if ($validated['section'] === 'theme') {
-            Cache::forget('theme-variables-css');
-        }
 
         return back()->with('success', translate(':section defaults restored.', [
             'section' => ucfirst(str_replace('_', ' ', $validated['section'])),

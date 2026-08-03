@@ -52,13 +52,13 @@ const featureCardImageClass = (style: string): string => ({ simple: 'w-full h-32
 const heroButtonClass = (style: string): string => {
     const isDarkTheme = isDark.value
     const map: Record<string, string> = {
-        primary_filled: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
+        primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
         outline: isDarkTheme
             ? 'border-2 border-white/40 bg-transparent !text-white hover:bg-white/10'
             : 'border-2 border-gray-300 bg-transparent text-gray-900 hover:bg-gray-50 dark:border-white/30 dark:bg-transparent dark:!text-white dark:hover:bg-white/10',
         dark: isDarkTheme
             ? 'bg-white text-gray-950 hover:bg-gray-100'
-            : 'bg-gray-900 text-white shadow-2xl shadow-gray-900/20 hover:bg-gray-800',
+            : 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-2xl shadow-gray-900/20 hover:from-gray-900 hover:to-gray-800',
         gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
         white: isDarkTheme
             ? 'bg-white/15 backdrop-blur-sm border border-white/25 !text-white shadow-xl hover:bg-white/25'

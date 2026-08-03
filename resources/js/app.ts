@@ -10,6 +10,7 @@ import ToastContainer from './Components/UI/ToastContainer.vue'
 import ShortcutsReferenceModal from '@themes/default/js/Components/ShortcutsReferenceModal.vue'
 import PageLoader from './Components/UI/PageLoader.vue'
 import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
+import { syncDefaultColorScheme } from './lib/colorScheme'
 
 // Document-title site name for the "<page title> - <site name>" pattern. Sourced
 // from the server-shared `appName` prop — which is settings('site_name') and itself
@@ -183,13 +184,7 @@ function applyThemeDefaults(themeSettings: Record<string, string> | undefined) {
     const html = document.documentElement
 
     // ── Theme Default Mode ──────────────────────────────────
-    const modeSetting = themeSettings.theme_default_mode
-    if (modeSetting === 'dark' || modeSetting === 'light') {
-        const stored = localStorage.getItem('vueuse-color-scheme')
-        if (stored === null) {
-            localStorage.setItem('vueuse-color-scheme', modeSetting === 'dark' ? 'dark' : '')
-        }
-    }
+    syncDefaultColorScheme(themeSettings.theme_default_mode)
 
     // ── Smooth Scroll ───────────────────────────────────────
     const scroll = themeSettings.smooth_scroll

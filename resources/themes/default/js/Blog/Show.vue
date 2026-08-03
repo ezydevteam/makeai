@@ -301,6 +301,7 @@ onUnmounted(() => window.removeEventListener('resize', closeShareOnResize))
                                     :urls="share.urls"
                                     :counts="share.counts"
                                     :show-counts="share.show_counts"
+                                    :collapse-after="3"
                                 />
                             </div>
                         </div>

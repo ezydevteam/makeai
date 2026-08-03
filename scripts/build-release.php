@@ -703,20 +703,20 @@ if (! $demo) {
 
 // The demo host's logo and favicon. ALLOW_DIRS deliberately omits public/ — the buyer
 // package's webroot is assembled file by file — so this one directory has to be carried
-// over explicitly, and only for a demo build. It lands in core/public/demo-assets, which
-// the web server denies; DemoProvisionSeeder reads it from disk and copies each image
+// over explicitly, and only for a demo build. It lands in
+// core/public/assets/image/demo-assets/logo, from which DemoProvisionSeeder copies each image
 // onto the public disk on every demo:reset. Without this step the demo would come up
 // with no logo, and no way to set one (the admin write is blocked in demo mode).
 if ($demo) {
     step('Bundling demo branding assets');
 
-    $assetSource = $srcDir . '/public/demo-assets';
+    $assetSource = $srcDir . '/public/assets/image/demo-assets/logo';
 
     if (! is_dir($assetSource)) {
-        fail('public/demo-assets is missing — the demo host has no logo or favicon source');
+        fail('public/assets/image/demo-assets/logo is missing — the demo host has no logo or favicon source');
     }
 
-    $assetFiles = copyTree($assetSource, $appRoot . '/public/demo-assets', null, 'public/demo-assets');
+    $assetFiles = copyTree($assetSource, $appRoot . '/public/assets/image/demo-assets/logo', null, 'public/assets/image/demo-assets/logo');
     info("{$assetFiles} files copied");
 }
 

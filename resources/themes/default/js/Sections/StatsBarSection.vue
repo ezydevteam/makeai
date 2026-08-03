@@ -99,23 +99,38 @@ const statsStyle = computed(() => asString(
     asString(props.section.config.title_color, 'dark'),
 ))
 
+// The masks fade the marquee out at both edges, so each one has to start in the section's
+// OWN background colour — anything else reads as two coloured slabs pinned to the sides.
+//
+// `default` paints bg-[var(--color-bg)], which the operator can set to anything, so the
+// mask follows that variable instead of assuming white. It was hardcoded white, which is
+// why a custom page background showed two white blocks.
+//
+// The keys also have to match SECTION_BG_DEFAULTS exactly. They did not — the map spelled
+// them primary_light / success_light / danger_light while the real values are
+// primary-light / green-light / red-light — so four of the tinted backgrounds missed the
+// map entirely and fell through to the white default as well.
 const marqueeMaskClass = computed(() => {
     if (isDark.value) {
         return 'from-surface-950 to-transparent'
     }
     const bg = asString(props.section.config.section_bg, 'default')
     const map: Record<string, string> = {
-        default: 'from-white to-transparent',
+        default: 'from-[var(--color-bg)] to-transparent',
         light: 'from-gray-50 to-transparent',
-        primary_light: 'from-primary-50/50 to-transparent',
-        success_light: 'from-emerald-50/50 to-transparent',
-        danger_light: 'from-rose-50/50 to-transparent',
-        warning_light: 'from-amber-50/50 to-transparent',
-        gradient1: 'from-emerald-950 to-transparent',
-        gradient2: 'from-blue-950 to-transparent',
-        gradient3: 'from-purple-950 to-transparent'
+        'primary-light': 'from-primary-50 to-transparent',
+        'green-light': 'from-emerald-50 to-transparent',
+        'warning-light': 'from-amber-50 to-transparent',
+        'red-light': 'from-red-50 to-transparent',
+        gradient1: 'from-[var(--color-primary)] to-transparent',
+        gradient2: 'from-purple-600 to-transparent',
+        gradient3: 'from-blue-600 to-transparent',
+        gradient4: 'from-blue-600 to-transparent',
     }
-    return map[bg] ?? 'from-white to-transparent'
+
+    // Anything unmapped — a background added later, or one set outside this list — gets a
+    // neutral slate rather than a white slab that fights every custom colour.
+    return map[bg] ?? 'from-slate-100 to-transparent'
 })
 </script>
 

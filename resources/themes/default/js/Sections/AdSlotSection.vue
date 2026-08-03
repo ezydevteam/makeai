@@ -29,7 +29,7 @@ const asString = (v: SectionConfigValue | undefined, fallback = ''): string => t
         :id="sectionAnchorId(section.config.section_anchor)" :class="[sectionVisibilityClass(asString(section.config.visibility, 'all')), isDark ? '!bg-surface-950' : sectionBgClass(asString(section.config.section_bg, 'default'))]" :style="sectionPaddingStyle(section.config.vertical_padding, '64')" class="transition-colors duration-300">
         <div class="mx-auto max-w-5xl px-6">
             <div :class="effectiveCardWrapperClass">
-                <div v-if="asString(section.config.title) || asString(section.config.subtitle) || asString(section.config.icon) || asString(section.config.badge_text)" 
+                <div v-if="asString(section.config.title) || asString(section.config.subtitle) || asString(section.config.icon) || asString(section.config.badge_text)"
                      :class="[sectionHeaderClass(asString(section.config.title_align, 'center'))]" class="mb-8">
                     <!-- Top Position Icon -->
                     <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'top'" :class="[

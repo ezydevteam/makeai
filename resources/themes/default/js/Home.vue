@@ -127,16 +127,17 @@ interface SimpleHeaderSettings {
     }
 }
 
+// These arrive as real booleans from settings.json and as "1"/"0" strings once the theme
+// form has been saved through multipart, so both shapes have to read the same — isEnabled
+// covers them. Hand-rolled string comparisons here silently dropped the default `true`.
 const themeShowBackToTop = computed(() => {
-    const settings = (page.props.appearanceThemeSettings as Record<string, string>) || {}
-    const val = settings.show_back_to_top
-    return val === undefined || val === '' || val === 'true' || val === '1'
+    const settings = (page.props.appearanceThemeSettings as Record<string, unknown>) || {}
+    return isEnabled(settings.show_back_to_top, true)
 })
 
 const themeHideScrollTopMobile = computed(() => {
-    const settings = (page.props.appearanceThemeSettings as Record<string, string | boolean | undefined>) || {}
-    const val = settings.hide_scroll_top_mobile
-    return val === 'true' || val === '1' || val === true
+    const settings = (page.props.appearanceThemeSettings as Record<string, unknown>) || {}
+    return isEnabled(settings.hide_scroll_top_mobile, false)
 })
 
 const isMobileBottomHeaderEnabled = computed(() => {

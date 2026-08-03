@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Link, router, useForm, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { mediaUrl } from '@/lib/media'
 
@@ -28,7 +29,7 @@ const props = defineProps<{
     comments: {
         data: CommentItem[]
         links: Array<{ url: string | null; label: string; active: boolean }>
-        meta: { total: number }
+        meta: { total: number; current_page: number; last_page: number }
     }
     modelType: string
     modelId: number
@@ -249,9 +250,15 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div v-if="comments.links.length > 3" class="flex flex-wrap gap-2">
-                <Link v-for="link in comments.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="[link.active ? 'btn-primary' : 'bg-gray-100 text-gray-600', !link.url ? 'pointer-events-none opacity-50' : '']" class="rounded-lg px-3 py-1 text-xs font-semibold" v-html="link.label" />
-            </div>
+            <Pagination
+                :links="comments.links"
+                :total="comments.meta.total"
+                :current-page="comments.meta.current_page"
+                :last-page="comments.meta.last_page"
+                preserve-scroll
+                align="left"
+                class="pt-2"
+            />
         </div>
 
         <AppModal

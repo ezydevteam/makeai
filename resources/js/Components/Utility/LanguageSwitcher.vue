@@ -57,7 +57,11 @@ const buttonClass = computed(() => isBottomDisplay.value
         ? 'inline-flex h-9 w-9 min-w-9 items-center justify-center gap-0 rounded-lg p-0 text-sm font-semibold transition-all duration-200 disabled:cursor-wait disabled:opacity-60'
         : 'inline-flex min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60')
 const dropdownClass = computed(() => {
-    const base = 'absolute z-50 max-h-72 min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900'
+    // `language-switcher-panel` is a styling hook, not decoration: a header sitting
+    // transparently on a hero paints its whole subtree white, and this panel opens below
+    // that header on its own white background. AppHeader excludes the panel from that
+    // white-out by name.
+    const base = 'language-switcher-panel absolute z-50 max-h-72 min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900'
     if (isBottomDisplay.value) {
         // Mobile bottom navigation: centre the menu above the trigger.
         return `${base} bottom-full start-1/2 mb-2 -translate-x-1/2 rtl:translate-x-1/2`

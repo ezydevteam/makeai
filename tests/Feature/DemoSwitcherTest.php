@@ -173,7 +173,7 @@ class DemoSwitcherTest extends TestCase
             $midnight = collect($catalog)->firstWhere('key', 'preset:midnight');
 
             $this->assertNotNull($midnight);
-            $this->assertSame('/assets/image/demos/midnight.png', $midnight['image']);
+            $this->assertSame('/assets/image/demo-assets/demos/midnight.png', $midnight['image']);
 
             // A preset with no screenshot dropped in reports null, so the UI falls back
             // to its icon placeholder.

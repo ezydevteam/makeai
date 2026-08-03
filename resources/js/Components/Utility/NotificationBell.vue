@@ -239,7 +239,11 @@ watch(realtime, () => {
         </button>
 
         <Transition enter-active-class="transition ease-out duration-200" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
-            <div v-if="open" :class="notificationDropdownClass">
+            <!-- `notification-panel` sits outside notificationDropdownClass so it survives a
+                 caller replacing that class wholesale. A header sitting transparently on a
+                 hero paints its subtree white to stay legible; this panel opens below the
+                 header on its own opaque background and must be left out of that. -->
+            <div v-if="open" :class="['notification-panel', notificationDropdownClass]">
                 <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2 dark:border-surface-800 dark:bg-surface-800/70">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Notifications') }}</h3>

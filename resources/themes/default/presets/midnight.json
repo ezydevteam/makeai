@@ -1,6 +1,6 @@
 {
     "name": "Midnight",
-    "description": "Dark, high-contrast UI with violet and cyan accents on deep navy.",
+    "description": "Dark, high-contrast developer platform — violet and cyan on deep navy, split neon hero, command-palette search, glass tool cards and a split-band footer.",
     "preview": {
         "mode": "dark",
         "primary": "#8b5cf6",
@@ -14,6 +14,11 @@
         "theme": {
             "theme_default_mode": "dark",
             "theme_allow_user_toggle": true,
+            "page_loading_animation": "skeleton",
+            "smooth_scroll": true,
+            "nav_progress_bar": true,
+            "show_back_to_top": false,
+            "hide_scroll_top_mobile": true,
             "primary_color": "#8b5cf6",
             "secondary_color": "#6366f1",
             "accent_color": "#22d3ee",
@@ -28,8 +33,598 @@
             "heading_font": "Poppins",
             "base_font_size": "15px",
             "heading_weight": "700",
-            "line_height": "1.6",
-            "letter_spacing": "normal"
+            "line_height": "1.625",
+            "letter_spacing": "normal",
+            "container_width": "1280px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "always",
+                "shadow_style": "none",
+                "menu_position": "center",
+                "menu_hover_style": "rounded_soft_bg",
+                "show_notification_bell": true,
+                "notification_button_style": "circular_soft_bg",
+                "show_social_icons": true,
+                "social_icon_style": "circular_soft_bg",
+                "social_button_text": "Follow",
+                "show_language_switcher": false,
+                "language_switcher_style": "icon_only",
+                "show_dark_mode_toggle": false,
+                "dark_mode_toggle_style": "circular_soft_bg",
+                "command_palette_style": "search_transparent",
+                "show_icon_tooltip": true,
+                "auth_mode": "user_menu",
+                "guest_login_text": "Sign in",
+                "guest_login_icon_class": "",
+                "guest_login_style": "ghost",
+                "guest_register_text": "Get started",
+                "guest_register_icon_class": "",
+                "guest_register_style": "purple",
+                "guest_button_shape": "pill",
+                "account_avatar_style": "avatar_only_rounded",
+                "show_cta_button": true,
+                "cta_text": "Start building",
+                "cta_link": "/register",
+                "cta_icon": "ti ti-terminal-2",
+                "cta_style": "purple",
+                "cta_shape": "pill",
+                "cta_access_level": "all",
+                "menu_source": "primary",
+                "height": 72,
+                "container_width": "1280px",
+                "bg_color": "",
+                "transparent_on_hero": true,
+                "text_color": "",
+                "menu_hover_color": "",
+                "show_border": false,
+                "show_shadow": false,
+                "menu_transform": "default"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "compact",
+                "height": 64,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "none",
+                "sticky_behavior": "always",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": false,
+                "show_notification_bell": false,
+                "show_search_icon": false,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": true
+            },
+            "mobile_bottom": {
+                "enabled": true,
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
+                "show_home": true,
+                "show_search_icon": true,
+                "show_tools": true,
+                "show_notification_bell": true,
+                "show_hamburger": false,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "split_band",
+            "show_newsletter": true,
+            "newsletter_title": "The changelog",
+            "newsletter_description": "New models, breaking changes and platform updates — sent the week they ship.",
+            "newsletter_placeholder": "you@company.com",
+            "newsletter_button_label": "Subscribe",
+            "newsletter_button_style": "dark",
+            "show_social_icons": true,
+            "social_title": "Community",
+            "social_multi_color": false,
+            "contact_title": "Support",
+            "menu_title": "Platform",
+            "tool_categories_title": "Capabilities",
+            "footer_heading_text_case": "uppercase",
+            "container_width": "1280px",
+            "show_logo_about": true,
+            "enable_card_style": true,
+            "hide_categories_count": false,
+            "footer_vertical_padding": 72,
+            "show_payment_icons": false,
+            "show_bottom_social_icons": true,
+            "show_bottom_language_selector": false,
+            "show_back_to_top": true,
+            "back_to_top_label": "",
+            "back_to_top_icon": "ti ti-arrow-up",
+            "back_to_top_shape": "circle",
+            "bottom_bar_show_border": true,
+            "bottom_bar_border_width": 1,
+            "bottom_bar_padding": 28,
+            "bottom_bar_centered": false,
+            "brand_description": "Ship AI features, not infrastructure. One platform for every model, with streaming and limits solved.",
+            "custom_title": "Status & support",
+            "custom_text": "Incidents post to the status page first. Priority support is included on every paid plan.",
+            "contact_email": "support@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0122",
+            "contact_address": "77 Bleecker Street, New York, NY 10012",
+            "copyright_text": "© {year} {site_name}. All rights reserved.",
+            "tool_categories_items": [
+                "blog-content",
+                "social-media",
+                "advertising",
+                "email-marketing",
+                "development",
+                "website-seo"
+            ]
+        },
+        "homepage": {
+            "hero_variant": "split-gradient",
+            "show_hero": true,
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": true,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": true,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": true,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": true
+        },
+        "homepage_config": {
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "split-gradient",
+                        "headline": "Ship AI features, not infrastructure",
+                        "subheadline": "One platform for every model, with streaming, retries, usage limits and billing already solved. Wire it up this afternoon.",
+                        "trust_badge_text": "Powering 3,400+ production apps",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Start building",
+                        "primary_cta_link": "/register",
+                        "primary_cta_style": "purple",
+                        "primary_cta_icon": "ti ti-terminal-2",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "rounded_xl",
+                        "primary_cta_size": "lg",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "Explore the tools",
+                        "secondary_cta_link": "/ai-tools",
+                        "secondary_cta_style": "white",
+                        "secondary_cta_icon": "ti ti-arrow-right",
+                        "secondary_cta_icon_position": "right",
+                        "secondary_cta_shape": "rounded_xl",
+                        "secondary_cta_size": "lg",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "96",
+                        "hero_heading_size": "lg",
+                        "hero_heading_color": "dark",
+                        "show_stats": true,
+                        "show_stats_separator": true,
+                        "hero_gradient_enabled": true,
+                        "hero_gradient_palette": "neon_night",
+                        "hero_gradient_direction": "to bottom right",
+                        "show_hero_background": false,
+                        "show_search_box": false,
+                        "visibility": "all",
+                        "stats": [
+                            {
+                                "number": "3.4K",
+                                "label": "Apps in production"
+                            },
+                            {
+                                "number": "120ms",
+                                "label": "p95 latency"
+                            },
+                            {
+                                "number": "99.98%",
+                                "label": "Uptime"
+                            },
+                            {
+                                "number": "400+",
+                                "label": "Models routed"
+                            }
+                        ],
+                        "sort_order": 0
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "Built like a platform, not a demo",
+                        "subtitle": "The unglamorous parts that decide whether an AI feature survives its first thousand users.",
+                        "badge_text": "Platform",
+                        "layout": "4-column",
+                        "card_style": "bordered",
+                        "enable_card_style": true,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "gradient3",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "icon": "ti ti-plug-connected",
+                                "title": "One interface, every model",
+                                "description": "Swap providers without touching your code. Routing, fallbacks and retries are configuration, not a rewrite."
+                            },
+                            {
+                                "icon": "ti ti-activity-heartbeat",
+                                "title": "Streaming that holds up",
+                                "description": "Token streaming, cancellation and timeouts handled properly, so a slow model never hangs a request."
+                            },
+                            {
+                                "icon": "ti ti-gauge",
+                                "title": "Limits before surprises",
+                                "description": "Per-user and per-plan ceilings enforced at the edge, with alerts long before the invoice lands."
+                            },
+                            {
+                                "icon": "ti ti-key",
+                                "title": "Keys, roles and audits",
+                                "description": "Scoped keys, rotation and a searchable record of every call — the things a security review asks for first."
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "Everything on the platform",
+                        "subtitle": "Ready-made tools your users can run today, built on the same API you get.",
+                        "badge_text": "Catalog",
+                        "layout": "3-column",
+                        "card_style": "style-2",
+                        "source": "all",
+                        "max_items": 9,
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "vertical_padding": "96",
+                        "icon_style": "gradient-1",
+                        "show_rating": true,
+                        "show_favorite": true,
+                        "show_category": true,
+                        "show_category_filter": true,
+                        "show_search": true,
+                        "primary_text": "Browse all tools",
+                        "primary_link": "/ai-tools",
+                        "primary_style": "purple",
+                        "primary_shape": "rounded_xl",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_icon_position": "right",
+                        "width": "contained",
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "title": "Inside the console",
+                        "subtitle": "Routing, usage and logs, exactly as they ship.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "hide_captions": true,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "Three steps to your first call",
+                        "subheading": "Most teams are streaming tokens before their coffee goes cold.",
+                        "section_anchor": "how-it-works",
+                        "icon": "ti ti-terminal-2",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "step_card_style": "bordered",
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "items": [
+                            {
+                                "icon": "ti ti-key",
+                                "title": "Grab a key",
+                                "description": "Sign up, generate a scoped key, and you are through the door — no sales call in the way."
+                            },
+                            {
+                                "icon": "ti ti-route",
+                                "title": "Choose your routing",
+                                "description": "Pick primary and fallback models per tool, set ceilings, and decide who gets access to what."
+                            },
+                            {
+                                "icon": "ti ti-rocket",
+                                "title": "Ship it",
+                                "description": "Point your app at the endpoint and watch calls, costs and errors land in the dashboard live."
+                            }
+                        ],
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "Running quietly at scale",
+                        "subheading": "Numbers from the last thirty days across every region.",
+                        "icon": "ti ti-chart-dots",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "sm",
+                        "title_color": "gradient3",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "stats_style": "gradient3",
+                        "show_stats": true,
+                        "show_stats_separator": true,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "410M",
+                                "label": "Calls served"
+                            },
+                            {
+                                "number": "120ms",
+                                "label": "p95 latency"
+                            },
+                            {
+                                "number": "6",
+                                "label": "Regions"
+                            },
+                            {
+                                "number": "0.01%",
+                                "label": "Error rate"
+                            }
+                        ],
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "From the teams who build on it",
+                        "subheading": "Engineers, founders and platform leads running production traffic.",
+                        "icon": "ti ti-message-code",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "source": "all",
+                        "card_style": "simple",
+                        "slider_columns": "3",
+                        "autoplay_enabled": "1",
+                        "hide_controls": "0",
+                        "max_items": 6,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "pricing",
+                    "config": {
+                        "heading": "Pay for what you generate",
+                        "subheading": "Usage-based from the first token, with ceilings you set yourself.",
+                        "badge_text": "Pricing",
+                        "section_anchor": "pricing",
+                        "icon": "ti ti-credit-card",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "source": "all",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Engineering questions",
+                        "subheading": "Rate limits, data retention and what happens when a provider goes down.",
+                        "icon": "ti ti-help-circle",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "category_tabs_style": "sidebar",
+                        "max_items": 10,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Your first 10,000 credits are on us",
+                        "subheadline": "No card, no sales call — generate a key and start streaming.",
+                        "primary_text": "Create an account",
+                        "primary_link": "/register",
+                        "primary_style": "white",
+                        "primary_shape": "rounded_xl",
+                        "primary_icon": "ti ti-terminal-2",
+                        "primary_access_level": "guest",
+                        "secondary_text": "See the tools",
+                        "secondary_link": "/ai-tools",
+                        "secondary_style": "outline",
+                        "secondary_shape": "rounded_xl",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
+                        "background_style": "gradient-3",
+                        "card_bg_style": "default",
+                        "width": "contained",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "vertical_padding": "96",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "Engineering notes",
+                        "subtitle": "Model benchmarks, latency deep dives and postmortems worth reading.",
+                        "icon": "ti ti-code",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "simple",
+                        "max_items": 3,
+                        "show_description": true,
+                        "show_button": true,
+                        "button_text": "All notes",
+                        "button_link": "/blog",
+                        "button_style": "ghost",
+                        "button_icon": "ti ti-arrow-right",
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "sort_order": 11
+                    }
+                },
+                {
+                    "type": "newsletter",
+                    "config": {
+                        "heading": "The changelog, weekly",
+                        "subheading": "New models, breaking changes and platform updates the week they ship.",
+                        "icon": "ti ti-mail-star",
+                        "icon_style": "gradient-1",
+                        "icon_position": "top",
+                        "newsletter_style": "inline_pill",
+                        "background_style": "gradient-3",
+                        "card_bg_style": "default",
+                        "placeholder_text": "you@company.com",
+                        "button_text": "Subscribe",
+                        "button_style": "dark",
+                        "privacy_text": "No spam. Unsubscribe anytime.",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "vertical_padding": "96",
+                        "sort_order": 12
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "modern",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": true,
+            "archive_layout": "modern",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "load_more",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": true,
+            "category_pagination": "load_more"
         }
     }
 }

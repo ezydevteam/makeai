@@ -1,0 +1,633 @@
+{
+    "name": "SaaS Startup",
+    "description": "Product-led SaaS look — indigo and sky on slate, app-showcase hero, pricing above the fold, and an app-style mobile bar.",
+    "preview": {
+        "mode": "light",
+        "primary": "#6366f1",
+        "secondary": "#0ea5e9",
+        "accent": "#a855f7",
+        "bg": "#f8fafc",
+        "heading": "#0f172a",
+        "text": "#475569"
+    },
+    "settings": {
+        "theme": {
+            "theme_default_mode": "light",
+            "theme_allow_user_toggle": true,
+            "page_loading_animation": "none",
+            "smooth_scroll": true,
+            "nav_progress_bar": true,
+            "show_back_to_top": false,
+            "hide_scroll_top_mobile": true,
+            "primary_color": "#6366f1",
+            "secondary_color": "#0ea5e9",
+            "accent_color": "#a855f7",
+            "bg_color": "#f8fafc",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#0f172a",
+            "body_text_color": "#475569",
+            "muted_text_color": "#64748b",
+            "border_color": "#e2e8f0",
+            "font_body": "DM Sans",
+            "heading_font": "Plus Jakarta Sans",
+            "base_font_size": "15px",
+            "heading_weight": "800",
+            "line_height": "1.625",
+            "letter_spacing": "tight",
+            "container_width": "1280px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "always",
+                "shadow_style": "border_small",
+                "menu_position": "center",
+                "menu_hover_style": "pill_soft_bg",
+                "show_notification_bell": true,
+                "notification_button_style": "light_bg",
+                "show_social_icons": false,
+                "show_language_switcher": false,
+                "show_dark_mode_toggle": true,
+                "dark_mode_toggle_style": "light_bg",
+                "command_palette_style": "search_transparent",
+                "show_icon_tooltip": true,
+                "auth_mode": "user_menu",
+                "guest_login_text": "Sign in",
+                "guest_login_icon_class": "ti ti-user",
+                "guest_login_style": "ghost",
+                "guest_register_text": "Start free",
+                "guest_register_icon_class": "",
+                "guest_register_style": "primary",
+                "guest_button_shape": "pill",
+                "account_avatar_style": "avatar_name_arrow",
+                "show_cta_button": true,
+                "cta_text": "Start free trial",
+                "cta_link": "/register",
+                "cta_icon": "ti ti-bolt",
+                "cta_style": "primary",
+                "cta_shape": "pill",
+                "cta_access_level": "guest",
+                "menu_source": "primary",
+                "height": 76,
+                "container_width": "1280px",
+                "bg_color": "",
+                "transparent_on_hero": false,
+                "text_color": "#111111",
+                "menu_hover_color": "#6366f1",
+                "show_border": true,
+                "show_shadow": false,
+                "menu_transform": "default"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "compact",
+                "height": 64,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "small",
+                "sticky_behavior": "always",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": true,
+                "show_notification_bell": false,
+                "show_search_icon": true,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": true
+            },
+            "mobile_bottom": {
+                "enabled": true,
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
+                "show_home": true,
+                "show_search_icon": false,
+                "show_tools": true,
+                "show_notification_bell": true,
+                "show_hamburger": false,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "floating_panel",
+            "footer_bg_color": "#f8fafc",
+            "footer_text_color": "#111111",
+            "footer_heading_color": "#000000",
+            "show_newsletter": true,
+            "newsletter_title": "Product updates, no noise",
+            "newsletter_description": "One email a month: new tools, model updates, and pricing changes.",
+            "newsletter_placeholder": "you@company.com",
+            "newsletter_button_label": "Subscribe",
+            "newsletter_button_style": "primary",
+            "show_social_icons": true,
+            "social_title": "Follow along",
+            "social_multi_color": false,
+            "contact_title": "Talk to us",
+            "menu_title": "Product",
+            "footer_heading_text_case": "capitalize",
+            "container_width": "1280px",
+            "show_logo_about": true,
+            "enable_card_style": false,
+            "hide_categories_count": false,
+            "footer_vertical_padding": 64,
+            "show_payment_icons": true,
+            "show_bottom_social_icons": false,
+            "show_bottom_language_selector": true,
+            "show_back_to_top": true,
+            "back_to_top_label": "",
+            "back_to_top_icon": "ti ti-arrow-up",
+            "back_to_top_shape": "",
+            "bottom_bar_show_border": true,
+            "bottom_bar_border_width": 1,
+            "bottom_bar_padding": 28,
+            "bottom_bar_centered": false,
+            "brand_description": "The AI workspace your whole team can run on — credits, billing and roles handled for you.",
+            "custom_title": "Start your trial",
+            "custom_text": "Fourteen days on the full platform, no card up front. Bring your own provider keys whenever you are ready.",
+            "contact_email": "sales@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0188",
+            "contact_address": "500 Howard Street, Floor 3, San Francisco, CA 94105",
+            "tool_categories_title": "Popular tools",
+            "copyright_text": "© {year} {site_name}. All rights reserved."
+        },
+        "homepage": {
+            "hero_variant": "app-showcase",
+            "show_hero": true,
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": true,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": true,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": true,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": true
+        },
+        "homepage_config": {
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "app-showcase",
+                        "headline": "The AI workspace your whole team can run on",
+                        "subheadline": "Content, images, chat and code from one dashboard — with credits, billing and roles already handled for you.",
+                        "trust_badge_text": "Trusted by 12,000+ product teams",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Start free trial",
+                        "primary_cta_link": "#pricing",
+                        "primary_cta_style": "primary_filled",
+                        "primary_cta_icon": "ti ti-bolt",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "pill",
+                        "primary_cta_size": "lg",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "See how it works",
+                        "secondary_cta_link": "https://youtu.be/eHEHE2fpnWQ?si=E7hiTt2t8Ys2X3Ca",
+                        "secondary_cta_style": "outline",
+                        "secondary_cta_icon": "ti ti-player-play",
+                        "secondary_cta_icon_position": "left",
+                        "secondary_cta_shape": "pill",
+                        "secondary_cta_size": "lg",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "96",
+                        "hero_heading_size": "lg",
+                        "hero_heading_color": "dark",
+                        "show_stats": true,
+                        "show_stats_separator": true,
+                        "hero_gradient_enabled": true,
+                        "hero_gradient_palette": "light_glow",
+                        "hero_gradient_direction": "to bottom",
+                        "show_hero_background": false,
+                        "show_search_box": false,
+                        "visibility": "all",
+                        "stats": [
+                            {
+                                "number": "12K+",
+                                "label": "Teams onboarded"
+                            },
+                            {
+                                "number": "400+",
+                                "label": "AI tools included"
+                            },
+                            {
+                                "number": "99.9%",
+                                "label": "Uptime SLA"
+                            },
+                            {
+                                "number": "14 days",
+                                "label": "Free trial"
+                            }
+                        ],
+                        "sort_order": 0
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "Built to scale from your first user",
+                        "subheading": "The numbers behind the platform.",
+                        "icon": "ti ti-chart-bar",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "sm",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "stats_style": "primary",
+                        "show_stats": true,
+                        "show_stats_separator": true,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "2.4M",
+                                "label": "Generations / month"
+                            },
+                            {
+                                "number": "68ms",
+                                "label": "Median API latency"
+                            },
+                            {
+                                "number": "SOC 2",
+                                "label": "Type II ready"
+                            },
+                            {
+                                "number": "24/7",
+                                "label": "Engineer on call"
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "Everything a modern AI product needs",
+                        "subtitle": "Tools, billing and controls that scale from your first signup to your first thousand.",
+                        "badge_text": "Platform",
+                        "layout": "3-column",
+                        "card_style": "bordered",
+                        "enable_card_style": true,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "icon": "ti ti-layout-grid",
+                                "title": "One catalog, every model",
+                                "description": "Writing, image, chat and code tools behind a single credit balance your users already understand."
+                            },
+                            {
+                                "icon": "ti ti-credit-card",
+                                "title": "Billing that just works",
+                                "description": "Plans, credits, metered usage and invoices — wired up before you write a line of code."
+                            },
+                            {
+                                "icon": "ti ti-shield-lock",
+                                "title": "Roles and limits built in",
+                                "description": "Per-plan tool access, rate limits and usage caps you can change without a deploy."
+                            },
+                            {
+                                "icon": "ti ti-chart-dots",
+                                "title": "Usage you can actually read",
+                                "description": "Cost per tool, per user, per day — with exports when finance asks for the numbers."
+                            },
+                            {
+                                "icon": "ti ti-key",
+                                "title": "Bring your own keys",
+                                "description": "Point the platform at your own provider accounts and keep the margin on every call."
+                            },
+                            {
+                                "icon": "ti ti-webhook",
+                                "title": "API and webhooks",
+                                "description": "Everything the dashboard does is available over HTTP, so your product can drive it too."
+                            }
+                        ],
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "400+ AI tools, ready on day one",
+                        "subtitle": "Your users get a full catalog the moment they sign up.",
+                        "badge_text": "Tool catalog",
+                        "layout": "3-column",
+                        "card_style": "style-1",
+                        "source": "featured",
+                        "max_items": 6,
+                        "section_bg": "light",
+                        "card_bg_style": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "show_rating": true,
+                        "show_favorite": true,
+                        "show_category": true,
+                        "show_category_filter": true,
+                        "show_search": false,
+                        "primary_text": "Browse all tools",
+                        "primary_link": "/ai-tools",
+                        "primary_style": "primary",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_icon_position": "right",
+                        "width": "contained",
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "title": "See it in the product",
+                        "subtitle": "A look at the dashboard your users get on day one.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "hide_captions": true,
+                        "section_bg": "light",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "Live in three steps",
+                        "subheading": "No infrastructure and no model wrangling — connect a key and launch.",
+                        "section_anchor": "how-it-works",
+                        "icon": "ti ti-route",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "step_card_style": "bordered",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "items": [
+                            {
+                                "icon": "ti ti-plug-connected",
+                                "title": "Connect your provider",
+                                "description": "Paste an API key. Models, pricing and fallbacks are configured from the admin panel."
+                            },
+                            {
+                                "icon": "ti ti-adjustments-bolt",
+                                "title": "Pick your plans",
+                                "description": "Set credits, limits and which tools each tier unlocks. Stripe and the rest are already wired."
+                            },
+                            {
+                                "icon": "ti ti-rocket",
+                                "title": "Open the doors",
+                                "description": "Point your domain, publish, and watch usage land in the dashboard in real time."
+                            }
+                        ],
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "Teams that shipped faster with us",
+                        "subheading": "Feedback from founders, marketers and engineers running on the platform.",
+                        "icon": "ti ti-message-2-heart",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "source": "all",
+                        "card_style": "simple",
+                        "slider_columns": "1",
+                        "autoplay_enabled": "1",
+                        "hide_controls": "1",
+                        "max_items": 6,
+                        "section_bg": "light",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "pricing",
+                    "config": {
+                        "heading": "Pricing that scales with usage",
+                        "subheading": "Start free. Upgrade when your credits do.",
+                        "badge_text": "Plans",
+                        "section_anchor": "pricing",
+                        "icon": "ti ti-credit-card",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "source": "all",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Questions, answered",
+                        "subheading": "Everything about limits, billing and your data.",
+                        "icon": "ti ti-help-circle",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "category_tabs_style": "sidebar",
+                        "max_items": 8,
+                        "section_bg": "light",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Start building on your own AI platform today",
+                        "subheadline": "Free to try, no credit card, cancel whenever you like.",
+                        "primary_text": "Create your account",
+                        "primary_link": "/register",
+                        "primary_style": "white",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_access_level": "guest",
+                        "secondary_text": "Talk to sales",
+                        "secondary_link": "/contact",
+                        "secondary_style": "outline",
+                        "secondary_shape": "pill",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
+                        "background_style": "gradient-1",
+                        "card_bg_style": "default",
+                        "width": "contained",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "vertical_padding": "96",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "From the build log",
+                        "subtitle": "Product notes, model benchmarks and release rundowns.",
+                        "icon": "ti ti-article",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "simple",
+                        "max_items": 3,
+                        "show_description": true,
+                        "show_button": true,
+                        "button_text": "Read the blog",
+                        "button_link": "/blog",
+                        "button_style": "outline",
+                        "button_icon": "ti ti-arrow-right",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "sort_order": 11
+                    }
+                },
+                {
+                    "type": "newsletter",
+                    "config": {
+                        "heading": "Get the monthly build log",
+                        "subheading": "New tools, model updates and pricing changes — once a month, no filler.",
+                        "title_color": "light",
+                        "icon": "ti ti-mail-star",
+                        "icon_style": "primary",
+                        "icon_position": "top",
+                        "newsletter_style": "inline_pill",
+                        "background_style": "gradient-1",
+                        "card_bg_style": "default",
+                        "placeholder_text": "you@company.com",
+                        "button_text": "Subscribe",
+                        "button_style": "ghost",
+                        "privacy_text": "No spam. Unsubscribe anytime.",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "vertical_padding": "96",
+                        "sort_order": 12
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "modern",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": true,
+            "archive_layout": "modern",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "load_more",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": true,
+            "category_pagination": "load_more"
+        }
+    }
+}

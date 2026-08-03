@@ -42,6 +42,15 @@ interface ThemePreset {
     sections: string[]
 }
 
+/** The look captured before the last preset was applied — null when there is nothing to undo. */
+interface PresetBackup {
+    captured_at?: string | null
+    replaced_by?: string | null
+    replaced_by_name?: string | null
+    previous_preset?: string | null
+    previous_preset_name?: string | null
+}
+
 type HeaderDesktopSettings = {
     sticky?: boolean
     sticky_behavior?: string
@@ -113,6 +122,8 @@ type HeaderMobileBottomSettings = {
     show_glassmorphism?: boolean
     show_home?: boolean
     show_search_icon?: boolean
+    show_dark_mode_toggle?: boolean
+    show_language_switcher?: boolean
     show_tools?: boolean
     show_notification_bell?: boolean
     show_hamburger?: boolean
@@ -139,6 +150,8 @@ type FooterPresetSettings = {
     newsletter_button_label?: string
     newsletter_button_style?: string
     show_social_icons?: boolean
+    social_title?: string
+    social_multi_color?: boolean
     contact_title?: string
     contact_email?: string
     contact_phone?: string
@@ -146,6 +159,8 @@ type FooterPresetSettings = {
     contact_details?: string
     menu_title?: string
     menu_column?: string
+    secondary_menu_title?: string
+    secondary_menu_column?: string
     custom_title?: string
     custom_text?: string
     tool_categories_title?: string
@@ -286,6 +301,7 @@ const props = defineProps<{
     homepageTemplate?: string
     themePresets?: ThemePreset[]
     activePreset?: string | null
+    presetBackup?: PresetBackup | null
 }>()
 
 const { t } = useTranslate()
@@ -407,6 +423,11 @@ const headerLanguageSwitcherStyleOptions = computed(() => [
     ...headerActionItemStyleOptions.value,
     { value: 'icon_with_label', label: t('Icon With Label') },
 ])
+// Same list as the other utility controls, minus Icon Only — social icons are not offered
+// that tone.
+const headerSocialIconStyleOptions = computed(
+    () => headerActionItemStyleOptions.value.filter((option) => option.value !== 'icon_only')
+)
 const headerCommandPaletteStyleOptions = computed(() => [
     { value: 'hidden', label: t('Hide') },
     { value: 'icon_only', label: t('Icon Only') },
@@ -415,9 +436,9 @@ const headerCommandPaletteStyleOptions = computed(() => [
     { value: 'search_transparent', label: t('Searchbox Pill') },
     { value: 'search_light', label: t('Searchbox Light') },
 ])
-// Which half of the header tab is on screen. Presentation only — both halves stay mounted
-// (v-show, not v-if) and are submitted by the same form, so switching cards can never drop
-// edits made on the other device.
+// Which slice of the header tab is on screen. Presentation only — every slice stays
+// mounted (v-show, not v-if) and they are submitted by the same form, so switching cards
+// can never drop edits made under another one.
 const headerDevice = ref<'desktop' | 'mobile'>('desktop')
 // The viewport width the theme swaps headers at — Tailwind's `md`, as used by the
 // `hidden md:block` / `md:hidden` pair in AppHeader.vue. Named here so the two card
@@ -808,10 +829,12 @@ const footerContentItemOptions = computed(() => [
     { value: 'about_text', label: t('About Text') },
     { value: 'logo', label: t('Logo') },
     { value: 'menu', label: t('Menu') },
+    { value: 'menu_secondary', label: t('Secondary Menu') },
     { value: 'contact_info', label: t('Contact Info') },
     { value: 'custom_text', label: t('Custom Text') },
     { value: 'categories', label: t('Categories') },
     { value: 'newsletter', label: t('Newsletter') },
+    { value: 'social_icons', label: t('Social Icons') },
 ])
 
 const activeFooterContentItemOptions = computed(() => {
@@ -1198,6 +1221,8 @@ const headerForm = useForm({
             show_glassmorphism: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_glassmorphism, true),
             show_home: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_home, true),
             show_search_icon: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_search_icon, false),
+            show_dark_mode_toggle: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_dark_mode_toggle, false),
+            show_language_switcher: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_language_switcher, false),
             show_tools: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_tools, true),
             show_notification_bell: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_notification_bell, false),
             show_hamburger: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_bottom?.show_hamburger, false),
@@ -1222,6 +1247,8 @@ const footerForm = useForm({
         newsletter_button_label: resolvedFooterDefaults.value.newsletter_button_label ?? '',
         newsletter_button_style: resolvedFooterDefaults.value.newsletter_button_style ?? 'primary',
         show_social_icons: normalizeBooleanValue(resolvedFooterDefaults.value.show_social_icons, true),
+        social_title: resolvedFooterDefaults.value.social_title ?? '',
+        social_multi_color: normalizeBooleanValue(resolvedFooterDefaults.value.social_multi_color, true),
         contact_title: resolvedFooterDefaults.value.contact_title ?? '',
         contact_email: resolvedFooterDefaults.value.contact_email ?? '',
         contact_phone: resolvedFooterDefaults.value.contact_phone ?? '',
@@ -1229,6 +1256,8 @@ const footerForm = useForm({
         contact_details: resolvedFooterDefaults.value.contact_details ?? '',
         menu_title: resolvedFooterDefaults.value.menu_title ?? '',
         menu_column: resolvedFooterDefaults.value.menu_column ?? 'footer-company',
+        secondary_menu_title: resolvedFooterDefaults.value.secondary_menu_title ?? '',
+        secondary_menu_column: resolvedFooterDefaults.value.secondary_menu_column ?? '',
         custom_title: resolvedFooterDefaults.value.custom_title ?? '',
         custom_text: resolvedFooterDefaults.value.custom_text ?? '',
         tool_categories_title: resolvedFooterDefaults.value.tool_categories_title ?? '',
@@ -1448,6 +1477,7 @@ interface SectionConfig {
     primary_style?: string
     primary_shape?: string
     primary_icon?: string
+    primary_icon_position?: string
     primary_access_level?: string
     secondary_text?: string
     secondary_link?: string
@@ -1506,6 +1536,7 @@ const secCfg = (type: string): any => {
         if (cfg.primary_style === undefined) cfg.primary_style = 'primary'
         if (cfg.primary_shape === undefined) cfg.primary_shape = 'rounded_xl'
         if (cfg.primary_icon === undefined) cfg.primary_icon = ''
+        if (cfg.primary_icon_position === undefined) cfg.primary_icon_position = 'left'
         if (cfg.show_rating === undefined) cfg.show_rating = true
         if (cfg.show_favorite === undefined) cfg.show_favorite = true
         if (cfg.show_category === undefined) cfg.show_category = true
@@ -1949,22 +1980,22 @@ type HomepageSectionDef = {
 }
 
 const HOMEPAGE_SECTION_DEFS: HomepageSectionDef[] = [
-    { toggleKey: 'show_features', type: 'features', label: t('Features'), icon: 'ti ti-layout-grid', fields: ['title', 'subtitle'] },
-    { toggleKey: 'show_tools', type: 'tools_showcase', label: t('Tools Showcase'), icon: 'ti ti-tool', fields: ['title', 'subtitle'] },
-    { toggleKey: 'show_steps', type: 'how_it_works', label: t('How It Works'), icon: 'ti ti-route', fields: ['heading', 'subheading'] },
-    { toggleKey: 'show_pricing', type: 'pricing', label: t('Pricing'), icon: 'ti ti-credit-card', fields: ['heading', 'subheading'] },
-    { toggleKey: 'show_testimonials', type: 'testimonials', label: t('Testimonials'), icon: 'ti ti-message-2-heart', fields: ['heading', 'subheading'] },
-    { toggleKey: 'show_faq', type: 'faq', label: t('FAQ'), icon: 'ti ti-help-circle', fields: ['heading', 'subheading'] },
-    { toggleKey: 'show_social_proof', type: 'stats_bar', label: t('Social Proof'), icon: 'ti ti-chart-bar', fields: ['heading', 'subheading'] },
-    { toggleKey: 'show_cta', type: 'cta_banner', label: t('CTA Banner'), icon: 'ti ti-banner', fields: ['headline', 'subheadline'] },
-    { toggleKey: 'show_blog', type: 'latest_posts', label: t('Latest Blog Posts'), icon: 'ti ti-article', fields: ['title', 'subtitle'] },
-    { toggleKey: 'show_newsletter', type: 'newsletter', label: t('Newsletter'), icon: 'ti ti-mail-star', fields: ['heading', 'subheading', 'button_text', 'placeholder_text'] },
-    { toggleKey: 'show_custom_html', type: 'custom_html', label: t('Custom HTML'), icon: 'ti ti-code', fields: ['heading', 'subheading', 'content'] },
-    { toggleKey: 'show_richtext', type: 'richtext', label: t('Rich Text'), icon: 'ti ti-align-left', fields: ['title', 'subtitle', 'content'] },
-    { toggleKey: 'show_image_carousel', type: 'image_carousel', label: t('Image Carousel'), icon: 'ti ti-photo-sensor', fields: ['title', 'subtitle'] },
-    { toggleKey: 'show_ad_slot', type: 'ad_slot', label: t('Ad Slot 1'), icon: 'ti ti-ad', fields: ['title', 'subtitle', 'zone'] },
-    { toggleKey: 'show_ad_slot_2', type: 'ad_slot_2', label: t('Ad Slot 2'), icon: 'ti ti-ad', fields: ['title', 'subtitle', 'zone'] },
-    { toggleKey: 'show_ad_slot_3', type: 'ad_slot_3', label: t('Ad Slot 3'), icon: 'ti ti-ad', fields: ['title', 'subtitle', 'zone'] },
+    { toggleKey: 'show_features', type: 'features', label: t('Features'), icon: 'ti ti-layout-grid', fields: ['title', 'badge_text', 'subtitle'] },
+    { toggleKey: 'show_tools', type: 'tools_showcase', label: t('Tools Showcase'), icon: 'ti ti-tool', fields: ['title', 'badge_text', 'subtitle'] },
+    { toggleKey: 'show_steps', type: 'how_it_works', label: t('How It Works'), icon: 'ti ti-route', fields: ['heading', 'badge_text', 'subheading'] },
+    { toggleKey: 'show_pricing', type: 'pricing', label: t('Pricing'), icon: 'ti ti-credit-card', fields: ['heading', 'badge_text', 'subheading'] },
+    { toggleKey: 'show_testimonials', type: 'testimonials', label: t('Testimonials'), icon: 'ti ti-message-2-heart', fields: ['heading', 'badge_text', 'subheading'] },
+    { toggleKey: 'show_faq', type: 'faq', label: t('FAQ'), icon: 'ti ti-help-circle', fields: ['heading', 'badge_text', 'subheading'] },
+    { toggleKey: 'show_social_proof', type: 'stats_bar', label: t('Social Proof'), icon: 'ti ti-chart-bar', fields: ['heading', 'badge_text', 'subheading'] },
+    { toggleKey: 'show_cta', type: 'cta_banner', label: t('CTA Banner'), icon: 'ti ti-banner', fields: ['headline', 'badge_text', 'subheadline'] },
+    { toggleKey: 'show_blog', type: 'latest_posts', label: t('Latest Blog Posts'), icon: 'ti ti-article', fields: ['title', 'badge_text', 'subtitle'] },
+    { toggleKey: 'show_newsletter', type: 'newsletter', label: t('Newsletter'), icon: 'ti ti-mail-star', fields: ['heading', 'badge_text', 'subheading', 'button_text', 'placeholder_text'] },
+    { toggleKey: 'show_custom_html', type: 'custom_html', label: t('Custom HTML'), icon: 'ti ti-code', fields: ['heading', 'badge_text', 'subheading', 'content'] },
+    { toggleKey: 'show_richtext', type: 'richtext', label: t('Rich Text'), icon: 'ti ti-align-left', fields: ['title', 'badge_text', 'subtitle', 'content'] },
+    { toggleKey: 'show_image_carousel', type: 'image_carousel', label: t('Image Carousel'), icon: 'ti ti-photo-sensor', fields: ['title', 'badge_text', 'subtitle'] },
+    { toggleKey: 'show_ad_slot', type: 'ad_slot', label: t('Ad Slot 1'), icon: 'ti ti-ad', fields: ['title', 'badge_text', 'subtitle', 'zone'] },
+    { toggleKey: 'show_ad_slot_2', type: 'ad_slot_2', label: t('Ad Slot 2'), icon: 'ti ti-ad', fields: ['title', 'badge_text', 'subtitle', 'zone'] },
+    { toggleKey: 'show_ad_slot_3', type: 'ad_slot_3', label: t('Ad Slot 3'), icon: 'ti ti-ad', fields: ['title', 'badge_text', 'subtitle', 'zone'] },
 ]
 
 // Pricing sells subscription plans, which only exist when billing is available (Extended
@@ -2349,6 +2380,31 @@ function handleConfirmPreset(): void {
     })
 }
 
+// ─── Undo the last preset apply ───
+const presetBackup = computed<PresetBackup | null>(() => props.presetBackup ?? null)
+const isBackupModalOpen = ref(false)
+const isRestoringBackup = ref(false)
+
+// What the button offers to bring back: the preset that was active before the apply, or
+// the admin's own edits when no preset had been applied yet.
+const backupLabel = computed(() => presetBackup.value?.previous_preset_name || t('your custom settings'))
+
+const backupCapturedAt = computed(() => {
+    const raw = presetBackup.value?.captured_at
+    if (!raw) return ''
+    const parsed = new Date(raw)
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString()
+})
+
+function handleConfirmRestoreBackup(): void {
+    isBackupModalOpen.value = false
+    isRestoringBackup.value = true
+    router.post(route('admin.themes.settings.restore-preset', { slug: props.theme.slug }), {}, {
+        preserveScroll: true,
+        onFinish: () => { isRestoringBackup.value = false },
+    })
+}
+
 const isSaving = computed(() => {
     if (activeTab.value === 'general' || activeTab.value === 'colors' || activeTab.value === 'typography') {
         return themeForm.processing
@@ -2513,6 +2569,32 @@ watch(() => [
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Pick a preset to instantly restyle your site. Applying one overwrites the settings it covers — the rest stay as they are.') }}</p>
                         </div>
 
+                        <!-- Offered only while a snapshot exists: taken on every apply, consumed by the restore. -->
+                        <div
+                            v-if="presetBackup"
+                            class="mb-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/30 dark:bg-amber-900/20"
+                        >
+                            <div class="flex min-w-0 items-start gap-3">
+                                <i class="ti ti-history mt-0.5 shrink-0 text-lg text-amber-600 dark:text-amber-400"></i>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">{{ t('You can undo the last preset') }}</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-amber-800/80 dark:text-amber-200/70">
+                                        {{ t('Applying :preset replaced :previous. Restore it and the presets keep working as normal.', { preset: presetBackup.replaced_by_name ?? t('a preset'), previous: backupLabel }) }}
+                                        <span v-if="backupCapturedAt" class="whitespace-nowrap opacity-70">({{ backupCapturedAt }})</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/40 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-900/30"
+                                :disabled="isRestoringBackup"
+                                @click="isBackupModalOpen = true"
+                            >
+                                <i :class="isRestoringBackup ? 'ti ti-loader-2 animate-spin' : 'ti ti-arrow-back-up'"></i>
+                                {{ t('Restore previous look') }}
+                            </button>
+                        </div>
+
                         <div v-if="presets.length === 0" class="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 p-10 text-center dark:border-surface-700 dark:bg-surface-800/50">
                             <i class="ti ti-layout-collage mx-auto mb-2 block text-3xl text-gray-400"></i>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('No presets found. Add a JSON file to the theme\'s presets/ folder and it will appear here.') }}</p>
@@ -2568,7 +2650,7 @@ watch(() => [
                                             {{ t(preset.preview.mode === 'dark' ? 'Dark' : 'Light') }}
                                         </span>
                                     </div>
-                                    <p class="text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ preset.description }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-200">{{ preset.description }}</p>
                                 </div>
 
                                 <!-- Radio indicator -->
@@ -2784,7 +2866,7 @@ watch(() => [
 
                     <section v-show="headerDevice === 'desktop'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="space-y-1">
-                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('Desktop Header') }}</h2>
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('General') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set up the main desktop navigation area that visitors see first.') }}</p>
                         </div>
 
@@ -2831,13 +2913,22 @@ watch(() => [
                                     </div>
                                     <AppSwitch v-model="headerForm.settings.desktop.transparent_on_hero" class="shrink-0" />
                                 </div>
-                                <div class="mb-5 grid gap-5 sm:grid-cols-2">
-                                    <div class="sm:col-span-2 flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                <div class="mb-5 space-y-5">
+                                    <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                                         <div>
                                             <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Bottom Border') }}</p>
                                             <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display a thin border at the bottom of the header.') }}</p>
                                         </div>
                                         <AppSwitch v-model="headerForm.settings.desktop.show_border" class="shrink-0" />
+                                    </div>
+                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800 sm:col-span-2">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Icon Tooltips') }}</p>
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Name each header icon on hover — search, notifications, language and dark mode.') }}</p>
+                                            </div>
+                                            <AppSwitch v-model="headerForm.settings.desktop.show_icon_tooltip" class="shrink-0" />
+                                        </div>
                                     </div>
                                     <AppSelect v-model="headerForm.settings.desktop.shadow_style" :label="t('Header Shadow')" :options="headerShadowStyleOptions" />
                                 </div>
@@ -2847,6 +2938,13 @@ watch(() => [
                                     <AppColorPicker v-model="headerForm.settings.desktop.menu_hover_color" :label="t('Menu Hover Color')" />
                                 </div>
                             </section>
+                        </div>
+                    </section>
+
+                    <section v-show="headerDevice === 'desktop'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="space-y-1">
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('Elements') }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose what sits in the desktop header and how each item behaves.') }}</p>
                         </div>
 
                         <div class="mt-6 grid gap-6 xl:grid-cols-2">
@@ -2860,19 +2958,20 @@ watch(() => [
                                         <AppSelect v-model="headerForm.settings.desktop.notification_button_style" :label="t('Notification Bell')" :options="headerActionItemStyleOptions" />
                                     </div>
                                     <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <AppSelect v-model="headerForm.settings.desktop.social_icon_style" :label="t('Social Icons')" :options="headerActionItemStyleOptions" />
+                                        <AppSelect v-model="headerForm.settings.desktop.language_switcher_style" :label="t('Language Switcher')" :options="headerLanguageSwitcherStyleOptions" />
+                                    </div>
+                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSelect v-model="headerForm.settings.desktop.dark_mode_toggle_style" :label="t('Dark Mode Toggle')" :options="headerActionItemStyleOptions" />
+                                    </div>
+                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSelect v-model="headerForm.settings.desktop.social_icon_style" :label="t('Social Icons')" :options="headerSocialIconStyleOptions" />
                                         <div v-if="headerForm.settings.desktop.social_icon_style !== 'hide'" class="mt-4">
                                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 {{ t('Social Button Text') }}
                                                 <input v-model="headerForm.settings.desktop.social_button_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
                                             </label>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Leave blank to icon only.') }}</p>
                                         </div>
-                                    </div>
-                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <AppSelect v-model="headerForm.settings.desktop.language_switcher_style" :label="t('Language Switcher')" :options="headerLanguageSwitcherStyleOptions" />
-                                    </div>
-                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <AppSelect v-model="headerForm.settings.desktop.dark_mode_toggle_style" :label="t('Dark Mode Toggle')" :options="headerActionItemStyleOptions" />
                                     </div>
                                     <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800 sm:col-span-2">
                                         <div>
@@ -2880,15 +2979,6 @@ watch(() => [
                                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show a header search trigger that opens the command palette on click or with Ctrl + K.') }}</p>
                                         </div>
                                         <AppSelect v-model="headerForm.settings.desktop.command_palette_style" :label="t('Search Box Style')" :options="headerCommandPaletteStyleOptions" class="mt-4" />
-                                    </div>
-                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800 sm:col-span-2">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <div>
-                                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Icon Tooltips') }}</p>
-                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Name each header icon on hover — search, notifications, language and dark mode. Desktop only; a touch header has no pointer to rest on one.') }}</p>
-                                            </div>
-                                            <AppSwitch v-model="headerForm.settings.desktop.show_icon_tooltip" class="shrink-0" />
-                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -2907,24 +2997,25 @@ watch(() => [
                                                 { value: 'none', label: t('Hide Auth Buttons') },
                                                 { value: 'login_register', label: t('Login + Register') },
                                                 { value: 'user_menu', label: t('Login Only') },
+                                                { value: 'register_only', label: t('Register Only') },
                                             ]"
                                         />
                                     </div>
                                     <template v-if="headerForm.settings.desktop.auth_mode !== 'none'">
-                                        <label class="sm:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Login Button Text') }}<input v-model="headerForm.settings.desktop.guest_login_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
-                                        <IconClassSelect v-model="headerForm.settings.desktop.guest_login_icon_class" :label="t('Login Button Icon')" />
-                                        <AppSelect v-model="headerForm.settings.desktop.guest_login_style" :label="t('Login Button Style')" :options="headerButtonStyleOptions" />
+                                        <label v-if="headerForm.settings.desktop.auth_mode !== 'register_only'" class="sm:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Login Button Text') }}<input v-model="headerForm.settings.desktop.guest_login_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
+                                        <IconClassSelect v-if="headerForm.settings.desktop.auth_mode !== 'register_only'" v-model="headerForm.settings.desktop.guest_login_icon_class" :label="t('Login Button Icon')" />
+                                        <AppSelect v-if="headerForm.settings.desktop.auth_mode !== 'register_only'" v-model="headerForm.settings.desktop.guest_login_style" :label="t('Login Button Style')" :options="headerButtonStyleOptions" />
                                         <label
-                                            v-if="headerForm.settings.desktop.auth_mode === 'login_register'"
+                                            v-if="['login_register', 'register_only'].includes(headerForm.settings.desktop.auth_mode)"
                                             class="sm:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >{{ t('Register Button Text') }}<input v-model="headerForm.settings.desktop.guest_register_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
                                         <IconClassSelect
-                                            v-if="headerForm.settings.desktop.auth_mode === 'login_register'"
+                                            v-if="['login_register', 'register_only'].includes(headerForm.settings.desktop.auth_mode)"
                                             v-model="headerForm.settings.desktop.guest_register_icon_class"
                                             :label="t('Register Button Icon')"
                                         />
                                         <AppSelect
-                                            v-if="headerForm.settings.desktop.auth_mode === 'login_register'"
+                                            v-if="['login_register', 'register_only'].includes(headerForm.settings.desktop.auth_mode)"
                                             v-model="headerForm.settings.desktop.guest_register_style"
                                             :label="t('Register Button Style')"
                                             :options="headerButtonStyleOptions"
@@ -3017,6 +3108,8 @@ watch(() => [
 
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Home') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_home" /></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_search_icon" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Dark Mode Toggle') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_dark_mode_toggle" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Language Switcher') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_language_switcher" /></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Tools') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_tools" /></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_notification_bell" /></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_hamburger" /></div>
@@ -3167,15 +3260,32 @@ watch(() => [
                             <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">{{ t('Footer Column Items') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('For the selected footer style, arrange and configure which reusable content blocks should appear in each column or card.') }}</p>
                         </div>
-                        <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                            <div v-for="column in activeFooterStyleColumns" :key="column.key" class="flex flex-col rounded-2xl border border-gray-100 p-5 dark:border-surface-700 bg-gray-50/30 dark:bg-surface-800/10">
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ column.label }}</h3>
-                                    <span class="text-xs font-medium text-gray-400">
-                                        {{ footerForm.settings.style_columns?.[footerForm.settings.layout]?.[column.key]?.length || 0 }} {{ t('items') }}
+                        <!-- Four across only from 2xl. The admin sidebar leaves this panel about
+                             626px at 1280, which made each card ~129px — after the drag handle and
+                             the two action buttons the item name had no room left and truncated to
+                             nothing, so every row read as two anonymous icons. -->
+                        <div class="grid gap-5 sm:grid-cols-2 2xl:grid-cols-4">
+                            <!-- fieldset/legend rather than a heading row: at four columns each
+                                 card is ~130px wide, and a justify-between header broke both
+                                 "Column 1" and "3 items" across lines. On the border the label
+                                 costs no width at all, so nothing has to wrap. -->
+                            <!-- min-w-0: a fieldset refuses to shrink below its min-content width,
+                                 so without it each card spilled out of its grid cell and over the
+                                 next one. The count is the bare number for the same reason —
+                                 "3 items" pushed the legend past the ~130px a four-column card
+                                 gets; the full text is on the title attribute. -->
+                            <fieldset v-for="column in activeFooterStyleColumns" :key="column.key" class="min-w-0 rounded-2xl border border-gray-200 px-4 pb-4 dark:border-surface-700 bg-gray-50/30 dark:bg-surface-800/10">
+                                <legend class="ml-1 flex items-center gap-2 whitespace-nowrap px-2">
+                                    <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ column.label }}</span>
+                                    <span
+                                        class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-surface-800 dark:text-gray-400"
+                                        :title="`${footerForm.settings.style_columns?.[footerForm.settings.layout]?.[column.key]?.length || 0} ${t('items')}`"
+                                    >
+                                        {{ footerForm.settings.style_columns?.[footerForm.settings.layout]?.[column.key]?.length || 0 }}
                                     </span>
-                                </div>
+                                </legend>
 
+                                <div class="flex h-full flex-col">
                                 <VueDraggable
                                     v-slot:default
                                     v-model="footerForm.settings.style_columns[footerForm.settings.layout][column.key]"
@@ -3189,15 +3299,19 @@ watch(() => [
                                         :key="`${item}-${idx}`"
                                         class="group flex items-center justify-between p-2.5 border border-gray-200 dark:border-surface-700/80 bg-white dark:bg-surface-850 hover:border-gray-300 dark:hover:border-surface-650 rounded-lg shadow-xs transition"
                                     >
-                                        <div class="flex items-center gap-2 overflow-hidden">
-                                            <span class="drag-handle cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-355">
+                                        <!-- min-w-0 + flex-1, or the label loses the width fight
+                                             with the two action buttons and truncates to nothing:
+                                             at four columns the rows showed a drag handle and two
+                                             icons with no item name at all. -->
+                                        <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                                            <span class="drag-handle shrink-0 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-355">
                                                 <i class="ti ti-grip-vertical text-base"></i>
                                             </span>
-                                            <span class="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
+                                            <span class="min-w-0 truncate text-xs font-medium text-gray-800 dark:text-gray-200" :title="footerContentItemOptions.find(o => o.value === item)?.label || item">
                                                 {{ footerContentItemOptions.find(o => o.value === item)?.label || item }}
                                             </span>
                                         </div>
-                                        <div class="flex items-center gap-1">
+                                        <div class="flex shrink-0 items-center gap-1">
                                             <button
                                                 type="button"
                                                 class="text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 p-1 rounded-md hover:bg-gray-50 dark:hover:bg-surface-750 transition"
@@ -3229,11 +3343,10 @@ watch(() => [
                                     <i class="ti ti-plus text-sm"></i>
                                     {{ t('Add Item') }}
                                 </button>
-                            </div>
+                                </div>
+                            </fieldset>
                         </div>
                     </section>
-
-
 
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
@@ -3514,7 +3627,7 @@ watch(() => [
                                                 {{ t('Button Link') }}
                                             </label>
                                             <input v-model="secCfg('hero').primary_cta_link" type="text" class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
-                                            <p class="mt-1 text-xs text-gray-400">{{ t('Paste a YouTube URL or video ID to open a video popup instead of navigating') }}</p>
+                                            <p class="mt-1 text-xs text-gray-400">{{ t('Paste a YouTube URL to open a video popup instead of navigating') }}</p>
                                         </div>
                                     </div>
                                     <div class="grid gap-4 sm:grid-cols-2">
@@ -3547,6 +3660,7 @@ watch(() => [
                                                 {{ t('Button Link') }}
                                             </label>
                                             <input v-model="secCfg('hero').secondary_cta_link" type="text" class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                            <p class="mt-1 text-xs text-gray-400">{{ t('Paste a YouTube URL to open a video popup instead of navigating') }}</p>
                                         </div>
                                     </div>
                                     <div class="grid gap-4 sm:grid-cols-2">
@@ -3765,7 +3879,13 @@ watch(() => [
                                             {{ t(field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())) }}
                                             <input v-model="secCfg(sec.type)[field]" type="text" class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
                                         </label>
-                                        <label v-else-if="field === 'subheadline' || field === 'subtitle' || field === 'subheading'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <label v-else-if="field === 'badge_text'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {{ t('Badge Text') }}
+                                            <input v-model="secCfg(sec.type)[field]" type="text" class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                            <span class="mt-1 block text-xs font-normal text-gray-400 dark:text-gray-500">{{ t('Leave blank to hide.') }}</span>
+                                        </label>
+                                        <!-- Full width: it sits under the heading/badge pair, which share the row above. -->
+                                        <label v-else-if="field === 'subheadline' || field === 'subtitle' || field === 'subheading'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
                                             {{ t(field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())) }}
                                             <input v-model="secCfg(sec.type)[field]" type="text" class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
                                         </label>
@@ -3873,6 +3993,7 @@ watch(() => [
                                                 v-model="secCfg(sec.type).title_color"
                                                 :options="[
                                                     { value: 'dark', label: t('Dark') },
+                                                    { value: 'light', label: t('Light') },
                                                     { value: 'primary', label: t('Primary') },
                                                     { value: 'success', label: t('Success') },
                                                     { value: 'danger', label: t('Danger') },
@@ -4200,12 +4321,17 @@ watch(() => [
                                                     :options="headerButtonShapeOptions"
                                                 />
                                             </div>
-                                            <div class="sm:col-span-2">
+                                            <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                                     {{ t('Button Icon') }}
                                                 </label>
                                                 <IconClassSelect v-model="secCfg('tools_showcase').primary_icon" />
                                             </div>
+                                            <AppSelect
+                                                v-model="secCfg('tools_showcase').primary_icon_position"
+                                                :label="t('Icon Position')"
+                                                :options="[{ value: 'left', label: t('Left') }, { value: 'right', label: t('Right') }]"
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -5091,6 +5217,22 @@ watch(() => [
                 <AppSelect v-model="footerForm.settings.menu_column" :label="t('Menu')" :options="menuOptions" />
             </div>
 
+            <!-- Secondary Menu Links -->
+            <div v-else-if="activeSettingsItem === 'menu_secondary'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Menu Heading') }}
+                    <input v-model="footerForm.settings.secondary_menu_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Legal')" />
+                </label>
+                <AppSelect
+                    v-model="footerForm.settings.secondary_menu_column"
+                    :label="t('Menu')"
+                    :options="[{ value: '', label: t('None') }, ...menuOptions]"
+                />
+                <div class="rounded-xl bg-gray-50 dark:bg-surface-850 p-4 text-xs text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-surface-800">
+                    {{ t('Use this block to show a second, different menu alongside the Menu block. It is hidden on the site until you pick a menu here.') }}
+                </div>
+            </div>
+
             <!-- Contact Info -->
             <div v-else-if="activeSettingsItem === 'contact_info'" class="grid gap-4 sm:grid-cols-2">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -5148,6 +5290,24 @@ watch(() => [
                 </label>
             </div>
 
+            <!-- Social Icons -->
+            <div v-else-if="activeSettingsItem === 'social_icons'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Social Icons Heading') }}
+                    <input v-model="footerForm.settings.social_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Follow us')" />
+                </label>
+                <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Multi Color Icons') }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Each icon in its own brand color. Off gives them the soft neutral background the newsletter block uses.') }}</p>
+                    </div>
+                    <AppSwitch v-model="footerForm.settings.social_multi_color" class="shrink-0" />
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('The accounts themselves are managed under Settings › Social, and only profiles with a URL are shown.') }}
+                </p>
+            </div>
+
             <!-- Tool Categories -->
             <div v-else-if="activeSettingsItem === 'categories'" class="grid gap-4">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -5184,11 +5344,21 @@ watch(() => [
         <ActionConfirmModal
             :open="isPresetModalOpen"
             :title="t('Apply the \':preset\' preset?', { preset: pendingPreset?.name ?? '' })"
-            :message="t('This overwrites your current :sections settings with the preset\'s values. Other sections are left unchanged. This cannot be undone.', { sections: pendingPresetSections })"
+            :message="t('This overwrites your current :sections settings with the preset\'s values. Other sections are left unchanged. Your current look is saved first, so you can undo this from the Presets tab.', { sections: pendingPresetSections })"
             :confirm-label="t('Apply preset')"
             variant="primary"
             @confirm="handleConfirmPreset"
             @cancel="isPresetModalOpen = false"
+        />
+
+        <ActionConfirmModal
+            :open="isBackupModalOpen"
+            :title="t('Restore your previous look?')"
+            :message="t('This puts back the :previous settings that were live before you applied :preset, and discards the preset\'s changes to Colors & Typography, Header, Footer, Homepage and Page. Your custom code is not affected.', { previous: backupLabel, preset: presetBackup?.replaced_by_name ?? t('the preset') })"
+            :confirm-label="t('Restore previous look')"
+            variant="primary"
+            @confirm="handleConfirmRestoreBackup"
+            @cancel="isBackupModalOpen = false"
         />
 
         <ActionConfirmModal

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-label="Warm sunset hero background">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#4c1d3d"/>
+      <stop offset="0.45" stop-color="#c2410c"/>
+      <stop offset="0.78" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fde68a" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#fb923c" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#fb923c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rose" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ec4899" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haze" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#7c2d12" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#7c2d12" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+
+  <circle cx="1360" cy="760" r="620" fill="url(#sun)"/>
+  <circle cx="330" cy="240" r="520" fill="url(#rose)"/>
+
+  <g fill="#ffffff" opacity="0.07">
+    <circle cx="1360" cy="760" r="210"/>
+    <circle cx="520" cy="880" r="120"/>
+  </g>
+
+  <g stroke="#ffffff" stroke-opacity="0.10" stroke-width="1.5" fill="none">
+    <circle cx="1360" cy="760" r="330"/>
+    <circle cx="1360" cy="760" r="470"/>
+  </g>
+
+  <rect width="1920" height="1080" fill="url(#haze)"/>
+</svg>

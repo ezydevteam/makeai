@@ -55,7 +55,7 @@ class DemoSelectionResolver
                 'description' => $preset['description'],
                 'type' => 'preset',
                 'preview' => $preset['preview'] ?? [],
-                // Screenshot auto-picked from public/assets/image/demos/<preset-id>.<ext>.
+                // Screenshot auto-picked from public/assets/image/demo-assets/demos/<preset-id>.<ext>.
                 'image' => $this->demoImage($preset['id']),
             ];
         }
@@ -67,7 +67,7 @@ class DemoSelectionResolver
                 'description' => $option['description'],
                 'type' => 'addon',
                 'preview' => [],
-                // Screenshot auto-picked from public/assets/image/demos/<addon-slug>.<ext>
+                // Screenshot auto-picked from public/assets/image/demo-assets/demos/<addon-slug>.<ext>
                 // (e.g. ai-chatbot.png, ai-image-pro.png).
                 'image' => $this->demoImage($option['value']),
             ];
@@ -83,7 +83,7 @@ class DemoSelectionResolver
      * Public URL of the screenshot for a demo, or null if none has been dropped in.
      *
      * Convention: put a file named after the demo (preset id or addon slug) in
-     * public/assets/image/demos/ — e.g. midnight.png, ai-chatbot.jpg — and it renders
+     * public/assets/image/demo-assets/demos/ — e.g. midnight.png, ai-chatbot.jpg — and it renders
      * in the selector automatically. No DB entry, no rebuild.
      */
     private function demoImage(string $name): ?string
@@ -94,8 +94,8 @@ class DemoSelectionResolver
         }
 
         foreach (self::IMAGE_EXTENSIONS as $ext) {
-            if (File::exists(public_path("assets/image/demos/{$name}.{$ext}"))) {
-                return "/assets/image/demos/{$name}.{$ext}";
+            if (File::exists(public_path("assets/image/demo-assets/demos/{$name}.{$ext}"))) {
+                return "/assets/image/demo-assets/demos/{$name}.{$ext}";
             }
         }
 

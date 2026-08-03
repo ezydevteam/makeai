@@ -49,7 +49,7 @@ class DemoProvisionSeeder extends Seeder
      * Same reason as the credentials above: the admin panel cannot set these on a demo
      * (DemoMode blocks the branding save) and nothing set by hand survives demo:reset,
      * which wipes both the settings table and the storage trees before this runs. The
-     * source images therefore live in public/demo-assets/ — part of the release, not the
+     * source images therefore live in public/assets/image/demo-assets/logo/ — part of the release, not the
      * writable tree — and are copied onto the public disk on every reset.
      *
      * The setting stores the COPY's relative key, never the source path: media_url()
@@ -66,7 +66,7 @@ class DemoProvisionSeeder extends Seeder
             'site_favicon_png' => 'favicon_png',
         ];
 
-        $sourceDir = base_path('public/demo-assets');
+        $sourceDir = base_path('public/assets/image/demo-assets/logo');
         $provisioned = [];
         $missing = [];
 
@@ -99,7 +99,7 @@ class DemoProvisionSeeder extends Seeder
 
         if ($missing !== []) {
             $this->note(
-                'branding: not found in public/demo-assets — '.implode(', ', $missing)
+                'branding: not found in public/assets/image/demo-assets/logo — '.implode(', ', $missing)
                 .' (that slot stays empty; the header falls back to the site name)',
                 true
             );

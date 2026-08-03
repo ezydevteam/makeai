@@ -16,7 +16,9 @@ interface NotificationItem {
 }
 
 const props = defineProps<{
-    notifications: {
+    // Not `notifications` — that name is taken by the globally shared bell payload, and a
+    // page prop of the same name shadows it (see the note in the user-side page).
+    notificationList: {
         data: NotificationItem[]
         links: Array<{ url: string | null, label: string, active: boolean }>
     }
@@ -73,7 +75,7 @@ const levelIcon = (level: NotificationItem['level']) => ({
                  default is align-items: stretch, which rendered the old text pill as a
                  63x148 bar. A fixed 40px circle also leaves the text far more room than the
                  variable-width word did. -->
-            <div v-for="item in notifications.data" :key="item.id" class="flex gap-4 border-b border-gray-100 p-5 last:border-b-0 dark:border-surface-800">
+            <div v-for="item in notificationList.data" :key="item.id" class="flex gap-4 border-b border-gray-100 p-5 last:border-b-0 dark:border-surface-800">
                 <span
                     :class="levelClass(item.level)"
                     class="mt-0.5 flex h-10 w-10 shrink-0 self-start items-center justify-center rounded-full shadow-sm"
@@ -93,12 +95,12 @@ const levelIcon = (level: NotificationItem['level']) => ({
                     </Link>
                 </div>
             </div>
-            <div v-if="notifications.data.length === 0" class="px-6 py-16 text-center text-sm text-gray-500">
+            <div v-if="notificationList.data.length === 0" class="px-6 py-16 text-center text-sm text-gray-500">
                 <i class="ti ti-bell-off text-4xl block mb-3"></i>
                 {{ t('No notifications found.') }}
             </div>
         </section>
 
-        <Pagination :links="notifications.links" />
+        <Pagination :links="notificationList.links" />
     </div>
 </template>

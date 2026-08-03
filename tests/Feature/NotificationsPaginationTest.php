@@ -63,7 +63,7 @@ class NotificationsPaginationTest extends TestCase
     public function test_pagination_payload_carries_the_shared_component_props(): void
     {
         $props = $this->props('/user/dashboard/notifications');
-        $pagination = $props['notifications'];
+        $pagination = $props['notificationList'];
 
         $this->assertCount(15, $pagination['data']);
         $this->assertSame(20, $pagination['total']);
@@ -120,11 +120,11 @@ class NotificationsPaginationTest extends TestCase
     {
         $props = $this->props('/user/dashboard/notifications?status=unread');
 
-        $this->assertSame(8, $props['notifications']['total']);
+        $this->assertSame(8, $props['notificationList']['total']);
         $this->assertSame('unread', $props['filters']['status']);
 
         // Every page link must carry the filter, or page 2 silently returns to the full list.
-        foreach ($props['notifications']['links'] as $link) {
+        foreach ($props['notificationList']['links'] as $link) {
             if ($link['url']) {
                 $this->assertStringContainsString('status=unread', $link['url']);
             }

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 40" width="190" height="40" role="img" aria-label="Orbital">
+  <g fill="none" stroke="#334155" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" transform="translate(4 4)">
+    <path d="M16 16 m-9 0 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M16 16 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0"/>
+  </g>
+  <text x="42" y="27" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="20"
+        font-weight="700" letter-spacing="-0.4" fill="#334155">Orbital</text>
+</svg>

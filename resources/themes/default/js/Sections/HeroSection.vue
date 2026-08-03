@@ -128,16 +128,16 @@ const heroColorClass = (color: string, tone: 'heading' | 'subheading' = 'heading
 const heroButtonClass = (style: string): string => {
     const isDarkTheme = isDark.value || isBackgroundDark.value
     const map: Record<string, string> = {
-        primary_filled: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-        primary: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-        dark: 'bg-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:bg-gray-800',
-        purple: 'bg-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:bg-violet-700',
+        primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+        primary: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+        dark: 'bg-gradient-to-r from-gray-800 to-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:from-gray-900 hover:to-gray-800',
+        purple: 'bg-gradient-to-r from-violet-500 to-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:from-violet-600 hover:to-violet-500',
         gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
-        red: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-        danger: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-        green: 'bg-success-600 !text-white shadow-2xl shadow-success-600/20 hover:bg-success-700',
-        success: 'bg-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700',
-        warning: 'bg-amber-500 !text-white shadow-2xl shadow-amber-500/20 hover:bg-amber-600',
+        red: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+        green: 'bg-gradient-to-r from-success-500 to-success-600 !text-white shadow-2xl shadow-success-600/20 hover:from-success-600 hover:to-success-500',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:from-emerald-600 hover:to-emerald-500',
+        warning: 'bg-gradient-to-r from-amber-500 to-amber-600 !text-white shadow-2xl shadow-amber-600/20 hover:from-amber-600 hover:to-amber-500',
         gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-2xl hover:opacity-95',
         gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-2xl hover:opacity-95',
         gradient_royal: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 !text-white shadow-2xl hover:opacity-95',
@@ -227,6 +227,16 @@ const accentColorClass = computed(() =>
         ? heroGradientTextClass.value
         : (isBackgroundDark.value ? '!text-white' : 'text-primary-600 dark:text-primary-400')
 )
+
+// The caret is drawn as a BAR, not the "|" character, and that is the whole trick. The
+// gradient headline sets `background-clip: text` on the h1, which paints its gradient
+// through the union of every glyph beneath it — the caret's included. A text caret is
+// therefore repainted at full strength by its ancestor no matter what fill or opacity it
+// sets on itself, which is why dimming it did nothing. An element with a background and no
+// text is not a glyph, so the clip never touches it and its own opacity finally applies.
+const caretStyle = computed(() => ({
+    backgroundColor: isBackgroundDark.value ? '#ffffff' : 'var(--color-primary-600)',
+}))
 
 const toolsGridItems = computed<ToolItem[]>(() => {
     const raw = props.section.config.tools_grid_tool_slugs
@@ -475,30 +485,63 @@ const heroGradientTextDarkClass = computed(() => {
     return 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 bg-clip-text !text-transparent'
 })
 
-const extractYouTubeId = (url: string): string | null => {
-    if (!url) return null
-    const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\s?#]+)/,
-        /^([a-zA-Z0-9_-]{11})$/, // raw video ID
-    ]
-    for (const p of patterns) {
-        const m = url.match(p)
-        if (m?.[1]) return m[1]
-    }
-    return null
+/**
+ * A CTA link is a video only when it says so. This used to also accept any bare 11-character
+ * string as a video id, which silently swallowed ordinary relative links of the same shape —
+ * `contact-us1` is a valid path and a valid-looking id. Detection is now explicit: a real
+ * YouTube URL, or a `yt:` prefix for admins who only have the id to hand.
+ */
+const extractYouTubeId = (value: string): string | null => {
+    if (! value) return null
+
+    const prefixed = value.trim().match(/^(?:yt|youtube):([a-zA-Z0-9_-]{11})$/)
+    if (prefixed) return prefixed[1]
+
+    const url = value.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\s?#]+)/)
+
+    return url?.[1] ?? null
 }
 
+// Either CTA opens the lightbox when its link is a YouTube URL or a bare 11-char video id;
+// `activeVideoId` records which one was clicked so the iframe plays the right video.
 const primaryCtaVideoId = computed(() => extractYouTubeId(asString(props.section.config.primary_cta_link, '')))
+const secondaryCtaVideoId = computed(() => extractYouTubeId(asString(props.section.config.secondary_cta_link, '')))
 const showVideoPopup = ref(false)
+const activeVideoId = ref<string | null>(null)
 
-const openVideoPopup = () => { showVideoPopup.value = true }
+const openVideoPopup = (id: string) => {
+    activeVideoId.value = id
+    showVideoPopup.value = true
+}
+
+const closeVideoPopup = () => {
+    showVideoPopup.value = false
+    // Cleared so the iframe unmounts — otherwise the video keeps playing behind the overlay.
+    activeVideoId.value = null
+}
 
 const handlePrimaryCtaClick = () => {
     if (primaryCtaVideoId.value) {
-        openVideoPopup()
+        openVideoPopup(primaryCtaVideoId.value)
     } else {
         window.location.href = asString(props.section.config.primary_cta_link, '/register')
     }
+}
+
+// A video CTA renders as a plain <button>, not an Inertia <Link>. Link binds its own click
+// handler inside the component, which Vue runs BEFORE a fallthrough @click — so preventDefault
+// from here would fire too late and Inertia would still visit, remounting the hero and closing
+// the lightbox a moment after it opened. Ordinary links keep <Link> and its SPA navigation.
+const secondaryCtaComponent = computed(() => (secondaryCtaVideoId.value ? 'button' : Link))
+
+const secondaryCtaHref = computed(() => (
+    secondaryCtaVideoId.value ? undefined : asString(props.section.config.secondary_cta_link, '/pricing')
+))
+
+const handleSecondaryCtaClick = (event: MouseEvent) => {
+    if (! secondaryCtaVideoId.value) return
+    event.preventDefault()
+    openVideoPopup(secondaryCtaVideoId.value)
 }
 
 const openCommandPalette = () => {
@@ -579,7 +622,7 @@ onUnmounted(() => {
                         <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]" class="mb-8 font-black leading-[1.25] tracking-tight gsap-heading">
                             <template v-if="showTypewriter">
                                 <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                                &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                                &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                             </template>
                             <template v-else-if="headlineSplitLines.length">
                                 <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -623,8 +666,9 @@ onUnmounted(() => {
                             ></i>
                             {{ asString(props.section.config.primary_cta_text) }}
                         </button>
-                        <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                            :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                        <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                            :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                             :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'lg'))]"
                             class="inline-flex w-full items-center justify-center gap-3 font-black transition-all sm:w-auto"
                         >
@@ -632,7 +676,7 @@ onUnmounted(() => {
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
                             {{ asString(props.section.config.secondary_cta_text) }}
-                        </Link>
+                        </component>
                     </div>
                     <div v-if="asBoolean(props.section.config.show_stats, true) && asItems(props.section.config.stats).length > 0"
                         :class="asBoolean(props.section.config.show_stats_separator, true) ? (isBackgroundDark && !gradientEnabled ? 'mt-24 border-t border-white/20 pt-12 grid grid-cols-2 gap-8 md:grid-cols-4' : 'mt-24 border-t border-white/20 pt-12 grid grid-cols-2 gap-8 md:grid-cols-4') : 'mt-24 grid grid-cols-2 gap-8 md:grid-cols-4'"
@@ -673,7 +717,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -713,8 +757,9 @@ onUnmounted(() => {
                             ></i>
                             {{ asString(props.section.config.primary_cta_text) }}
                         </button>
-                        <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                            :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                        <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                            :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                             :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'sm'))]"
                             class="inline-flex items-center justify-center gap-2 font-black transition-all"
                         >
@@ -722,7 +767,7 @@ onUnmounted(() => {
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
                             {{ asString(props.section.config.secondary_cta_text) }}
-                        </Link>
+                        </component>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4 gsap-image">
@@ -775,7 +820,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -818,8 +863,9 @@ onUnmounted(() => {
                             ></i>
                             {{ asString(props.section.config.primary_cta_text) }}
                         </button>
-                        <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                            :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                        <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                            :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                             :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'md'))]"
                             class="inline-flex items-center justify-center gap-2 font-black transition-all hover:-translate-y-0.5"
                         >
@@ -827,7 +873,7 @@ onUnmounted(() => {
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
                             {{ asString(props.section.config.secondary_cta_text) }}
-                        </Link>
+                        </component>
                     </div>
                 </div>
                 <div v-if="asString(props.section.config.hero_split_image_url)" class="flex items-center justify-center gsap-image">
@@ -894,7 +940,7 @@ onUnmounted(() => {
                     <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), 'font-black leading-[1.15] tracking-tight mb-6 gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -937,8 +983,9 @@ onUnmounted(() => {
                             ></i>
                             {{ asString(props.section.config.primary_cta_text) }}
                         </button>
-                        <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                            :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                        <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                            :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                             :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'lg'))]"
                             class="inline-flex w-full items-center justify-center gap-3 font-black transition-all sm:w-auto"
                         >
@@ -946,7 +993,7 @@ onUnmounted(() => {
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
                             {{ asString(props.section.config.secondary_cta_text) }}
-                        </Link>
+                        </component>
                     </div>
                 </div>
 
@@ -1058,7 +1105,7 @@ onUnmounted(() => {
                 <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                     <template v-if="showTypewriter">
                         <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                        &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                        &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                     </template>
                     <template v-else-if="headlineSplitLines.length">
                         <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -1104,8 +1151,9 @@ onUnmounted(() => {
                         ></i>
                         {{ asString(props.section.config.primary_cta_text) }}
                     </button>
-                    <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                        :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                    <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                        :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                         :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'lg'))]"
                         class="inline-flex w-full items-center justify-center gap-3 font-black transition-all sm:w-auto"
                     >
@@ -1113,7 +1161,7 @@ onUnmounted(() => {
                             :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                         ></i>
                         {{ asString(props.section.config.secondary_cta_text) }}
-                    </Link>
+                    </component>
                 </div>
             </div>
             <div v-if="asBoolean(props.section.config.show_stats, true) && asItems(props.section.config.stats).length > 0"
@@ -1126,9 +1174,13 @@ onUnmounted(() => {
                 </div>
             </div>
         </div>
-        <!-- Bottom oval shape divider -->
+        <!-- Bottom oval shape divider. It has to read as a bite taken out of the hero by the
+             section below it, so it fills with --color-bg (the operator's background color,
+             and what a `default` section_bg paints) rather than a hardcoded white — on a
+             tinted theme like Sunset's peach, white read as a stripe of its own. Dark mode
+             needs no variant: .frontend-theme overrides --color-bg there. -->
         <div class="absolute inset-x-0 -bottom-[1px] z-10 pointer-events-none">
-            <svg class="h-auto w-full fill-white dark:fill-surface-950" width="1440" height="80" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <svg class="h-auto w-full fill-[var(--color-bg)]" width="1440" height="80" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
                 <path d="M0 0C240 50 480 75 720 75C960 75 1200 50 1440 0V80H0V0Z" />
             </svg>
         </div>
@@ -1167,7 +1219,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-5 text-4xl font-black leading-[1.25] tracking-tight md:text-5xl lg:text-6xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="animate-pulse">|</span></span>
+                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -1210,8 +1262,9 @@ onUnmounted(() => {
                             ></i>
                             {{ asString(props.section.config.primary_cta_text) }}
                         </button>
-                        <Link v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
-                            :href="asString(props.section.config.secondary_cta_link, '/pricing')"
+                        <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
+                            :href="secondaryCtaHref"
+                            @click="handleSecondaryCtaClick"
                             :class="[heroButtonClass(asString(props.section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(props.section.config.secondary_cta_shape, 'rounded_xl')), heroButtonSizeClass(asString(props.section.config.secondary_cta_size, 'md'))]"
                             class="inline-flex items-center justify-center gap-2 font-black transition-all"
                         >
@@ -1219,7 +1272,7 @@ onUnmounted(() => {
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
                             {{ asString(props.section.config.secondary_cta_text) }}
-                        </Link>
+                        </component>
                     </div>
                 </div>
 
@@ -1279,19 +1332,20 @@ onUnmounted(() => {
 
     <!-- Video Popup -->
     <Teleport to="body">
-        <div v-if="showVideoPopup && primaryCtaVideoId"
+        <div v-if="showVideoPopup && activeVideoId"
             class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-            @click.self="showVideoPopup = false"
+            @click.self="closeVideoPopup"
+            @keydown.esc="closeVideoPopup"
         >
             <div class="relative w-full max-w-5xl rounded-2xl bg-black shadow-2xl">
-                <button @click="showVideoPopup = false"
+                <button @click="closeVideoPopup"
                     class="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white transition-all hover:bg-black/80 hover:scale-110"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
                 <div class="aspect-video w-full">
                     <iframe
-                        :src="`https://www.youtube.com/embed/${primaryCtaVideoId}?autoplay=1&rel=0&mute=1`"
+                        :src="`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&mute=1`"
                         class="h-full w-full"
                         frameborder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -1346,5 +1400,35 @@ onUnmounted(() => {
 @keyframes displayMarqueeScroll {
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
+}
+
+/* Sized in em so it tracks the headline across every hero variant and breakpoint. Dimmer
+   than the phrase it trails so it reads as a cursor, and a hard step blink rather than
+   animate-pulse's sine fade — a caret that eases in and out looks like it is breathing,
+   not typing. The colour arrives inline (see caretStyle) because `currentColor` is
+   transparent inside the gradient headline. */
+.hero-caret {
+    display: inline-block;
+    width: 0.055em;
+    min-width: 2px;
+    height: 0.78em;
+    margin-inline-start: 0.08em;
+    vertical-align: -0.06em;
+    border-radius: 1px;
+    opacity: 0.45;
+    animation: heroCaretBlink 1.1s steps(1, end) infinite;
+}
+
+@keyframes heroCaretBlink {
+    0%, 49% { opacity: 0.45; }
+    50%, 99% { opacity: 0; }
+    100% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-caret {
+        animation: none;
+        opacity: 0.45;
+    }
 }
 </style>

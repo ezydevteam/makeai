@@ -129,6 +129,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('appearance/themes/{slug}/settings/save-homepage-config', [ThemeController::class, 'saveHomepageConfig'])->name('admin.themes.settings.save-homepage-config');
         Route::post('appearance/themes/{slug}/settings/restore-defaults', [ThemeController::class, 'restoreThemeDefaults'])->name('admin.themes.settings.restore-defaults');
         Route::post('appearance/themes/{slug}/settings/apply-preset', [ThemeController::class, 'applyThemePreset'])->name('admin.themes.settings.apply-preset');
+        Route::post('appearance/themes/{slug}/settings/restore-preset', [ThemeController::class, 'restoreThemePreset'])->name('admin.themes.settings.restore-preset');
 
         // Addons
         Route::get('appearance/addons', [AddonController::class, 'addons'])->name('admin.addons');

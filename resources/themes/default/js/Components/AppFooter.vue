@@ -8,7 +8,9 @@ import LanguageSwitcher from '@/Components/Utility/LanguageSwitcher.vue'
 import { mediaUrl } from '@/lib/media'
 
 type FooterStyle = 'default' | 'centered' | 'spotlight' | 'card_grid' | 'split_band' | 'floating_panel'
-type FooterContentKey = 'about_text' | 'logo' | 'menu' | 'contact_info' | 'custom_text' | 'categories' | 'newsletter'
+// `menu` and `menu_secondary` render the same markup from two independent menu sources,
+// so a layout can show two different link lists (e.g. Company and Legal) side by side.
+type FooterContentKey = 'about_text' | 'logo' | 'menu' | 'menu_secondary' | 'contact_info' | 'custom_text' | 'categories' | 'newsletter' | 'social_icons'
 type ConfigValue = string | number | boolean | null
 
 interface MenuItem {
@@ -70,6 +72,8 @@ interface SimpleFooterSettings {
     brand_title?: string
     brand_description?: string
     show_newsletter?: boolean
+    social_title?: string
+    social_multi_color?: boolean
     newsletter_title?: string
     newsletter_description?: string
     newsletter_placeholder?: string
@@ -83,6 +87,8 @@ interface SimpleFooterSettings {
     contact_details?: string
     menu_title?: string
     menu_column?: string
+    secondary_menu_title?: string
+    secondary_menu_column?: string
     custom_title?: string
     custom_text?: string
     tool_categories_title?: string
@@ -177,12 +183,14 @@ const styleColumnDefinitions: Record<FooterStyle, string[]> = {
 const brandTitle = computed(() => frontendFooterSettings.value.brand_title?.trim() || '')
 const brandDescription = computed(() => frontendFooterSettings.value.brand_description?.trim() || branding.value.site_description || '')
 const menuTitle = computed(() => frontendFooterSettings.value.menu_title?.trim() || '')
+const secondaryMenuTitle = computed(() => frontendFooterSettings.value.secondary_menu_title?.trim() || '')
 const customTitle = computed(() => frontendFooterSettings.value.custom_title?.trim() || '')
 const customText = computed(() => frontendFooterSettings.value.custom_text?.trim() || '')
 const toolCategoriesTitle = computed(() => frontendFooterSettings.value.tool_categories_title?.trim() || '')
 const contactTitle = computed(() => frontendFooterSettings.value.contact_title?.trim() || '')
 const contactEmail = computed(() => frontendFooterSettings.value.contact_email?.trim() || branding.value.site_support_email || '')
 const newsletterTitle = computed(() => frontendFooterSettings.value.newsletter_title?.trim() || t('Stay Updated'))
+const socialColumnTitle = computed(() => frontendFooterSettings.value.social_title?.trim() || '')
 const newsletterColumnTitle = computed(() => frontendFooterSettings.value.newsletter_title?.trim() || '')
 const newsletterDescription = computed(() => frontendFooterSettings.value.newsletter_description?.trim() || t('Get product news and launch updates in your inbox.'))
 const newsletterPlaceholder = computed(() => frontendFooterSettings.value.newsletter_placeholder?.trim() || t('Enter your email'))
@@ -228,6 +236,18 @@ const footerStyleColumns = computed<Record<FooterStyle, Record<string, FooterCon
 const footerLogo = computed(() => isDark.value
     ? (branding.value.site_logo_dark || branding.value.site_logo_light || '')
     : (branding.value.site_logo_light || branding.value.site_logo_dark || ''))
+
+// The footer's own `logo_mode` choice (light / dark / favicon), resolved the same way the
+// `logo` content block resolves it. Brand-bar logos used to read footerLogo directly, which
+// only ever switches on the active theme — so picking a mode in the footer settings had no
+// effect there. Falls back to footerLogo when the chosen asset was never uploaded, so the
+// brand bar keeps rendering instead of going blank.
+const footerModeLogo = computed(() => {
+    const mode = frontendFooterSettings.value.logo_mode ?? 'light'
+    if (mode === 'dark') return branding.value.site_logo_dark || footerLogo.value
+    if (mode === 'favicon') return branding.value.site_favicon_png || branding.value.site_favicon_ico || footerLogo.value
+    return branding.value.site_logo_light || footerLogo.value
+})
 
 const footerContainerClass = computed(() => {
     const cw = frontendFooterSettings.value.container_width ?? '1280px'
@@ -387,6 +407,19 @@ const topSocialIconStyle = computed<Record<string, string>>(() => ({
     background: isBgLight.value ? 'rgba(15, 23, 42, 0.04)' : 'rgb(255 255 255 / 0.06)',
 }))
 
+// Multi colour on (the default) leaves SocialFollow on its own props, which already paint
+// each platform in its brand colour. Off swaps in the same neutral treatment the
+// newsletter block's row uses, so the two read as one family.
+const socialMultiColor = computed(() => isTruthySetting(frontendFooterSettings.value.social_multi_color, true))
+const socialColumnIconProps = computed(() => socialMultiColor.value
+    ? {}
+    : {
+        iconItemClass: 'footer-social-icon',
+        iconItemStyle: topSocialIconStyle.value,
+        iconUsePlatformColor: false,
+        iconUsePlatformSurface: false,
+    })
+
 const cardGridSocialIconStyle = computed<Record<string, string>>(() => {
     if (isDark.value) {
         return {
@@ -456,6 +489,10 @@ const visibleMenuItems = (menu: GlobalMenu | null) => {
 const topMenuItems = (slug?: string | null) => visibleMenuItems(getMenu(slug)).filter((item) => !item.parent_id)
 const menuSlug = computed(() => resolveFooterMenuSlug(frontendFooterSettings.value.menu_column, 'footer-company'))
 const menuItems = computed(() => visibleMenuItems(getMenu(menuSlug.value)))
+// No fallback slug: an unconfigured secondary menu hides its block rather than
+// duplicating the primary one — see shouldRenderFooterItem.
+const secondaryMenuSlug = computed(() => resolveFooterMenuSlug(frontendFooterSettings.value.secondary_menu_column, ''))
+const secondaryMenuItems = computed(() => visibleMenuItems(getMenu(secondaryMenuSlug.value)))
 const bottomMenuItems = computed(() => topMenuItems(resolveFooterMenuSlug(frontendFooterSettings.value.bottom_menu, '')))
 
 function shouldRenderFooterItem(item: FooterContentKey): boolean {
@@ -468,6 +505,10 @@ function shouldRenderFooterItem(item: FooterContentKey): boolean {
         if (mode === 'dark') return Boolean(branding.value.site_logo_dark)
         if (mode === 'favicon') return Boolean(branding.value.site_favicon_png || branding.value.site_favicon_ico)
         return Boolean(branding.value.site_logo_light)
+    }
+
+    if (item === 'menu_secondary') {
+        return Boolean(secondaryMenuSlug.value)
     }
 
     if ((footerStyle.value === 'floating_panel' || footerStyle.value === 'spotlight' || footerStyle.value === 'card_grid') && item === 'newsletter') {
@@ -509,9 +550,9 @@ const categoryBlockItems = (value: string[] | undefined) => {
     return selected.map((slug) => map.get(slug)).filter(Boolean) as FooterAiCategory[]
 }
 
-const isMenuBlock = (item: FooterContentKey) => item === 'menu'
-const menuBlockTitle = (item: FooterContentKey) => menuTitle.value
-const menuBlockItems = (item: FooterContentKey) => menuItems.value
+const isMenuBlock = (item: FooterContentKey) => item === 'menu' || item === 'menu_secondary'
+const menuBlockTitle = (item: FooterContentKey) => item === 'menu_secondary' ? secondaryMenuTitle.value : menuTitle.value
+const menuBlockItems = (item: FooterContentKey) => item === 'menu_secondary' ? secondaryMenuItems.value : menuItems.value
 const isCustomBlock = (item: FooterContentKey) => item === 'custom_text'
 const customBlockTitle = (item: FooterContentKey) => customTitle.value
 const customBlockText = (item: FooterContentKey) => customText.value
@@ -589,7 +630,7 @@ const newsletterButtonClass = computed(() => {
         return 'rounded-xl bg-linear-to-r from-sky-500 to-cyan-500 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
     }
 
-    return 'rounded-xl btn-primary-admin px-5 py-3 text-sm font-semibold text-white transition'
+    return 'rounded-xl btn-primary px-5 py-3 text-sm font-semibold text-white transition'
 })
 
 const splitBandNewsletterButtonClass = computed(() => {
@@ -623,7 +664,7 @@ const splitBandNewsletterButtonClass = computed(() => {
         return 'split-band-newsletter-submit bg-linear-to-r from-sky-500 to-cyan-500 text-white hover:opacity-90'
     }
 
-    return 'split-band-newsletter-submit btn-primary-admin text-white'
+    return 'split-band-newsletter-submit btn-primary text-white'
 })
 
 const paymentIconList = computed(() => {
@@ -785,6 +826,14 @@ const backToTopShapeClass = (shape: ConfigValue | undefined, hasLabel: boolean) 
 
 const backToTopIcon = computed(() => frontendFooterSettings.value.back_to_top_icon?.trim() || 'ti ti-arrow-up')
 const backToTopLabel = computed(() => frontendFooterSettings.value.back_to_top_label?.trim() || '')
+// Icon-only either because no label was set, or because the circle/square shapes have no
+// room to draw one. Both cases leave the button unexplained, so it gets a tooltip —
+// carrying the admin's own label when there is one, since the shape is what hid it.
+const backToTopIsIconOnly = computed(() => {
+    const shape = String(frontendFooterSettings.value.back_to_top_shape || '')
+    return !backToTopLabel.value || shape === 'circle' || shape === 'square'
+})
+const backToTopTitle = computed(() => backToTopLabel.value || t('Scroll to top'))
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 const hasFooterContent = computed(() => {
@@ -807,7 +856,7 @@ const hasFooterContent = computed(() => {
 </script>
 
 <template>
-    <section v-if="hasFooterContent && footerStyle === 'card_grid' && showNewsletter" class="w-full pb-6">
+    <section v-if="hasFooterContent && footerStyle === 'card_grid' && showNewsletter" class="w-full py-6">
         <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
             <section class="card-grid-newsletter-band">
                 <p class="card-grid-newsletter-badge text-xs font-semibold uppercase tracking-[0.24em]">{{ t('Newsletter') }}</p>
@@ -848,7 +897,7 @@ const hasFooterContent = computed(() => {
                 >
                     <div class="space-y-3">
                         <h2 class="footer-heading-main text-2xl font-bold">{{ newsletterTitle }}</h2>
-                        <p class="footer-copy max-w-2xl text-sm leading-7">{{ newsletterDescription }}</p>
+                        <p class="footer-copy-muted max-w-2xl text-sm leading-7">{{ newsletterDescription }}</p>
                     </div>
                     <div class="space-y-3 lg:self-center">
                         <SocialFollow
@@ -860,7 +909,7 @@ const hasFooterContent = computed(() => {
                             :icon-use-platform-surface="false"
                         />
                         <form method="post" action="/newsletter/subscribe" class="default-newsletter-form w-full">
-                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="default-newsletter-input footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="default-newsletter-input  min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
                             <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
                                 {{ newsletterButtonLabel }}
                             </button>
@@ -872,18 +921,11 @@ const hasFooterContent = computed(() => {
                     <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]">
                         <div class="space-y-8">
                             <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
-                                <div v-if="item === 'about_text'" class="space-y-5">
-                                    <div v-if="showLogoAbout" class="space-y-3">
-                                        <Link href="/" class="inline-flex items-center gap-3">
-                                            <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
-                                            <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
-                                        </Link>
-                                        <div class="space-y-1">
-                                            <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
-                                            <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
-                                        </div>
-                                    </div>
-                                    <SocialFollow v-if="showSocialIcons" display-mode="icons" icon-item-class="footer-social-icon" :icon-item-style="topSocialIconStyle" :icon-use-platform-color="false" :icon-use-platform-surface="false" />
+                                <div v-if="item === 'about_text'" class="space-y-3">
+                                    <template v-if="showLogoAbout">
+                                        <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-6">{{ brandDescription }}</p>
+                                    </template>
                                 </div>
                                 <div v-else-if="isLogoBlock(item)">
                                     <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
@@ -893,7 +935,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
                                                 <span>{{ menuItemLabel(menuItem) }}</span>
                                                 <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
@@ -919,12 +961,17 @@ const hasFooterContent = computed(() => {
                                             <a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a>
                                         </li>
                                     </ul>
-                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft mt-5 text-sm leading-7">{{ frontendFooterSettings.contact_details }}</p>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-copy mt-5 text-sm leading-7">{{ frontendFooterSettings.contact_details }}</p>
+                                </div>
+
+                                <div v-else-if="item === 'social_icons'" class="space-y-4">
+                                    <h3 v-if="socialColumnTitle" class="footer-heading-title">{{ socialColumnTitle }}</h3>
+                                    <SocialFollow display-mode="icons" v-bind="socialColumnIconProps" />
                                 </div>
 
                                 <div v-else-if="item === 'newsletter'" class="space-y-4">
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
-                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
                                         <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
@@ -935,7 +982,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="category in categoryBlockList(item)" :key="category.slug">
-                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <span>{{ category.name }}</span>
                                                 <span v-if="category.tools_count !== undefined && !hideCategoriesCount" class="footer-subtle text-xs">({{ category.tools_count }})</span>
                                             </Link>
@@ -945,8 +992,8 @@ const hasFooterContent = computed(() => {
                                 </div>
                                 <div v-else>
                                     <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
-                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
-                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Use this area for trust signals, offer notes, or a short buyer-focused message.') }}</p>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-6">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-6">{{ t('Use this area for trust signals, offer notes, or a short buyer-focused message.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -958,11 +1005,11 @@ const hasFooterContent = computed(() => {
                 <div class="space-y-4">
                     <template v-if="showLogoAbout">
                         <Link href="/" class="inline-flex items-center justify-center gap-3">
-                            <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-11 max-w-44 object-contain">
+                            <img v-if="footerModeLogo" :src="footerModeLogo" :alt="appName" class="h-11 max-w-44 object-contain">
                             <span v-else class="footer-brand-mark text-2xl font-black tracking-tight">{{ appName }}</span>
                         </Link>
                         <h2 v-if="brandTitle" class="footer-heading-main text-3xl font-bold">{{ brandTitle }}</h2>
-                        <p v-if="brandDescription" class="footer-copy mx-auto max-w-3xl text-sm leading-7">{{ brandDescription }}</p>
+                        <p v-if="brandDescription" class="footer-copy mx-auto max-w-3xl text-sm leading-6">{{ brandDescription }}</p>
                     </template>
                     <SocialFollow
                         v-if="showSocialIcons"
@@ -978,9 +1025,9 @@ const hasFooterContent = computed(() => {
                 <section v-if="showNewsletter" :class="[panelClass, panelToneClass('border-white/12 bg-white/6')]">
                     <div class="mx-auto max-w-3xl space-y-4">
                         <h3 class="footer-heading-title text-base">{{ newsletterTitle }}</h3>
-                        <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                        <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                         <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 sm:flex-row">
-                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border !border-white/14 !bg-transparent px-4 py-3 text-sm focus:!border-white/30 focus:outline-none dark:!text-gray-100">
                             <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
                                 {{ newsletterButtonLabel }}
                             </button>
@@ -995,7 +1042,8 @@ const hasFooterContent = computed(() => {
                                 <div v-if="item === 'about_text'" class="space-y-4">
                                     <template v-if="showLogoAbout">
                                         <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
-                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-6
+                                        ">{{ brandDescription }}</p>
                                     </template>
                                     <SocialFollow v-if="showSocialIcons" display-mode="icons" class="justify-center" icon-item-class="footer-social-icon" :icon-item-style="topSocialIconStyle" :icon-use-platform-color="false" :icon-use-platform-surface="false" />
                                 </div>
@@ -1006,7 +1054,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="menuBlockTitle(item)" class="footer-heading-title">{{ menuBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <span>{{ menuItemLabel(menuItem) }}</span>
                                             </a>
                                         </li>
@@ -1017,11 +1065,16 @@ const hasFooterContent = computed(() => {
                                     <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
                                     <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
                                     <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
-                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-copy">{{ frontendFooterSettings.contact_details }}</p>
                                 </div>
+                                <div v-else-if="item === 'social_icons'" class="space-y-4">
+                                    <h3 v-if="socialColumnTitle" class="footer-heading-title">{{ socialColumnTitle }}</h3>
+                                    <SocialFollow display-mode="icons" v-bind="socialColumnIconProps" />
+                                </div>
+
                                 <div v-else-if="item === 'newsletter'" class="space-y-4">
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
-                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
                                         <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
@@ -1037,8 +1090,8 @@ const hasFooterContent = computed(() => {
                                 </div>
                                 <div v-else class="space-y-4">
                                     <h3 v-if="customBlockTitle(item)" class="footer-heading-title">{{ customBlockTitle(item) }}</h3>
-                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
-                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Add onboarding hints, guarantees, or buyer-friendly product guidance here.') }}</p>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-6">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-6">{{ t('Add onboarding hints, guarantees, or buyer-friendly product guidance here.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -1076,7 +1129,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
                                                 <span>{{ menuItemLabel(menuItem) }}</span>
                                                 <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
@@ -1091,12 +1144,17 @@ const hasFooterContent = computed(() => {
                                         <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
                                         <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
                                         <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
-                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-copy">{{ frontendFooterSettings.contact_details }}</p>
                                     </div>
                                 </div>
+                                <div v-else-if="item === 'social_icons'" class="space-y-4">
+                                    <h3 v-if="socialColumnTitle" class="footer-heading-title">{{ socialColumnTitle }}</h3>
+                                    <SocialFollow display-mode="icons" v-bind="socialColumnIconProps" />
+                                </div>
+
                                 <div v-else-if="item === 'newsletter'" class="space-y-4">
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
-                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
                                         <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
@@ -1105,7 +1163,7 @@ const hasFooterContent = computed(() => {
                                 <div v-else-if="item === 'about_text'" class="space-y-4">
                                     <template v-if="showLogoAbout">
                                         <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
-                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-6">{{ brandDescription }}</p>
                                     </template>
                                 </div>
                                 <div v-else-if="isLogoBlock(item)">
@@ -1115,7 +1173,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="category in categoryBlockList(item)" :key="category.slug">
-                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <span>{{ category.name }}</span>
                                                 <span v-if="category.tools_count !== undefined && !hideCategoriesCount" class="footer-subtle text-xs">({{ category.tools_count }})</span>
                                             </Link>
@@ -1125,8 +1183,8 @@ const hasFooterContent = computed(() => {
                                 </div>
                                 <div v-else>
                                     <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
-                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
-                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Use this card for trust badges, offer details, or short marketplace notes.') }}</p>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-6">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-6">{{ t('Use this card for trust badges, offer details, or short marketplace notes.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -1137,7 +1195,7 @@ const hasFooterContent = computed(() => {
                     <div :class="spotlightBrandBarCentered ? 'flex flex-col items-center gap-5 text-center' : 'flex flex-col gap-5 md:flex-row md:items-center md:justify-between'">
                         <div v-if="showLogoAbout" :class="spotlightBrandBarCentered ? 'flex justify-center' : 'flex items-center gap-4'">
                             <Link href="/" class="inline-flex items-center gap-4">
-                                <img v-if="footerLogo" :src="footerLogo" :alt="spotlightBrandName" class="h-12 max-w-48 object-contain">
+                                <img v-if="footerModeLogo" :src="footerModeLogo" :alt="spotlightBrandName || appName" class="h-12 max-w-48 object-contain">
                                 <span v-if="spotlightBrandName" class="footer-heading-title text-lg font-semibold normal-case">{{ spotlightBrandName }}</span>
                             </Link>
                         </div>
@@ -1166,11 +1224,11 @@ const hasFooterContent = computed(() => {
                     <div :class="showLogoAbout ? 'grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center' : 'mx-auto flex max-w-3xl flex-col gap-4 text-center'">
                         <div v-if="showLogoAbout" class="space-y-4">
                             <Link href="/" class="inline-flex items-center gap-3">
-                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
+                                <img v-if="footerModeLogo" :src="footerModeLogo" :alt="appName" class="h-10 max-w-40 object-contain">
                                 <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
                             </Link>
                             <h2 v-if="brandTitle" class="footer-heading-main text-xl font-bold">{{ brandTitle }}</h2>
-                            <p v-if="brandDescription" class="footer-copy max-w-2xl text-sm leading-7">{{ brandDescription }}</p>
+                            <p v-if="brandDescription" class="footer-copy max-w-2xl text-sm leading-6">{{ brandDescription }}</p>
                         </div>
                         <div :class="showLogoAbout ? 'space-y-4 lg:text-end' : 'space-y-4 text-center'">
                             <div v-if="showNewsletter" class="space-y-3">
@@ -1186,7 +1244,7 @@ const hasFooterContent = computed(() => {
                                     />
                                     <div :class="showLogoAbout ? 'space-y-3' : 'space-y-3 text-center'">
                                         <p class="footer-kicker text-base font-semibold uppercase tracking-[0.24em]">{{ newsletterTitle }}</p>
-                                        <p :class="showLogoAbout ? 'footer-copy text-sm leading-7 lg:ms-auto lg:max-w-xl' : 'footer-copy mx-auto max-w-2xl text-sm leading-7'">{{ newsletterDescription }}</p>
+                                        <p :class="showLogoAbout ? 'footer-copy-muted text-sm leading-6 lg:ms-auto lg:max-w-xl' : 'footer-copy-muted mx-auto max-w-2xl text-sm leading-7'">{{ newsletterDescription }}</p>
                                     </div>
                                 </div>
                                 <form method="post" action="/newsletter/subscribe" :class="showLogoAbout ? 'split-band-newsletter-form lg:justify-end' : 'split-band-newsletter-form mx-auto w-full max-w-xl'">
@@ -1217,7 +1275,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
                                                 <span>{{ menuItemLabel(menuItem) }}</span>
                                             </a>
@@ -1233,9 +1291,14 @@ const hasFooterContent = computed(() => {
                                         <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
                                     </div>
                                 </div>
+                                <div v-else-if="item === 'social_icons'" class="space-y-4">
+                                    <h3 v-if="socialColumnTitle" class="footer-heading-title">{{ socialColumnTitle }}</h3>
+                                    <SocialFollow display-mode="icons" v-bind="socialColumnIconProps" />
+                                </div>
+
                                 <div v-else-if="item === 'newsletter'" class="space-y-4">
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
-                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
                                         <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
@@ -1254,7 +1317,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="category in categoryBlockList(item)" :key="category.slug">
-                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <span>{{ category.name }}</span>
                                                 <span v-if="category.tools_count !== undefined && !hideCategoriesCount" class="footer-subtle text-xs">({{ category.tools_count }})</span>
                                             </Link>
@@ -1264,8 +1327,8 @@ const hasFooterContent = computed(() => {
                                 </div>
                                 <div v-else>
                                     <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
-                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
-                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Add a short product trust message or onboarding note here.') }}</p>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-6">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-6">{{ t('Add a short product trust message or onboarding note here.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -1296,7 +1359,7 @@ const hasFooterContent = computed(() => {
                     <div class="space-y-5 flex flex-col items-center justify-center text-center">
                         <div v-if="showLogoAbout" class="space-y-5">
                             <Link href="/" class="inline-flex items-center gap-3">
-                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
+                                <img v-if="footerModeLogo" :src="footerModeLogo" :alt="appName" class="h-10 max-w-40 object-contain">
                                     <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
                             </Link>
                             <h2 v-if="brandTitle" class="footer-heading-main text-4xl font-bold">{{ brandTitle }}</h2>
@@ -1321,7 +1384,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
                                                 <span>{{ menuItemLabel(menuItem) }}</span>
                                                 <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
@@ -1336,12 +1399,17 @@ const hasFooterContent = computed(() => {
                                         <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
                                         <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
                                         <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
-                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-copy">{{ frontendFooterSettings.contact_details }}</p>
                                     </div>
                                 </div>
+                                <div v-else-if="item === 'social_icons'" class="space-y-4">
+                                    <h3 v-if="socialColumnTitle" class="footer-heading-title">{{ socialColumnTitle }}</h3>
+                                    <SocialFollow display-mode="icons" v-bind="socialColumnIconProps" />
+                                </div>
+
                                 <div v-else-if="item === 'newsletter'" class="space-y-4">
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
-                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <p class="footer-copy-muted text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
                                         <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input footer-input-ghost min-w-0 flex-1 rounded-xl border border-white/18 bg-transparent px-4 py-3 text-sm focus:border-white/36 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
@@ -1350,7 +1418,7 @@ const hasFooterContent = computed(() => {
                                 <div v-else-if="item === 'about_text'" class="space-y-4">
                                     <template v-if="showLogoAbout">
                                         <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
-                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-6">{{ brandDescription }}</p>
                                     </template>
                                 </div>
                                 <div v-else-if="isLogoBlock(item)">
@@ -1360,7 +1428,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
                                     <ul class="space-y-3">
                                         <li v-for="category in categoryBlockList(item)" :key="category.slug">
-                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                                 <span>{{ category.name }}</span>
                                                 <span v-if="category.tools_count !== undefined && !hideCategoriesCount" class="footer-subtle text-xs">({{ category.tools_count }})</span>
                                             </Link>
@@ -1388,7 +1456,7 @@ const hasFooterContent = computed(() => {
                                 <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
                                 <ul class="space-y-3">
                                     <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
-                                        <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                        <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                             <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
                                             <span>{{ menuItemLabel(menuItem) }}</span>
                                             <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
@@ -1403,12 +1471,12 @@ const hasFooterContent = computed(() => {
                                     <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
                                     <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
                                     <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
-                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-copy">{{ frontendFooterSettings.contact_details }}</p>
                                 </div>
                             </div>
                             <div v-else-if="item === 'about_text'" class="space-y-4">
                                 <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
-                                <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                <p v-if="brandDescription" class="footer-copy text-sm leading-6">{{ brandDescription }}</p>
                             </div>
                             <div v-else-if="isLogoBlock(item)">
                                 <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
@@ -1417,7 +1485,7 @@ const hasFooterContent = computed(() => {
                                 <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
                                 <ul class="space-y-3">
                                     <li v-for="category in categoryBlockList(item)" :key="category.slug">
-                                        <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                        <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-normal">
                                             <span>{{ category.name }}</span>
                                             <span v-if="category.tools_count !== undefined && !hideCategoriesCount" class="footer-subtle text-xs">({{ category.tools_count }})</span>
                                         </Link>
@@ -1427,8 +1495,8 @@ const hasFooterContent = computed(() => {
                             </div>
                             <div v-else>
                                 <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
-                                <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
-                                <p v-else class="footer-subtle text-sm leading-7">{{ t('Share a support promise, launch note, or short buyer reassurance here.') }}</p>
+                                <p v-if="customBlockText(item)" class="footer-copy text-sm leading-6">{{ customBlockText(item) }}</p>
+                                <p v-else class="footer-subtle text-sm leading-6">{{ t('Share a support promise, launch note, or short buyer reassurance here.') }}</p>
                             </div>
                         </div>
                     </div>
@@ -1469,29 +1537,18 @@ const hasFooterContent = computed(() => {
                     :icon-use-platform-surface="false"
                 />
 
-                <div v-if="bottomMenuItems.length" class="footer-bottom-item">
-                    <ul class="flex flex-wrap items-center justify-center gap-4">
-                        <li v-for="item in bottomMenuItems" :key="item.id">
-                            <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" class="footer-bottom-link inline-flex items-center gap-2 text-xs font-medium" :style="bottomBarLinkStyle">
-                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-sm leading-none']" aria-hidden="true" />
-                                <span>{{ menuItemLabel(item) }}</span>
-                                <span v-if="menuItemBadgeText(item)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
                 <div v-if="showBackToTop || showBottomLanguageSelector" class="flex flex-wrap items-center justify-center gap-3">
                     <button
                         v-if="showBackToTop"
                         type="button"
                         class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
-                        :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(frontendFooterSettings.back_to_top_label?.trim()))"
-                        :aria-label="backToTopLabel"
+                        :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(backToTopLabel))"
+                        :aria-label="backToTopTitle"
+                        :title="backToTopIsIconOnly ? backToTopTitle : undefined"
                         @click="scrollToTop"
                     >
                         <i :class="backToTopIcon"></i>
-                        <span v-if="frontendFooterSettings.back_to_top_shape !== 'circle' && frontendFooterSettings.back_to_top_shape !== 'square'">
+                        <span v-if="frontendFooterSettings.back_to_top_shape !== 'circle' && frontendFooterSettings.back_to_top_shape !== 'square' && backToTopLabel">
                             {{ backToTopLabel }}
                         </span>
                     </button>
@@ -1502,6 +1559,18 @@ const hasFooterContent = computed(() => {
                         placement="up"
                         :ui="{ buttonClass: 'footer-language-switcher inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold', buttonStyle: bottomBarLanguageSwitcherStyle }"
                     />
+                </div>
+
+                <div v-if="bottomMenuItems.length" class="footer-bottom-item">
+                    <ul class="flex flex-wrap items-center justify-center gap-4">
+                        <li v-for="item in bottomMenuItems" :key="item.id">
+                            <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" class="footer-bottom-link inline-flex items-center gap-2 text-xs font-medium" :style="bottomBarLinkStyle">
+                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-sm leading-none']" aria-hidden="true" />
+                                <span>{{ menuItemLabel(item) }}</span>
+                                <span v-if="menuItemBadgeText(item)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                            </a>
+                        </li>
+                    </ul>
                 </div>
 
                 <p class="text-xs font-medium">{{ copyrightLine }}</p>
@@ -1548,7 +1617,8 @@ const hasFooterContent = computed(() => {
                         type="button"
                         class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
                         :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(backToTopLabel))"
-                        :aria-label="backToTopLabel || t('Scroll to top')"
+                        :aria-label="backToTopTitle"
+                        :title="backToTopIsIconOnly ? backToTopTitle : undefined"
                         @click="scrollToTop"
                     >
                         <i :class="backToTopIcon"></i>
@@ -1612,7 +1682,8 @@ const hasFooterContent = computed(() => {
                         type="button"
                         class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
                         :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(backToTopLabel))"
-                        :aria-label="backToTopLabel || t('Scroll to top')"
+                        :aria-label="backToTopTitle"
+                        :title="backToTopIsIconOnly ? backToTopTitle : undefined"
                         @click="scrollToTop"
                     >
                         <i :class="backToTopIcon"></i>
@@ -1645,6 +1716,27 @@ const hasFooterContent = computed(() => {
 .footer-heading-title,
 .footer-kicker {
     text-transform: var(--footer-heading-transform, capitalize);
+    /* The capitalize transform closes the gaps up optically — "Popular Categories" reads
+       as one long word at this weight and size. A touch of word-spacing separates them
+       again without touching the tracking. */
+    word-spacing: 0.08em;
+}
+
+/* Column headings only (h3): the spotlight layout puts .footer-heading-title on a span
+   beside the brand mark, where turning it into a flex row would break the inline layout.
+   The rule runs from the end of the text to the edge of the column, legend style. */
+h3.footer-heading-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+h3.footer-heading-title::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.18;
 }
 
 .footer-nav-link,
@@ -1662,7 +1754,17 @@ const hasFooterContent = computed(() => {
     opacity: 0.84;
 }
 
+/* Full strength, not the 74% muted tier: the column items are the footer's content, and
+   about text / custom text / the contact list were reading a shade lighter than the menu
+   and category links sitting right beside them. The muted, soft and subtle tiers stay for
+   what they are actually for — icons, meta lines and fine print. */
 .footer-copy {
+    color: var(--footer-text-color) !important;
+}
+
+/* The newsletter blurb is the one body text that stays muted — it is a prompt for the
+   form under it, not column content competing with the links. */
+.footer-copy-muted {
     color: var(--footer-text-muted) !important;
 }
 
@@ -1764,6 +1866,7 @@ const hasFooterContent = computed(() => {
 }
 
 .default-newsletter-input {
+    color: rgb(15 23 42);
     width: 100%;
     border-radius: 0.75rem;
     border-end-start-radius: 0;
@@ -2105,7 +2208,7 @@ const hasFooterContent = computed(() => {
 
     .floating-newsletter-button {
         margin-top: -2px;
-    } 
+    }
 }
 
 @media (max-width: 639px) {

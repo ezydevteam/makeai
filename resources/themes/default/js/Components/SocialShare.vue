@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<{
     showCounts?: boolean
     style?: ShareStyle
     layout?: 'horizontal' | 'vertical'
+    collapseAfter?: number
 }>(), {
     title: '',
     urls: () => ({}),
@@ -30,6 +31,9 @@ const props = withDefaults(defineProps<{
     showCounts: false,
     style: 'icon-label',
     layout: 'horizontal',
+    // 0 = show every network, which is what the dropdown and any other caller want. Only a
+    // caller that sets it gets the More/Less toggle.
+    collapseAfter: 0,
 })
 
 const { t } = useTranslate()
@@ -82,6 +86,12 @@ const shareLinks = computed<ShareLink[]>(() => props.networks
         external: network !== 'email' && network !== 'copy',
     })))
 
+const expanded = ref(false)
+const isCollapsible = computed(() => props.collapseAfter > 0 && shareLinks.value.length > props.collapseAfter)
+const visibleShareLinks = computed(() => (isCollapsible.value && ! expanded.value)
+    ? shareLinks.value.slice(0, props.collapseAfter)
+    : shareLinks.value)
+
 const showLabel = computed(() => props.style === 'icon-label')
 const showCount = (network: ShareNetwork) => props.style === 'icon-count' && props.showCounts && props.counts[network] !== undefined
 
@@ -99,7 +109,7 @@ const shareTitle = (label: string) => t('Share on :network', { network: t(label)
 
 <template>
     <div class="flex gap-2" :class="layout === 'vertical' ? 'flex-col' : 'flex-wrap'" :aria-label="t('Social share buttons')">
-        <template v-for="link in shareLinks" :key="link.key">
+        <template v-for="link in visibleShareLinks" :key="link.key">
             <button
                 v-if="link.key === 'copy'"
                 type="button"
@@ -138,5 +148,22 @@ const shareTitle = (label: string) => t('Share on :network', { network: t(label)
                 <span v-if="showCount(link.key)" class="text-xs">{{ counts[link.key] }}</span>
             </a>
         </template>
+
+        <!-- Styled as a share button rather than a plain link so the row keeps one rhythm.
+             aria-expanded, because it discloses the rest of the group rather than navigating. -->
+        <button
+            v-if="isCollapsible"
+            type="button"
+            :aria-expanded="expanded"
+            :title="expanded ? t('Show fewer sharing options') : t('Show more sharing options')"
+            class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition hover:border-gray-300 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
+            :class="{ 'w-full': layout === 'vertical' }"
+            @click="expanded = ! expanded"
+        >
+            <span class="inline-flex h-5 w-5 items-center justify-center">
+                <i :class="['ti', expanded ? 'ti-chevron-up' : 'ti-dots']" class="text-base leading-none"></i>
+            </span>
+            <span v-if="showLabel">{{ expanded ? t('Less') : t('More') }}</span>
+        </button>
     </div>
 </template>

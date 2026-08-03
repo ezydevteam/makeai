@@ -12,6 +12,7 @@ const {
     titleSizeClass,
     cardBgClass,
     cardWrapperClass,
+    badgeClass,
     sectionIconClass,
     sectionHeaderClass,
     sectionPaddingStyle,
@@ -243,6 +244,10 @@ onUnmounted(() => gsapCtx?.revert())
                     </div>
 
                     <div class="w-full">
+                        <span v-if="asString(section.config.badge_text)" :class="badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))">
+                            <i class="ti ti-sparkles text-xs"></i>
+                            {{ asString(section.config.badge_text) }}
+                        </span>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
                             <div v-if="(section.config.icon !== undefined ? asString(section.config.icon) : 'ti ti-help-circle') && asString(section.config.icon_position, 'top') === 'left'" :class="[

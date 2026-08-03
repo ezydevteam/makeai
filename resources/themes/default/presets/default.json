@@ -1,35 +1,12 @@
 {
     "name": "Default",
-    "description": "The factory Emerald look — fresh green primary on a soft mint background.",
-    "preview": {
-        "mode": "light",
-        "primary": "#10b981",
-        "secondary": "#3b82f6",
-        "accent": "#8b5cf6",
-        "bg": "#f0fdf8",
-        "heading": "#111827",
-        "text": "#374151"
-    },
+    "description": "The factory look. Every section is declared empty on purpose: applying this clears the stored overrides so colors, header, footer, homepage and page settings all fall back to settings.json. Nothing here can drift from the theme defaults because nothing here duplicates them.",
     "settings": {
-        "theme": {
-            "theme_default_mode": "light",
-            "theme_allow_user_toggle": true,
-            "primary_color": "#10b981",
-            "secondary_color": "#3b82f6",
-            "accent_color": "#8b5cf6",
-            "bg_color": "#f0fdf8",
-            "bg_image": "",
-            "bg_image_enabled": false,
-            "heading_color": "#111827",
-            "body_text_color": "#374151",
-            "muted_text_color": "#6b7280",
-            "border_color": "#dbe4ea",
-            "font_body": "Inter",
-            "heading_font": "Plus Jakarta Sans",
-            "base_font_size": "15px",
-            "heading_weight": "700",
-            "line_height": "1.5",
-            "letter_spacing": "normal"
-        }
+        "theme": {},
+        "header": {},
+        "footer": {},
+        "homepage": {},
+        "homepage_config": {},
+        "tool_page": {}
     }
 }

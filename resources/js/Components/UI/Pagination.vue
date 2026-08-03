@@ -9,14 +9,23 @@ interface PaginationLink {
     active: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     links: PaginationLink[]
     from?: number | null
     to?: number | null
     total?: number | null
     currentPage?: number | null
     lastPage?: number | null
-}>()
+    // For lists that sit partway down a page — comments, say — where jumping back to the
+    // top on every page change loses the reader's place.
+    preserveScroll?: boolean
+    // Right by default so the summary line reads left-to-right against it. Left suits a
+    // list that has no summary and sits against a left-aligned column.
+    align?: 'left' | 'right'
+}>(), {
+    preserveScroll: false,
+    align: 'right',
+})
 
 const { t } = useTranslate()
 
@@ -143,11 +152,16 @@ const summaryText = computed(() => {
         <p v-if="summaryText" class="text-sm text-gray-500 dark:text-gray-400">
             {{ summaryText }}
         </p>
-        <div v-else class="hidden md:block"></div>
+        <!-- Spacer only pushes the controls right; left alignment wants them flush. -->
+        <div v-else-if="align === 'right'" class="hidden md:block"></div>
 
-        <div class="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+        <div
+            class="flex flex-wrap items-center justify-start gap-2"
+            :class="align === 'right' ? 'md:justify-end' : 'md:justify-start'"
+        >
             <component
                 :is="prevLink?.url ? Link : 'div'"
+                :preserve-scroll="props.preserveScroll"
                 v-if="prevLink"
                 :href="prevLink.url ?? undefined"
                 class="inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-all"
@@ -168,6 +182,7 @@ const summaryText = computed(() => {
                 <component
                     v-else
                     :is="item.url && !item.active ? Link : 'div'"
+                :preserve-scroll="props.preserveScroll"
                     :href="item.url ?? undefined"
                     class="inline-flex h-9 min-w-[36px] items-center justify-center rounded-full px-4 text-sm font-semibold transition-all"
                     :class="item.active
@@ -180,6 +195,7 @@ const summaryText = computed(() => {
 
             <component
                 :is="nextLink?.url ? Link : 'div'"
+                :preserve-scroll="props.preserveScroll"
                 v-if="nextLink"
                 :href="nextLink.url ?? undefined"
                 class="inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-all"

@@ -476,7 +476,7 @@ class DemoProvisionSeederTest extends TestCase
      */
     public function test_the_shipped_branding_defaults_name_files_that_exist(): void
     {
-        $readme = file_get_contents(base_path('public/demo-assets/README.md'));
+        $readme = file_get_contents(base_path('public/assets/image/demo-assets/logo/README.md'));
 
         foreach (config('demo.provisioning.branding') as $slot => $filename) {
             if ($filename === '') {
@@ -484,13 +484,13 @@ class DemoProvisionSeederTest extends TestCase
             }
 
             $this->assertFileExists(
-                base_path('public/demo-assets/'.$filename),
-                "demo.provisioning.branding.{$slot} points at {$filename}, which is not in public/demo-assets"
+                base_path('public/assets/image/demo-assets/logo/'.$filename),
+                "demo.provisioning.branding.{$slot} points at {$filename}, which is not in public/assets/image/demo-assets/logo"
             );
             $this->assertStringContainsString(
                 $filename,
                 $readme,
-                "public/demo-assets/README.md does not document {$filename}"
+                "public/assets/image/demo-assets/logo/README.md does not document {$filename}"
             );
         }
     }
@@ -501,7 +501,7 @@ class DemoProvisionSeederTest extends TestCase
      */
     private function writeDemoAsset(string $name, string $contents): string
     {
-        $path = base_path('public/demo-assets/'.$name);
+        $path = base_path('public/assets/image/demo-assets/logo/'.$name);
         file_put_contents($path, $contents);
         $this->beforeApplicationDestroyed(fn () => @unlink($path));
 

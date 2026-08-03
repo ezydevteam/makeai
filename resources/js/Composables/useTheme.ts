@@ -1,19 +1,16 @@
 import { useDark, useToggle } from '@vueuse/core'
 import { usePage } from '@inertiajs/vue3'
+import { syncDefaultColorScheme } from '../lib/colorScheme'
 
 export function useTheme() {
     const page = usePage()
 
-    // Apply theme_default_mode BEFORE useDark initializes, so the server-configured
-    // default (not the system preference) is used for first-time visitors
-    const storageKey = 'vueuse-color-scheme'
-    if (localStorage.getItem(storageKey) === null) {
-        const settings = (page.props.appearanceThemeSettings as Record<string, string>) || {}
-        const mode = settings.theme_default_mode
-        if (mode === 'dark' || mode === 'light') {
-            localStorage.setItem(storageKey, mode === 'dark' ? 'dark' : '')
-        }
-    }
+    // Align the stored scheme with theme_default_mode BEFORE useDark initializes, so the
+    // server-configured default (not the system preference) is what it reads. app.ts does
+    // the same on load and on every navigation; this covers a component reaching for the
+    // theme first. Both routes are idempotent.
+    const settings = (page.props.appearanceThemeSettings as Record<string, string>) || {}
+    syncDefaultColorScheme(settings.theme_default_mode)
 
     const isDark = useDark({
         selector: 'html',

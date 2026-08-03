@@ -258,26 +258,28 @@ class ThemeSettingsService
     private function filterHeaderSettings(array $settings): array
     {
         $defaults = $this->getDefaults('header');
-        $desktop = is_array($settings['desktop'] ?? null)
-            ? array_intersect_key($settings['desktop'], $defaults['desktop'] ?? [])
-            : [];
-        $mobileTop = is_array($settings['mobile_top'] ?? null)
-            ? array_intersect_key($settings['mobile_top'], $defaults['mobile_top'] ?? [])
-            : [];
-        $mobileBottom = is_array($settings['mobile_bottom'] ?? null)
-            ? array_intersect_key($settings['mobile_bottom'], $defaults['mobile_bottom'] ?? [])
-            : [];
+
+        $group = function (string $name) use ($settings, $defaults): array {
+            $groupDefaults = $defaults[$name] ?? [];
+            $values = is_array($settings[$name] ?? null)
+                ? array_intersect_key($settings[$name], $groupDefaults)
+                : [];
+
+            return $this->castToDefaultTypes($values, $groupDefaults);
+        };
 
         return [
-            'desktop' => $desktop,
-            'mobile_top' => $mobileTop,
-            'mobile_bottom' => $mobileBottom,
+            'desktop' => $group('desktop'),
+            'mobile_top' => $group('mobile_top'),
+            'mobile_bottom' => $group('mobile_bottom'),
         ];
     }
 
     private function filterFooterSettings(array $settings): array
     {
-        return array_intersect_key($settings, $this->getDefaults('footer'));
+        $defaults = $this->getDefaults('footer');
+
+        return $this->castToDefaultTypes(array_intersect_key($settings, $defaults), $defaults);
     }
 
     private function filterHomepageSettings(array $settings): array
@@ -288,10 +290,18 @@ class ThemeSettingsService
     }
 
     /**
-     * The homepage form uploads images, so it is sent as multipart — an encoding with no
-     * boolean type, which turns every toggle into the string "1"/"0". Restore each value to
-     * the type its default declares. Applied on both save and read, so configs already
-     * stored in the corrupted shape resolve correctly.
+     * The homepage and footer forms upload images, so they are sent as multipart — an
+     * encoding with no boolean type, which turns every toggle into the string "1"/"0".
+     * Restore each value to the type its default declares.
+     *
+     * Applied on both save and read by every section filter, so rows already written in the
+     * stringified shape resolve correctly without a migration. Without it a stored "0" reads
+     * as a JS-truthy string on the frontend — the exact inversion that hid the homepage's
+     * back-to-top button — and each consumer has to hand-roll its own truthiness check.
+     *
+     * Booleans only: integers such as `height` and `footer_vertical_padding` are interpolated
+     * into CSS lengths where a numeric string behaves identically, and coercing them would
+     * turn a cleared field into 0 rather than leaving it to fall back to the default.
      */
     private function castToDefaultTypes(array $settings, array $defaults): array
     {

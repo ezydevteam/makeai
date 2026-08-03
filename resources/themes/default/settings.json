@@ -24,10 +24,10 @@
             "nav_progress_bar": true,
             "show_back_to_top": true,
             "hide_scroll_top_mobile": false,
-            "primary_color": "#10b981",
-            "secondary_color": "#3b82f6",
+            "primary_color": "#1F75FE",
+            "secondary_color": "#8b5cf6",
             "accent_color": "#8b5cf6",
-            "bg_color": "#f0fdf8",
+            "bg_color": "#ffffff",
             "bg_image": "",
             "bg_image_enabled": false,
             "heading_color": "#111827",
@@ -48,40 +48,40 @@
                 "sticky_behavior": "always",
                 "shadow_style": "border_small",
                 "menu_position": "center",
-                "menu_hover_style": "rounded_soft_bg",
+                "menu_hover_style": "pill_soft_bg",
                 "show_notification_bell": true,
-                "notification_button_style": "rounded_soft_bg",
+                "notification_button_style": "light_bg",
                 "show_social_icons": false,
-                "social_icon_style": "rounded_soft_bg",
+                "social_icon_style": "light_bg",
                 "social_button_text": "Follow Us",
-                "show_language_switcher": true,
+                "show_language_switcher": false,
                 "language_switcher_style": "icon_with_label",
                 "show_dark_mode_toggle": true,
-                "dark_mode_toggle_style": "rounded_soft_bg",
-                "command_palette_style": "hidden",
+                "dark_mode_toggle_style": "light_bg",
+                "command_palette_style": "search_transparent",
                 "show_icon_tooltip": true,
-                "auth_mode": "login_register",
-                "guest_login_text": "Login",
-                "guest_login_icon_class": "ti ti-login-2",
+                "auth_mode": "login_only",
+                "guest_login_text": "Sign In",
+                "guest_login_icon_class": "ti ti-user",
                 "guest_login_style": "primary",
-                "guest_register_text": "Register",
+                "guest_register_text": "Sign Up",
                 "guest_register_icon_class": "ti ti-user-plus",
                 "guest_register_style": "dark",
-                "guest_button_shape": "rounded_xl",
-                "account_avatar_style": "avatar_name_arrow",
+                "guest_button_shape": "pill",
+                "account_avatar_style": "avatar_only",
                 "show_cta_button": true,
                 "cta_text": "Get Started",
                 "cta_link": "/register",
                 "cta_icon": "ti ti-rocket",
-                "cta_style": "primary",
-                "cta_shape": "rounded_xl",
-                "cta_access_level": "all",
+                "cta_style": "warning",
+                "cta_shape": "pill",
+                "cta_access_level": "guest",
                 "menu_source": "primary",
-                "height": 72,
+                "height": 60,
                 "container_width": "1280px",
                 "bg_color": "",
                 "transparent_on_hero": false,
-                "text_color": "",
+                "text_color": "#111111",
                 "menu_hover_color": "",
                 "show_border": true,
                 "show_shadow": false,
@@ -89,11 +89,11 @@
             },
             "mobile_top": {
                 "enabled": true,
-                "layout": "compact",
+                "layout": "centered",
                 "height": 64,
                 "bg_color": "",
                 "text_color": "",
-                "show_shadow": "none",
+                "show_shadow": "border_small",
                 "sticky_behavior": "always",
                 "show_logo": true,
                 "show_hamburger": true,
@@ -102,16 +102,18 @@
                 "show_search_icon": false,
                 "show_language_switcher": false,
                 "show_login": false,
-                "show_cta_button": false
+                "show_cta_button": true
             },
             "mobile_bottom": {
-                "enabled": false,
+                "enabled": true,
                 "hide_menu_labels": false,
                 "show_glassmorphism": true,
                 "show_home": true,
-                "show_search_icon": false,
+                "show_search_icon": true,
+                "show_dark_mode_toggle": false,
+                "show_language_switcher": false,
                 "show_tools": true,
-                "show_notification_bell": false,
+                "show_notification_bell": true,
                 "show_hamburger": false,
                 "show_profile": true
             }
@@ -120,85 +122,144 @@
             "layout": "default",
             "style_columns": {
                 "default": {
-                    "col_1": ["about_text"],
-                    "col_2": ["menu"],
-                    "col_3": ["contact_info"],
-                    "col_4": ["custom_text"]
+                    "col_1": [
+                        "logo",
+                        "about_text",
+                        "social_icons"
+                    ],
+                    "col_2": [
+                        "categories"
+                    ],
+                    "col_3": [
+                        "menu"
+                    ],
+                    "col_4": [
+                        "contact_info"
+                    ]
                 },
                 "centered": {
-                    "col_1": ["about_text"],
-                    "col_2": ["menu"],
-                    "col_3": ["contact_info"]
+                    "col_1": [
+                        "menu_secondary"
+                    ],
+                    "col_2": [
+                        "menu"
+                    ],
+                    "col_3": [
+                        "contact_info"
+                    ]
                 },
                 "spotlight": {
-                    "col_1": ["menu"],
-                    "col_2": ["contact_info"],
-                    "col_3": ["custom_text"]
+                    "col_1": [
+                        "menu"
+                    ],
+                    "col_2": [
+                        "contact_info"
+                    ],
+                    "col_3": [
+                        "custom_text"
+                    ]
                 },
                 "card_grid": {
-                    "col_1": ["menu"],
-                    "col_2": ["contact_info"],
-                    "col_3": ["custom_text"]
+                    "col_1": [
+                        "menu"
+                    ],
+                    "col_2": [
+                        "menu_secondary"
+                    ],
+                    "col_3": [
+                        "categories"
+                    ],
+                    "col_4": [
+                        "contact_info"
+                    ],
+                    "col_5": [
+                        "custom_text"
+                    ]
                 },
                 "split_band": {
-                    "col_1": ["menu"],
-                    "col_2": ["contact_info"],
-                    "col_3": ["custom_text"],
-                    "col_4": ["categories"]
+                    "col_1": [
+                        "categories"
+                    ],
+                    "col_2": [
+                        "menu"
+                    ],
+                    "col_3": [
+                        "menu_secondary"
+                    ],
+                    "col_4": [
+                        "contact_info"
+                    ]
                 },
                 "floating_panel": {
-                    "col_1": ["menu"],
-                    "col_2": ["contact_info"],
-                    "col_3": ["custom_text"]
+                    "col_1": [
+                        "menu"
+                    ],
+                    "col_2": [
+                        "contact_info"
+                    ],
+                    "col_3": [
+                        "custom_text"
+                    ]
                 }
             },
             "brand_title": "",
-            "brand_description": "",
+            "brand_description": "Every AI tool your team needs — writing, images, chat and code — behind one login and one credit balance.",
             "show_newsletter": true,
-            "newsletter_title": "",
+            "newsletter_title": "Join Our Newsletter",
             "newsletter_description": "",
             "newsletter_placeholder": "",
             "newsletter_button_label": "",
             "newsletter_button_style": "primary",
-            "show_social_icons": true,
-            "contact_title": "",
-            "contact_email": "",
-            "contact_phone": "",
-            "contact_address": "",
-            "contact_details": "",
-            "menu_title": "",
+            "show_social_icons": false,
+            "social_title": "Follow us",
+            "social_multi_color": false,
+            "contact_title": "Get in touch",
+            "contact_email": "hello@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0142",
+            "contact_address": "100 Market Street, Suite 400, San Francisco, CA 94105",
+            "contact_details": "Mon to Sat, 10am to 6pm PT. Email reply within one business day.",
+            "menu_title": "Company",
             "menu_column": "footer-company",
-            "custom_title": "",
-            "custom_text": "",
-            "tool_categories_title": "",
-            "tool_categories_items": [],
+            "secondary_menu_title": "Legal",
+            "secondary_menu_column": "footer-legal",
+            "custom_title": "Start free",
+            "custom_text": "Create an account and get monthly credits across every tool. No card required, cancel whenever you like.",
+            "tool_categories_title": "Popular categories",
+            "tool_categories_items": [
+                "blog-content",
+                "social-media",
+                "advertising",
+                "email-marketing",
+                "development",
+                "website-seo"
+            ],
             "footer_bg_color": "",
             "footer_text_color": "",
             "footer_heading_color": "",
             "footer_heading_text_case": "capitalize",
-            "logo_mode": "light",
+            "logo_mode": "dark",
             "container_width": "1280px",
             "show_logo_about": true,
-            "enable_card_style": true,
-            "hide_categories_count": false,
+            "enable_card_style": false,
+            "hide_categories_count": true,
             "footer_vertical_padding": 56,
-            "show_payment_icons": true,
+            "show_payment_icons": false,
             "payment_icons": "",
             "show_bottom_social_icons": false,
-            "show_bottom_language_selector": false,
-            "show_back_to_top": true,
+            "show_bottom_language_selector": true,
+            "show_back_to_top": false,
             "back_to_top_label": "",
             "back_to_top_icon": "ti ti-arrow-up",
             "back_to_top_shape": "rounded",
-            "bottom_menu": "",
+            "bottom_menu": "footer-legal",
             "bottom_bar_show_border": true,
             "bottom_bar_border_color": "",
             "bottom_bar_border_width": 1,
             "bottom_bar_bg_color": "",
             "bottom_bar_text_color": "",
-            "bottom_bar_padding": 32,
+            "bottom_bar_padding": 28,
             "bottom_bar_centered": false,
-            "copyright_text": ""
+            "copyright_text": "© {year} {site_name}. All rights reserved."
         },
         "homepage": {
             "hero_variant": "centered-gradient",
@@ -206,18 +267,18 @@
             "show_features": true,
             "show_tools": true,
             "show_steps": true,
-            "show_pricing": false,
+            "show_pricing": true,
             "show_testimonials": true,
             "show_faq": true,
             "show_cta": true,
             "show_blog": true,
             "show_newsletter": true,
-            "show_custom_html": false,
-            "show_richtext": false,
-            "show_ad_slot": false,
-            "show_ad_slot_2": false,
+            "show_custom_html": true,
+            "show_richtext": true,
+            "show_ad_slot": true,
+            "show_ad_slot_2": true,
             "show_ad_slot_3": false,
-            "show_image_carousel": false,
+            "show_image_carousel": true,
             "show_hero": true
         },
         "homepage_config": {
@@ -237,7 +298,7 @@
                     "type": "hero",
                     "config": {
                         "layout": "centered-gradient",
-                        "headline": "One Platform. Every AI Tool.",
+                        "headline": "One platform for | writing. | images. | conversations. | code.",
                         "subheadline": "Unleash your creativity with the world's most powerful AI models. From high-quality content to stunning images and precise code.",
                         "show_primary_cta": true,
                         "primary_cta_text": "Get Started for Free",
@@ -245,16 +306,16 @@
                         "primary_cta_style": "primary_filled",
                         "primary_cta_icon": "",
                         "primary_cta_icon_position": "left",
-                        "primary_cta_shape": "rounded_xl",
+                        "primary_cta_shape": "pill",
                         "primary_cta_size": "lg",
                         "primary_cta_access_level": "all",
                         "show_secondary_cta": true,
-                        "secondary_cta_text": "View Pricing",
-                        "secondary_cta_link": "/pricing",
-                        "secondary_cta_style": "outline",
-                        "secondary_cta_icon": "",
+                        "secondary_cta_text": "Watch a video tour",
+                        "secondary_cta_link": "https://youtu.be/eHEHE2fpnWQ?si=E7hiTt2t8Ys2X3Ca",
+                        "secondary_cta_style": "white",
+                        "secondary_cta_icon": "ti ti-player-play",
                         "secondary_cta_icon_position": "left",
-                        "secondary_cta_shape": "rounded_xl",
+                        "secondary_cta_shape": "pill",
                         "secondary_cta_size": "lg",
                         "secondary_cta_access_level": "all",
                         "hero_vertical_padding": "48",
@@ -297,7 +358,7 @@
                         "subtitle": "Everything you need to build the future, powered by AI.",
                         "layout": "3-column",
                         "card_style": "bordered",
-                        "enable_card_style": true,
+                        "enable_card_style": false,
                         "items": [
                             {
                                 "icon": "ti ti-pencil",
@@ -318,6 +379,16 @@
                                 "icon": "ti ti-code",
                                 "title": "AI Code",
                                 "description": "From debugging to writing entire functions. Code faster with AI."
+                            },
+                            {
+                                "icon": "ti ti-microphone-2",
+                                "title": "AI Voice",
+                                "description": "Turn scripts into natural speech, or transcribe hours of audio into clean text."
+                            },
+                            {
+                                "icon": "ti ti-template",
+                                "title": "Ready Templates",
+                                "description": "Hundreds of starting points for ads, emails and posts — tuned and ready to run."
                             }
                         ],
                         "sort_order": 1
@@ -328,15 +399,21 @@
                     "config": {
                         "title": "AI Tools Showcase",
                         "subtitle": "Explore the tools you can launch immediately after signup.",
+                        "icon": "ti ti-sparkles",
                         "layout": "3-column",
                         "card_style": "bordered",
                         "source": "all",
                         "max_items": 6,
-                        "background_style": "gradient-1",
+                        "show_category_filter": true,
+                        "show_search": true,
+                        "background_style": "border",
                         "width": "contained",
                         "primary_text": "View all tools",
                         "primary_link": "/ai-tools",
-                        "sort_order": 2
+                        "sort_order": 2,
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-up-right",
+                        "primary_icon_position": "right"
                     }
                 },
                 {
@@ -363,7 +440,26 @@
                                 "description": "Run the tool, review the output, and keep iterating."
                             }
                         ],
-                        "sort_order": 3
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "richtext",
+                    "config": {
+                        "sort_order": 6,
+                        "title": "One platform instead of ten subscriptions",
+                        "subtitle": "Why teams consolidate their AI tooling here.",
+                        "content": "<p>Most teams arrive with a drawer full of half-used AI subscriptions: one for copy, another for images, a third for transcripts, and a spreadsheet somewhere tracking who pays for what. Every one of them bills separately, enforces its own limits, and reports usage in its own format.</p><p>Running them from a single platform changes the arithmetic. Credits are shared across every tool, so a quiet month on images pays for a busy month on writing. Access follows the plan a member is on rather than a pile of seat licences. And because usage is recorded in one place, the question <em>“what did AI actually cost us last month?”</em> has an answer you can export.</p><p>Start on the free tier, connect your own provider keys when volume justifies it, and grow into the paid plans only when the credits run short.</p>",
+                        "badge_text": "Why consolidate",
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon": "ti ti-notebook",
+                        "icon_style": "primary",
+                        "icon_position": "top"
                     }
                 },
                 {
@@ -373,7 +469,7 @@
                         "subheading": "Choose the plan that fits your needs.",
                         "icon": "ti ti-credit-card",
                         "source": "all",
-                        "sort_order": 4
+                        "sort_order": 7
                     }
                 },
                 {
@@ -385,7 +481,27 @@
                         "source": "all",
                         "card_style": "bordered",
                         "max_items": 6,
-                        "sort_order": 5
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "custom_html",
+                    "config": {
+                        "sort_order": 9,
+                        "content": "<div class=\"grid gap-6 sm:grid-cols-3 text-center\"><div class=\"rounded-2xl border border-gray-200 bg-white p-8 dark:border-surface-800 dark:bg-surface-900\"><div class=\"text-3xl font-black text-primary-600 dark:text-primary-400\">SOC 2</div><p class=\"mt-2 text-sm text-gray-500 dark:text-gray-400\">Type II aligned controls</p></div><div class=\"rounded-2xl border border-gray-200 bg-white p-8 dark:border-surface-800 dark:bg-surface-900\"><div class=\"text-3xl font-black text-primary-600 dark:text-primary-400\">99.9%</div><p class=\"mt-2 text-sm text-gray-500 dark:text-gray-400\">Rolling 90-day uptime</p></div><div class=\"rounded-2xl border border-gray-200 bg-white p-8 dark:border-surface-800 dark:bg-surface-900\"><div class=\"text-3xl font-black text-primary-600 dark:text-primary-400\">24/7</div><p class=\"mt-2 text-sm text-gray-500 dark:text-gray-400\">Support that answers</p></div></div>",
+                        "title": "Trusted where it counts",
+                        "subtitle": "This whole block is raw HTML — edit or replace it in Appearance › Homepage.",
+                        "badge_text": "Custom HTML",
+                        "section_bg": "light",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "width": "contained",
+                        "icon": "ti ti-code",
+                        "icon_style": "primary",
+                        "icon_position": "top"
                     }
                 },
                 {
@@ -395,7 +511,7 @@
                         "subheading": "Everything you need to know about MakeAI.",
                         "icon": "ti ti-help-circle",
                         "max_items": 8,
-                        "sort_order": 6
+                        "sort_order": 10
                     }
                 },
                 {
@@ -406,7 +522,7 @@
                         "icon": "ti ti-chart-bar",
                         "show_stats_separator": true,
                         "show_stats": true,
-                        "show_brands": false,
+                        "show_brands": true,
                         "stats": [
                             {
                                 "number": "50K+",
@@ -425,8 +541,90 @@
                                 "label": "Countries"
                             }
                         ],
-                        "brands": [],
-                        "sort_order": 7
+                        "brands": [
+                            {
+                                "name": "Northwind",
+                                "image": "/assets/image/demo-assets/brands/northwind.svg"
+                            },
+                            {
+                                "name": "Aperture",
+                                "image": "/assets/image/demo-assets/brands/aperture.svg"
+                            },
+                            {
+                                "name": "Lumina",
+                                "image": "/assets/image/demo-assets/brands/lumina.svg"
+                            },
+                            {
+                                "name": "Vertex",
+                                "image": "/assets/image/demo-assets/brands/vertex.svg"
+                            },
+                            {
+                                "name": "Quanta",
+                                "image": "/assets/image/demo-assets/brands/quanta.svg"
+                            },
+                            {
+                                "name": "Orbital",
+                                "image": "/assets/image/demo-assets/brands/orbital.svg"
+                            }
+                        ],
+                        "sort_order": 11
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "sort_order": 12,
+                        "title": "Built with MakeAI",
+                        "subtitle": "A rolling look at what teams are shipping on the platform.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "hide_captions": true,
+                        "section_bg": "light",
+                        "title_align": "center",
+                        "title_size": "md",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "primary",
+                        "icon_position": "top"
                     }
                 },
                 {
@@ -434,21 +632,22 @@
                     "config": {
                         "headline": "Ready to create with AI?",
                         "subheadline": "Start with the tools your audience needs most and grow from one dashboard.",
+                        "title_color": "light",
                         "primary_text": "Get Started for Free",
                         "primary_link": "/register",
                         "primary_style": "white",
-                        "primary_shape": "rounded_xl",
-                        "primary_icon": "",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-up-right",
                         "primary_access_level": "all",
                         "secondary_text": "View Pricing",
                         "secondary_link": "/pricing",
                         "secondary_style": "outline",
-                        "secondary_shape": "rounded_xl",
+                        "secondary_shape": "pill",
                         "secondary_icon": "",
                         "secondary_access_level": "all",
                         "width": "contained",
                         "background_style": "gradient-1",
-                        "sort_order": 8
+                        "sort_order": 13
                     }
                 },
                 {
@@ -467,7 +666,19 @@
                         "button_link": "/blog",
                         "button_style": "outline",
                         "button_icon": "",
-                        "sort_order": 9
+                        "sort_order": 14
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "sort_order": 15,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48"
                     }
                 },
                 {
@@ -481,62 +692,28 @@
                         "button_text": "Subscribe",
                         "button_style": "primary_filled",
                         "privacy_text": "No spam. Unsubscribe anytime.",
-                        "sort_order": 10
-                    }
-                },
-                {
-                    "type": "custom_html",
-                    "config": {
-                        "sort_order": 11,
-                        "content": ""
-                    }
-                },
-                {
-                    "type": "richtext",
-                    "config": {
-                        "sort_order": 12,
-                        "title": "",
-                        "subtitle": "",
-                        "content": ""
-                    }
-                },
-                {
-                    "type": "ad_slot",
-                    "config": {
-                        "sort_order": 13,
-                        "title": "",
-                        "subtitle": "",
-                        "zone": ""
+                        "sort_order": 16
                     }
                 },
                 {
                     "type": "ad_slot_2",
                     "config": {
-                        "sort_order": 14,
+                        "sort_order": 17,
                         "title": "",
                         "subtitle": "",
-                        "zone": ""
+                        "zone": "custom_zone_2",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48"
                     }
                 },
                 {
                     "type": "ad_slot_3",
                     "config": {
-                        "sort_order": 15,
+                        "sort_order": 18,
                         "title": "",
                         "subtitle": "",
                         "zone": ""
-                    }
-                },
-                {
-                    "type": "image_carousel",
-                    "config": {
-                        "sort_order": 16,
-                        "title": "",
-                        "subtitle": "",
-                        "carousel_layout": "3",
-                        "carousel_autoplay": "1",
-                        "carousel_time": "5",
-                        "items": []
                     }
                 }
             ]

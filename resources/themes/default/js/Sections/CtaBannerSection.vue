@@ -5,7 +5,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 import { useSectionStyle } from '../composables/useSectionStyle'
 import { useTheme } from '@/Composables/useTheme'
 import { mediaUrl } from '@/lib/media'
-const { sectionBgClass, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, sectionIconClass, sectionHeaderClass, sectionPaddingStyle, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
+const { sectionBgClass, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, sectionIconClass, sectionHeaderClass, sectionPaddingStyle, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
 const { isDark } = useTheme()
 
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
@@ -33,16 +33,16 @@ const ctaBannerImageOverlayClass = (style: string): string => ({ 'gradient-1': '
 const ctaBannerIsLightSurface = (style: string): boolean => ['primary_light', 'green_light', 'white', 'light', 'transparent'].includes(style)
 
 const heroButtonClass = (style: string): string => ({
-    primary: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    primary_filled: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    dark: 'bg-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:bg-gray-800',
-    purple: 'bg-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:bg-violet-700',
+    primary: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+    primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+    dark: 'bg-gradient-to-r from-gray-800 to-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:from-gray-900 hover:to-gray-800',
+    purple: 'bg-gradient-to-r from-violet-500 to-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:from-violet-600 hover:to-violet-500',
     gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
-    red: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    danger: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    green: 'bg-success-600 !text-white shadow-2xl shadow-success-600/20 hover:bg-success-700',
-    success: 'bg-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700',
-    warning: 'bg-amber-50 !text-white shadow-2xl shadow-amber-50/20 hover:bg-amber-600',
+    red: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+    danger: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+    green: 'bg-gradient-to-r from-success-500 to-success-600 !text-white shadow-2xl shadow-success-600/20 hover:from-success-600 hover:to-success-500',
+    success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:from-emerald-600 hover:to-emerald-500',
+    warning: 'bg-gradient-to-r from-amber-500 to-amber-600 !text-white shadow-2xl shadow-amber-600/20 hover:from-amber-600 hover:to-amber-500',
     gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-2xl hover:opacity-95',
     gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-2xl hover:opacity-95',
     gradient_royal: 'bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 !text-white shadow-2xl hover:opacity-95',
@@ -144,6 +144,12 @@ onUnmounted(() => gsapCtx?.revert())
                 </div>
                 <div class="relative z-10">
                     <div :class="[sectionHeaderClass(asString(section.config.title_align, 'center'))]" class="w-full">
+                        <!-- Contrast is taken from the banner's own background, not section_bg:
+                             this section paints its own gradient/solid panel behind the text. -->
+                        <span v-if="asString(section.config.badge_text)" :class="badgeClass(activeBgStyle, asString(section.config.title_color, 'dark'))">
+                            <i class="ti ti-sparkles text-xs"></i>
+                            {{ asString(section.config.badge_text) }}
+                        </span>
                         <!-- Top Position Icon -->
                         <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'top'" :class="[
                             sectionIconClass(asString(section.config.icon_style, 'primary')),

@@ -1,0 +1,601 @@
+{
+    "name": "Marketing Agency",
+    "description": "Loud, conversion-first layout — rose and amber, split gradient hero, transparent uppercase nav, full-width gradient CTA bands, testimonials up front and a spotlight footer.",
+    "preview": {
+        "mode": "light",
+        "primary": "#e11d48",
+        "secondary": "#f59e0b",
+        "accent": "#8b5cf6",
+        "bg": "#fffbf7",
+        "heading": "#18181b",
+        "text": "#52525b"
+    },
+    "settings": {
+        "theme": {
+            "theme_default_mode": "light",
+            "theme_allow_user_toggle": true,
+            "page_loading_animation": "",
+            "smooth_scroll": true,
+            "nav_progress_bar": true,
+            "show_back_to_top": true,
+            "hide_scroll_top_mobile": false,
+            "primary_color": "#e11d48",
+            "secondary_color": "#f59e0b",
+            "accent_color": "#8b5cf6",
+            "bg_color": "#fffbf7",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#18181b",
+            "body_text_color": "#52525b",
+            "muted_text_color": "#71717a",
+            "border_color": "#f0e2d8",
+            "font_body": "Rubik",
+            "heading_font": "Montserrat",
+            "base_font_size": "16px",
+            "heading_weight": "800",
+            "line_height": "1.625",
+            "letter_spacing": "tight",
+            "container_width": "1280px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "upscroll",
+                "shadow_style": "none",
+                "menu_position": "center",
+                "menu_hover_style": "bottom_border",
+                "show_notification_bell": true,
+                "notification_button_style": "circular_soft_bg",
+                "show_social_icons": true,
+                "social_icon_style": "circular_soft_bg",
+                "social_button_text": "Follow",
+                "show_language_switcher": false,
+                "language_switcher_style": "icon_only",
+                "show_dark_mode_toggle": true,
+                "dark_mode_toggle_style": "circular_soft_bg",
+                "command_palette_style": "hidden",
+                "show_icon_tooltip": true,
+                "auth_mode": "user_menu",
+                "guest_login_text": "Client login",
+                "guest_login_icon_class": "",
+                "guest_login_style": "ghost",
+                "guest_register_text": "Get started",
+                "guest_register_icon_class": "",
+                "guest_register_style": "primary",
+                "guest_button_shape": "pill",
+                "account_avatar_style": "avatar_only_circle",
+                "show_cta_button": true,
+                "cta_text": "Book a call",
+                "cta_link": "/contact",
+                "cta_icon": "ti ti-calendar-event",
+                "cta_style": "gradient_sunset",
+                "cta_shape": "pill",
+                "cta_access_level": "all",
+                "menu_source": "primary",
+                "height": 84,
+                "container_width": "1280px",
+                "bg_color": "",
+                "transparent_on_hero": true,
+                "text_color": "",
+                "menu_hover_color": "",
+                "show_border": true,
+                "show_shadow": false,
+                "menu_transform": "uppercase"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "centered",
+                "height": 70,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "border_small",
+                "sticky_behavior": "upscroll",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": false,
+                "show_notification_bell": false,
+                "show_search_icon": false,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": true
+            },
+            "mobile_bottom": {
+                "enabled": true,
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
+                "show_home": true,
+                "show_search_icon": true,
+                "show_tools": true,
+                "show_notification_bell": true,
+                "show_hamburger": false,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "spotlight",
+            "logo_mode": "dark",
+            "show_newsletter": true,
+            "newsletter_title": "Steal our playbooks",
+            "newsletter_description": "Campaign teardowns and AI prompt packs, straight to your inbox every other Tuesday.",
+            "newsletter_placeholder": "Your best email",
+            "newsletter_button_label": "Send them over",
+            "newsletter_button_style": "gradient_sunset",
+            "show_social_icons": true,
+            "social_title": "Say hi",
+            "social_multi_color": true,
+            "contact_title": "Start a project",
+            "menu_title": "Services",
+            "footer_heading_text_case": "uppercase",
+            "container_width": "1280px",
+            "show_logo_about": true,
+            "enable_card_style": true,
+            "hide_categories_count": true,
+            "footer_vertical_padding": 80,
+            "show_payment_icons": false,
+            "show_bottom_social_icons": false,
+            "show_bottom_language_selector": true,
+            "show_back_to_top": false,
+            "bottom_bar_show_border": false,
+            "bottom_bar_border_width": 0,
+            "bottom_bar_padding": 32,
+            "bottom_bar_centered": false,
+            "brand_description": "An AI studio for copy, visuals and landing pages — built for teams that ship campaigns weekly.",
+            "custom_title": "Book a call",
+            "custom_text": "Thirty minutes is usually enough to map your first campaign. Tell us the brief and we will bring the plan.",
+            "contact_email": "studio@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0176",
+            "contact_address": "24 Shoreditch High Street, London E1 6PG",
+            "tool_categories_title": "What we do",
+            "copyright_text": "© {year} {site_name}. All rights reserved."
+        },
+        "homepage": {
+            "hero_variant": "split-gradient",
+            "show_hero": true,
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": false,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": true,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": true,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": true
+        },
+        "homepage_config": {
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "split-gradient",
+                        "headline": "Campaigns that write, design and ship themselves",
+                        "subheadline": "Give your team an AI studio for copy, visuals and landing pages — and get the week back you used to spend on first drafts.",
+                        "trust_badge_text": "The AI stack behind 400+ campaigns",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Book a strategy call",
+                        "primary_cta_link": "/contact",
+                        "primary_cta_style": "gradient_sunset",
+                        "primary_cta_icon": "ti ti-calendar-event",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "pill",
+                        "primary_cta_size": "lg",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "See the work",
+                        "secondary_cta_link": "#work",
+                        "secondary_cta_style": "white",
+                        "secondary_cta_icon": "ti ti-arrow-down",
+                        "secondary_cta_icon_position": "right",
+                        "secondary_cta_shape": "pill",
+                        "secondary_cta_size": "lg",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "128",
+                        "hero_heading_size": "xl",
+                        "hero_heading_color": "gradient4",
+                        "show_stats": true,
+                        "show_stats_separator": false,
+                        "hero_gradient_enabled": true,
+                        "hero_gradient_palette": "gold_rush",
+                        "hero_gradient_direction": "to bottom right",
+                        "show_hero_background": false,
+                        "show_search_box": false,
+                        "visibility": "all",
+                        "stats": [
+                            {
+                                "number": "400+",
+                                "label": "Campaigns shipped"
+                            },
+                            {
+                                "number": "6x",
+                                "label": "Faster first drafts"
+                            },
+                            {
+                                "number": "38%",
+                                "label": "Avg. lift in CTR"
+                            },
+                            {
+                                "number": "4.9/5",
+                                "label": "Client rating"
+                            }
+                        ],
+                        "sort_order": 0
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "The numbers behind the work",
+                        "subheading": "Four years of campaigns, measured.",
+                        "icon": "",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "sm",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "stats_style": "gradient1",
+                        "show_stats": true,
+                        "show_stats_separator": false,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "$12M",
+                                "label": "Ad spend managed"
+                            },
+                            {
+                                "number": "2.1M",
+                                "label": "Assets generated"
+                            },
+                            {
+                                "number": "17",
+                                "label": "Industries served"
+                            },
+                            {
+                                "number": "11",
+                                "label": "Awards won"
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "One studio, every deliverable",
+                        "subtitle": "Swap the ten tools your team juggles for one workspace that already knows your brand voice.",
+                        "badge_text": "What we do",
+                        "layout": "2-column",
+                        "card_style": "simple",
+                        "enable_card_style": true,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "lg",
+                        "title_color": "gradient4",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "icon_style": "gradient-4",
+                        "icon_position": "left",
+                        "items": [
+                            {
+                                "icon": "ti ti-writing-sign",
+                                "title": "Copy in your brand voice",
+                                "description": "Train the voice once, then generate ads, emails and landing pages that already sound like you."
+                            },
+                            {
+                                "icon": "ti ti-palette",
+                                "title": "Visuals on demand",
+                                "description": "Concepts, social cuts and hero imagery — generated, edited and exported without a design queue."
+                            },
+                            {
+                                "icon": "ti ti-target-arrow",
+                                "title": "Campaign kits in minutes",
+                                "description": "Brief in, full kit out: headlines, variants, captions and CTAs ready for review."
+                            },
+                            {
+                                "icon": "ti ti-chart-arrows-vertical",
+                                "title": "Results you can defend",
+                                "description": "Every asset tracked to spend and performance, so the retainer conversation writes itself."
+                            }
+                        ],
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "The toolkit behind the work",
+                        "subtitle": "Everything the studio runs on, open to your team from day one.",
+                        "badge_text": "Toolkit",
+                        "section_anchor": "work",
+                        "layout": "3-column",
+                        "card_style": "style-3",
+                        "source": "popular",
+                        "max_items": 9,
+                        "section_bg": "gradient4",
+                        "card_bg_style": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "light",
+                        "vertical_padding": "128",
+                        "icon_style": "light",
+                        "show_rating": true,
+                        "show_favorite": false,
+                        "show_category": true,
+                        "show_category_filter": true,
+                        "show_search": true,
+                        "primary_text": "Explore every tool",
+                        "primary_link": "/ai-tools",
+                        "primary_style": "white",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_icon_position": "right",
+                        "width": "contained",
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "title": "Selected work",
+                        "subtitle": "Campaign kits produced end to end in the studio.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "hide_captions": true,
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "lg",
+                        "title_color": "gradient4",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "Clients say it better than we do",
+                        "subheading": "Straight from the marketing leads who stopped waiting on drafts.",
+                        "icon": "ti ti-quote",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "source": "all",
+                        "card_style": "spotlight",
+                        "slider_columns": "2",
+                        "autoplay_enabled": "1",
+                        "hide_controls": "0",
+                        "max_items": 8,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "How an engagement runs",
+                        "subheading": "Three weeks from kickoff to campaigns in market.",
+                        "section_anchor": "process",
+                        "icon": "ti ti-flag-3",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "step_card_style": "simple",
+                        "section_bg": "warning-light",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "items": [
+                            {
+                                "icon": "ti ti-microphone-2",
+                                "title": "We learn your voice",
+                                "description": "One workshop, a handful of past campaigns, and the brand voice is trained and locked."
+                            },
+                            {
+                                "icon": "ti ti-wand",
+                                "title": "We build the kit",
+                                "description": "Copy, visuals and variants for every channel, drafted in days rather than sprints."
+                            },
+                            {
+                                "icon": "ti ti-rocket",
+                                "title": "You ship and scale",
+                                "description": "Launch, measure, iterate — with the whole studio still in your team's hands."
+                            }
+                        ],
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Before you book the call",
+                        "subheading": "The questions every marketing lead asks us first.",
+                        "icon": "ti ti-help-circle",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "category_tabs_style": "top",
+                        "max_items": 8,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Your next campaign could be live this month",
+                        "subheadline": "Thirty minutes on a call is usually all it takes to map the first one.",
+                        "primary_text": "Book a strategy call",
+                        "primary_link": "/contact",
+                        "primary_style": "white",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-calendar-event",
+                        "primary_access_level": "all",
+                        "secondary_text": "See pricing",
+                        "secondary_link": "/pricing",
+                        "secondary_style": "outline",
+                        "secondary_shape": "pill",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
+                        "background_style": "gradient-4",
+                        "card_bg_style": "default",
+                        "width": "full",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "vertical_padding": "128",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "Teardowns and playbooks",
+                        "subtitle": "What is working in AI marketing right now, with the receipts.",
+                        "icon": "ti ti-news",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "bordered",
+                        "max_items": 3,
+                        "show_description": true,
+                        "show_button": true,
+                        "button_text": "All articles",
+                        "button_link": "/blog",
+                        "button_style": "dark",
+                        "button_icon": "ti ti-arrow-right",
+                        "section_bg": "default",
+                        "title_align": "left",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "128",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "64",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "newsletter",
+                    "config": {
+                        "heading": "The every-other-Tuesday email",
+                        "subheading": "One campaign teardown, one prompt pack, zero fluff.",
+                        "icon": "ti ti-mail-star",
+                        "icon_style": "gradient-4",
+                        "icon_position": "top",
+                        "newsletter_style": "stacked",
+                        "background_style": "gradient-4",
+                        "card_bg_style": "default",
+                        "placeholder_text": "Your best email",
+                        "button_text": "Send them over",
+                        "button_style": "dark",
+                        "privacy_text": "Unsubscribe in one click. We never sell lists.",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "vertical_padding": "128",
+                        "sort_order": 11
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "creative",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": true,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": false,
+            "archive_layout": "default",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": false,
+            "archive_show_open_button": true,
+            "archive_pagination": "load_more",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": true,
+            "category_pagination": "load_more"
+        }
+    }
+}

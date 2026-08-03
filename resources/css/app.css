@@ -1303,7 +1303,6 @@ input[type="checkbox"]:disabled {
 .btn-primary:hover {
   background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-500));
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
 }
 
 .btn-primary-admin:active,

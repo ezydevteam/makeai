@@ -328,7 +328,7 @@ return [
         // hand does not survive either — demo:reset runs migrate:fresh (wiping settings)
         // and demo:sweep-uploads (wiping the storage trees) before this seeder runs.
         //
-        // Each value is a FILENAME inside public/demo-assets/, not a path: that directory
+        // Each value is a FILENAME inside public/assets/image/demo-assets/logo/, not a path: that directory
         // is part of the release rather than the writable storage tree, so it is the one
         // place a source image survives a reset. DemoProvisionSeeder copies each file onto
         // the public disk and points the setting at the copy — storing the source path

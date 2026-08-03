@@ -1,6 +1,6 @@
 {
     "name": "Sunset",
-    "description": "Warm, inviting palette — amber and rose on a soft peach background.",
+    "description": "Warm, welcoming community look — amber and rose on soft peach, enterprise hero over a sunset background image with search, rounded pills everywhere, spotlight testimonials and a centered footer.",
     "preview": {
         "mode": "light",
         "primary": "#f97316",
@@ -14,6 +14,11 @@
         "theme": {
             "theme_default_mode": "light",
             "theme_allow_user_toggle": true,
+            "page_loading_animation": "none",
+            "smooth_scroll": true,
+            "nav_progress_bar": true,
+            "show_back_to_top": true,
+            "hide_scroll_top_mobile": false,
             "primary_color": "#f97316",
             "secondary_color": "#ec4899",
             "accent_color": "#f59e0b",
@@ -26,10 +31,566 @@
             "border_color": "#f5d9c0",
             "font_body": "Nunito",
             "heading_font": "Poppins",
-            "base_font_size": "15px",
-            "heading_weight": "700",
-            "line_height": "1.5",
-            "letter_spacing": "normal"
+            "base_font_size": "16px",
+            "heading_weight": "800",
+            "line_height": "1.625",
+            "letter_spacing": "normal",
+            "container_width": "1280px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "always",
+                "shadow_style": "small",
+                "menu_position": "center",
+                "menu_hover_style": "pill_soft_bg",
+                "show_notification_bell": true,
+                "notification_button_style": "circular_soft_bg",
+                "show_social_icons": false,
+                "show_language_switcher": true,
+                "language_switcher_style": "icon_with_label",
+                "show_dark_mode_toggle": true,
+                "dark_mode_toggle_style": "circular_soft_bg",
+                "command_palette_style": "search_light",
+                "show_icon_tooltip": true,
+                "auth_mode": "user_menu",
+                "guest_login_text": "Log in",
+                "guest_login_icon_class": "ti ti-user",
+                "guest_login_style": "ghost",
+                "guest_register_text": "Join free",
+                "guest_register_icon_class": "",
+                "guest_register_style": "primary",
+                "guest_button_shape": "pill",
+                "account_avatar_style": "avatar_only_circle",
+                "show_cta_button": true,
+                "cta_text": "Join free",
+                "cta_link": "/register",
+                "cta_icon": "ti ti-heart-handshake",
+                "cta_style": "gradient_sunset",
+                "cta_shape": "pill",
+                "cta_access_level": "guest",
+                "menu_source": "primary",
+                "height": 76,
+                "container_width": "1280px",
+                "bg_color": "",
+                "transparent_on_hero": true,
+                "text_color": "",
+                "menu_hover_color": "",
+                "show_border": true,
+                "show_shadow": false,
+                "menu_transform": "capitalize"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "centered",
+                "height": 66,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "small",
+                "sticky_behavior": "always",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": true,
+                "show_notification_bell": false,
+                "show_search_icon": true,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": true
+            },
+            "mobile_bottom": {
+                "enabled": true,
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
+                "show_home": true,
+                "show_search_icon": false,
+                "show_tools": true,
+                "show_notification_bell": true,
+                "show_hamburger": false,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "floating_panel",
+            "show_newsletter": true,
+            "newsletter_title": "Come for the tools, stay for the people",
+            "newsletter_description": "A friendly monthly note with new tools, community picks and a prompt worth stealing.",
+            "newsletter_placeholder": "Your email",
+            "newsletter_button_label": "Count me in",
+            "newsletter_button_style": "gradient_sunset",
+            "show_social_icons": false,
+            "social_title": "Find us around",
+            "social_multi_color": true,
+            "contact_title": "Say hello",
+            "menu_title": "Explore",
+            "tool_categories_title": "Popular with the community",
+            "footer_heading_text_case": "capitalize",
+            "container_width": "1280px",
+            "show_logo_about": false,
+            "enable_card_style": false,
+            "hide_categories_count": false,
+            "footer_vertical_padding": 72,
+            "show_payment_icons": false,
+            "show_bottom_social_icons": true,
+            "show_bottom_language_selector": false,
+            "show_back_to_top": false,
+            "bottom_bar_show_border": true,
+            "bottom_bar_border_width": 1,
+            "bottom_bar_padding": 32,
+            "bottom_bar_centered": false,
+            "brand_description": "Friendly AI tools that need no setup, no jargon and no prior experience. Come make something.",
+            "contact_email": "hello@yourcompany.com",
+            "contact_phone": "+1 (555) 010-0166",
+            "contact_address": "42 Ocean Drive, Miami Beach, FL 33139",
+            "custom_title": "New here?",
+            "custom_text": "Open any tool and hit go — every one comes with an example filled in. Your first credits are on us.",
+            "copyright_text": "© {year} {site_name}. Made with the community."
+        },
+        "homepage": {
+            "hero_variant": "enterprise",
+            "show_hero": true,
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": false,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": true,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": true,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": true
+        },
+        "homepage_config": {
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "enterprise",
+                        "headline": "Make something today",
+                        "subheadline": "Writing, images, chat and more — friendly AI tools that need no setup, no jargon and no prior experience.",
+                        "trust_badge_text": "Loved by 120,000+ creators",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Join for free",
+                        "primary_cta_link": "/register",
+                        "primary_cta_style": "gradient_sunset",
+                        "primary_cta_icon": "ti ti-sparkles",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "pill",
+                        "primary_cta_size": "xl",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "See what's possible",
+                        "secondary_cta_link": "/ai-tools",
+                        "secondary_cta_style": "white",
+                        "secondary_cta_icon": "ti ti-arrow-right",
+                        "secondary_cta_icon_position": "right",
+                        "secondary_cta_shape": "pill",
+                        "secondary_cta_size": "xl",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "96",
+                        "hero_heading_size": "xl",
+                        "hero_heading_color": "dark",
+                        "show_stats": true,
+                        "show_stats_separator": false,
+                        "hero_gradient_enabled": true,
+                        "hero_gradient_palette": "light_warm",
+                        "hero_gradient_direction": "to bottom",
+                        "show_hero_background": true,
+                        "hero_background_type": "image",
+                        "hero_background_url": "/assets/image/demo-assets/hero/sunset-hero.svg",
+                        "show_hero_gradient_overlay": true,
+                        "overlay_opacity": 45,
+                        "show_search_box": true,
+                        "visibility": "all",
+                        "stats": [
+                            {
+                                "number": "120K",
+                                "label": "Happy creators"
+                            },
+                            {
+                                "number": "400+",
+                                "label": "Tools to try"
+                            },
+                            {
+                                "number": "5 min",
+                                "label": "To your first result"
+                            },
+                            {
+                                "number": "Free",
+                                "label": "To get going"
+                            }
+                        ],
+                        "sort_order": 0
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "Why people stick around",
+                        "subtitle": "No manuals, no credit-card wall, and nothing you need to configure before it works.",
+                        "badge_text": "The good bits",
+                        "layout": "3-column",
+                        "card_style": "simple",
+                        "enable_card_style": true,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "icon": "ti ti-wand",
+                                "title": "Works on the first try",
+                                "description": "Every tool opens with a sensible example filled in, so you get something real before you learn anything."
+                            },
+                            {
+                                "icon": "ti ti-heart-handshake",
+                                "title": "A community, not a queue",
+                                "description": "Prompts, tips and finished work shared by people using the same tools you are."
+                            },
+                            {
+                                "icon": "ti ti-gift",
+                                "title": "Generous free tier",
+                                "description": "Credits that refresh every month, so there is always room to try one more idea."
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "Pick something and play",
+                        "subtitle": "The tools people reach for most, ready the moment you sign up.",
+                        "badge_text": "Popular right now",
+                        "layout": "3-column",
+                        "card_style": "style-1",
+                        "source": "popular",
+                        "max_items": 6,
+                        "section_bg": "warning-light",
+                        "card_bg_style": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "vertical_padding": "96",
+                        "icon_style": "warning",
+                        "show_rating": true,
+                        "show_favorite": true,
+                        "show_category": true,
+                        "show_category_filter": true,
+                        "show_search": false,
+                        "primary_text": "Browse every tool",
+                        "primary_link": "/ai-tools",
+                        "primary_style": "gradient_sunset",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-arrow-right",
+                        "primary_icon_position": "right",
+                        "width": "contained",
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "title": "Made by the community",
+                        "subtitle": "A few favourites from this month.",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "hide_captions": true,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "items": [
+                            {
+                                "_key": "slide_1",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                            },
+                            {
+                                "_key": "slide_2",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                            },
+                            {
+                                "_key": "slide_3",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                            },
+                            {
+                                "_key": "slide_4",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                            },
+                            {
+                                "_key": "slide_5",
+                                "title": "",
+                                "description": "",
+                                "link_url": "",
+                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                            }
+                        ],
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "Getting started takes a minute",
+                        "subheading": "Honestly. That is the whole onboarding.",
+                        "section_anchor": "how-it-works",
+                        "icon": "ti ti-mood-smile",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "step_card_style": "simple",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "items": [
+                            {
+                                "icon": "ti ti-user-plus",
+                                "title": "Make an account",
+                                "description": "An email and a password. Your free credits are waiting on the other side."
+                            },
+                            {
+                                "icon": "ti ti-hand-click",
+                                "title": "Open any tool",
+                                "description": "Each one comes pre-filled with an example, so you can hit go and see what happens."
+                            },
+                            {
+                                "icon": "ti ti-confetti",
+                                "title": "Keep the good ones",
+                                "description": "Save what you like, share it with the community, and come back for the next idea."
+                            }
+                        ],
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "A community that keeps growing",
+                        "subheading": "What everyone made together last month.",
+                        "icon": "ti ti-users-group",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "sm",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "stats_style": "warning",
+                        "show_stats": true,
+                        "show_stats_separator": false,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "120K",
+                                "label": "Creators"
+                            },
+                            {
+                                "number": "3.8M",
+                                "label": "Things made"
+                            },
+                            {
+                                "number": "4.8/5",
+                                "label": "Average rating"
+                            },
+                            {
+                                "number": "92%",
+                                "label": "Come back weekly"
+                            }
+                        ],
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "In their own words",
+                        "subheading": "From people who were not sure AI was for them either.",
+                        "icon": "ti ti-message-2-heart",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "source": "all",
+                        "card_style": "spotlight",
+                        "slider_columns": "3",
+                        "autoplay_enabled": "1",
+                        "hide_controls": "0",
+                        "max_items": 9,
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Anything you're wondering",
+                        "subheading": "Credits, ownership and what happens to what you make.",
+                        "icon": "ti ti-help-circle",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "category_tabs_style": "top",
+                        "max_items": 8,
+                        "section_bg": "warning-light",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Your first idea is free",
+                        "subheadline": "Sign up, open a tool, and see what you make in the next five minutes.",
+                        "primary_text": "Join for free",
+                        "primary_link": "/register",
+                        "primary_style": "white",
+                        "primary_shape": "pill",
+                        "primary_icon": "ti ti-sparkles",
+                        "primary_access_level": "guest",
+                        "secondary_text": "Look around first",
+                        "secondary_link": "/ai-tools",
+                        "secondary_style": "outline",
+                        "secondary_shape": "pill",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
+                        "background_style": "gradient-4",
+                        "card_bg_style": "default",
+                        "width": "full",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "vertical_padding": "96",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "Ideas from the blog",
+                        "subtitle": "Prompt tips, tool walkthroughs and work from the community.",
+                        "icon": "ti ti-bulb",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "bordered",
+                        "max_items": 3,
+                        "show_description": true,
+                        "show_button": true,
+                        "button_text": "Read more",
+                        "button_link": "/blog",
+                        "button_style": "outline",
+                        "button_icon": "ti ti-arrow-right",
+                        "section_bg": "default",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "title_color": "dark",
+                        "card_bg_style": "default",
+                        "vertical_padding": "96",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "title": "",
+                        "subtitle": "",
+                        "zone": "custom_zone_1",
+                        "section_bg": "default",
+                        "card_bg_style": "default",
+                        "vertical_padding": "48",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "newsletter",
+                    "config": {
+                        "heading": "One friendly email a month",
+                        "subheading": "New tools, community picks and a prompt worth stealing.",
+                        "icon": "ti ti-mail-heart",
+                        "icon_style": "warning",
+                        "icon_position": "top",
+                        "newsletter_style": "inline_pill",
+                        "background_style": "primary_light",
+                        "card_bg_style": "default",
+                        "placeholder_text": "Your email",
+                        "button_text": "Count me in",
+                        "button_style": "gradient_sunset",
+                        "privacy_text": "No spam, ever. Leave in one click.",
+                        "title_align": "center",
+                        "title_size": "lg",
+                        "vertical_padding": "96",
+                        "sort_order": 11
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "default",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": true,
+            "archive_layout": "default",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "load_more",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": true,
+            "category_pagination": "load_more"
         }
     }
 }

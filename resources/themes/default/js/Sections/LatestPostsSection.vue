@@ -7,7 +7,7 @@ import { useSectionStyle } from '../composables/useSectionStyle'
 import { useTheme } from '@/Composables/useTheme'
 import { mediaUrl } from '@/lib/media'
 
-const { sectionBgClass, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, cardBgClass, cardWrapperClass, sectionIconClass, sectionHeaderClass, sectionPaddingStyle, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
+const { sectionBgClass, sectionBgIsDark, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, cardBgClass, cardWrapperClass, sectionIconClass, sectionHeaderClass, sectionPaddingStyle, sectionVisibilityClass, sectionAnchorId } = useSectionStyle()
 const { isDark } = useTheme()
 
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
@@ -26,25 +26,40 @@ const localeCode = computed(() => String(page.props.locale?.code || 'en'))
 
 const resolveMediaUrl = (path?: string | null): string => mediaUrl(path)
 
-const heroButtonClass = (style: string): string => ({
-    primary: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    primary_filled: 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700',
-    dark: 'bg-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:bg-gray-800',
-    purple: 'bg-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:bg-violet-700',
-    gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
-    red: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    danger: 'bg-red-600 !text-white shadow-2xl shadow-red-600/20 hover:bg-red-700',
-    green: 'bg-success-600 !text-white shadow-2xl shadow-success-600/20 hover:bg-success-700',
-    success: 'bg-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700',
-    warning: 'bg-amber-500 !text-white shadow-2xl shadow-amber-500/20 hover:bg-amber-600',
-    gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-2xl hover:opacity-95',
-    gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-2xl hover:opacity-95',
-    gradient_royal: 'bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 !text-white shadow-2xl hover:opacity-95',
-    outline: 'border-2 border-gray-200 bg-transparent text-gray-900 hover:bg-gray-50 dark:border-surface-700 dark:text-white dark:hover:bg-surface-850',
-    white: 'bg-white/15 backdrop-blur-sm border border-white/25 !text-white shadow-xl hover:bg-white/25',
-    light: 'bg-white/10 !text-white shadow-xl hover:bg-white/20',
-    ghost: 'bg-white/15 backdrop-blur-sm border border-white/25 !text-white shadow-xl hover:bg-white/25',
-}[style] ?? 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700')
+// `white`, `light` and `ghost` are white-on-translucent: legible only over a dark or
+// gradient surface. This button sits on the section background, so on a light section
+// they used to render white text on white — invisible.
+const DARK_SURFACE_BUTTON_STYLES = ['white', 'light', 'ghost']
+
+const onDarkSurface = computed(() => isDark.value || sectionBgIsDark(asString(props.section.config.section_bg, 'default')))
+
+const heroButtonClass = (style: string): string => {
+    if (DARK_SURFACE_BUTTON_STYLES.includes(style) && !onDarkSurface.value) {
+        return style === 'light'
+            ? 'bg-gray-900/5 !text-gray-900 shadow-sm hover:bg-gray-900/10'
+            : 'bg-gray-900/5 backdrop-blur-sm border border-gray-200 !text-gray-900 shadow-sm hover:bg-gray-900/10'
+    }
+
+    return ({
+        primary: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+        primary_filled: 'bg-gradient-to-r from-primary-500 to-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:from-primary-600 hover:to-primary-500',
+        dark: 'bg-gradient-to-r from-gray-800 to-gray-900 !text-white shadow-2xl shadow-gray-900/20 hover:from-gray-900 hover:to-gray-800',
+        purple: 'bg-gradient-to-r from-violet-500 to-violet-600 !text-white shadow-2xl shadow-violet-600/20 hover:from-violet-600 hover:to-violet-500',
+        gradient: 'bg-gradient-to-r from-primary-600 via-violet-600 to-primary-500 !text-white shadow-2xl shadow-primary-600/20 hover:opacity-95',
+        red: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 !text-white shadow-2xl shadow-red-600/20 hover:from-red-600 hover:to-red-500',
+        green: 'bg-gradient-to-r from-success-500 to-success-600 !text-white shadow-2xl shadow-success-600/20 hover:from-success-600 hover:to-success-500',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 !text-white shadow-2xl shadow-emerald-600/20 hover:from-emerald-600 hover:to-emerald-500',
+        warning: 'bg-gradient-to-r from-amber-500 to-amber-600 !text-white shadow-2xl shadow-amber-600/20 hover:from-amber-600 hover:to-amber-500',
+        gradient_sunset: 'bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 !text-white shadow-2xl hover:opacity-95',
+        gradient_ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 !text-white shadow-2xl hover:opacity-95',
+        gradient_royal: 'bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 !text-white shadow-2xl hover:opacity-95',
+        outline: 'border-2 border-gray-200 bg-transparent text-gray-900 hover:bg-gray-50 dark:border-surface-700 dark:text-white dark:hover:bg-surface-850',
+        white: 'bg-white/15 backdrop-blur-sm border border-white/25 !text-white shadow-xl hover:bg-white/25',
+        light: 'bg-white/10 !text-white shadow-xl hover:bg-white/20',
+        ghost: 'bg-white/15 backdrop-blur-sm border border-white/25 !text-white shadow-xl hover:bg-white/25',
+    }[style] ?? 'bg-primary-600 !text-white shadow-2xl shadow-primary-600/20 hover:bg-primary-700')
+}
 
 const latestPostsPageButtonText = () => asString(props.section.config.button_text, t('Visit Blog'))
 const latestPostsPageButtonLink = () => asString(props.section.config.button_link, '/blog')
