@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /**
  * Delete every uploaded file left behind by the previous demo window.
@@ -94,8 +95,22 @@ class DemoSweepUploads extends Command
      */
     private function sweepDisk(string $name, bool $dryRun): int
     {
-        $disk = Storage::disk($name);
-        $root = realpath($disk->path(''));
+        try {
+            $disk = Storage::disk($name);
+            $root = realpath($disk->path(''));
+        } catch (Throwable $e) {
+            // Resolving a local disk creates its root directory, so a root that cannot be
+            // created throws here — before any of the guards below get to run. The case that
+            // actually happens is a public/storage link this host cannot follow: a checkout
+            // served both natively and from a container sees the project at two different
+            // absolute paths, and `artisan storage:link` can only bake one of them in, so
+            // mkdir meets a dangling link and fails with EEXIST. Nothing can be swept through
+            // a root like that — but the sweep is the first step of demo:reset, and the
+            // fifteen that follow are unaffected, so it must not be what ends them.
+            $this->warn("  {$name}: skipped, root is unusable ({$e->getMessage()})");
+
+            return 0;
+        }
 
         if ($root === false) {
             // Nothing has been written to this disk yet on this host. Not an error —
