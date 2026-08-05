@@ -648,6 +648,18 @@ const mobileHeaderSectionStyle = computed<CSSProperties>(() => {
     return style
 })
 const mobileHeaderBackgroundStyle = computed(() => isTransparentMainHeaderActive.value ? {} : sectionBackgroundStyle(mobileHeaderConfig.value))
+// Auto-shift for the centered desktop menu — measured in measureDesktopMenuFit().
+//
+// A centered menu wants the middle of the row and the action cluster is shrink-0, so a
+// header carrying a search box, social icons, a language switcher, an account button and a
+// CTA runs out of row before the menu has anywhere to be: the cluster is pushed onto a
+// second line and the bar comes out half again as tall (94px against a configured 72 on a
+// 1440 viewport, with the actions sitting under the logo). Rather than reserve the middle
+// at that price, the menu gives up centering once it stops fitting and packs in beside the
+// logo, and whatever still does not fit collapses into a "More" dropdown. The row then
+// holds one line at every width.
+const desktopMenuIsCompact = ref(false)
+const desktopNavVisibleCount = ref(Number.POSITIVE_INFINITY)
 const mainRowGapClass = computed(() => {
     return 'gap-x-2.5 gap-y-1.5'
 })
@@ -670,8 +682,11 @@ const mainColumnGroupClass = (col: 'left' | 'center' | 'right') => {
 }
 const mainNavClass = (zone: 'left' | 'center' | 'right') => {
     // flex-wrap lets a long menu break onto a second line rather than running over the
-    // logo / action cluster on a narrow viewport.
-    const classes = ['hidden', 'items-center', 'flex-wrap']
+    // logo / action cluster on a narrow viewport. The shifted centered menu is the one
+    // exception: it has been measured down to the links that fit on one line, with the rest
+    // in the "More" panel, so wrapping there would only undo the fit just calculated.
+    const isCompactCenter = zone === 'center' && desktopMenuIsCompact.value
+    const classes = ['hidden', 'items-center', isCompactCenter ? 'flex-nowrap' : 'flex-wrap']
 
     if (zone === 'left') {
         if (isStackedCenteredMainHeader.value) {
@@ -693,7 +708,7 @@ const mainNavClass = (zone: 'left' | 'center' | 'right') => {
         return classes
     }
 
-    classes.push('md:flex', 'min-w-0', 'max-w-full', 'justify-center', 'gap-1')
+    classes.push('md:flex', 'min-w-0', 'max-w-full', isCompactCenter ? 'justify-start' : 'justify-center', 'gap-1')
     return classes
 }
 const mainColFlexClass = (col: 'left' | 'center' | 'right') => {
@@ -719,7 +734,14 @@ const mainColFlexClass = (col: 'left' | 'center' | 'right') => {
     }
 
     if (col === 'left') return 'shrink-0'
-    if (col === 'center') return 'flex-auto min-w-0 justify-center'
+    // flex-auto (basis auto) is what pushes the action cluster onto a second line: flex line
+    // breaking measures this column at the menu's full width, so the row is judged too long
+    // before anything is allowed to give. The shifted state switches to basis 0 — the column
+    // no longer claims a width of its own, the three columns always share one line, and the
+    // menu takes whatever is left between the logo and the actions.
+    if (col === 'center') {
+        return desktopMenuIsCompact.value ? 'flex-1 min-w-0 justify-start' : 'flex-auto min-w-0 justify-center'
+    }
     return 'shrink-0 justify-end'
 }
 const mobileColFlexClass = (col: 'left' | 'right') => {
@@ -822,6 +844,122 @@ const submenuPanelExtraClass = (item: any) => menuItemIsMega(item) ? 'header-meg
 // Mega-menu: each direct child becomes a column heading, capped at 4 columns.
 const MEGA_MAX_COLUMNS = 4
 const megaColumns = (slug: string, parentId: string | number) => submenuItems(slug, parentId).slice(0, MEGA_MAX_COLUMNS)
+
+// The centered desktop menu, split into the links that fit on the row and the ones that do
+// not. See desktopMenuIsCompact for why the split exists.
+const MORE_MENU_KEY = '__header_more__'
+const mainRowEl = ref<HTMLElement | null>(null)
+const centeredNavBlock = computed<any>(() => mainCenterBlocks.value.find((block: any) => block.type === 'navigation') ?? null)
+const centeredNavItems = computed(() => centeredNavBlock.value ? topMenuItems(centeredNavBlock.value.config.menu_slug) : [])
+const centeredNavInlineItems = computed(() => centeredNavItems.value.slice(0, desktopNavVisibleCount.value))
+const centeredNavOverflowItems = computed(() => centeredNavItems.value.slice(desktopNavVisibleCount.value))
+
+// Natural width of each top-level link, keyed by menu item and kept once read. A link that
+// has been moved into the "More" panel has no width left to measure, and the next
+// measurement still has to plan the row around the width it would take if it came back.
+const desktopNavItemWidths = new Map<string, number>()
+const desktopNavMoreWidth = ref(0)
+let desktopNavRemeasureQueued = false
+let desktopMenuResizeObserver: ResizeObserver | null = null
+
+const measureDesktopMenuFit = () => {
+    if (typeof window === 'undefined') return
+
+    const row = mainRowEl.value
+    if (! row) return
+
+    const reset = () => {
+        desktopMenuIsCompact.value = false
+        desktopNavVisibleCount.value = Number.POSITIVE_INFINITY
+    }
+
+    // Under md the desktop nav is display:none and every width here reads 0; the stacked
+    // layouts give the menu a row to itself, where nothing is competing for the space.
+    if (! window.matchMedia('(min-width: 768px)').matches || isStackedCenteredMainHeader.value) {
+        reset()
+
+        return
+    }
+
+    const [logoColumn, menuColumn, actionColumn] = Array.from(row.children) as HTMLElement[]
+    const nav = menuColumn?.querySelector('nav')
+    if (! nav || ! logoColumn || ! actionColumn || ! centeredNavItems.value.length) {
+        reset()
+
+        return
+    }
+
+    nav.querySelectorAll<HTMLElement>('[data-menu-item]').forEach((el) => {
+        if (el.dataset.menuItem) {
+            desktopNavItemWidths.set(el.dataset.menuItem, el.getBoundingClientRect().width)
+        }
+    })
+
+    const moreButton = nav.querySelector<HTMLElement>('[data-menu-more]')
+    if (moreButton) {
+        desktopNavMoreWidth.value = moreButton.getBoundingClientRect().width
+    }
+
+    const widths = centeredNavItems.value.map((item: any) => desktopNavItemWidths.get(String(menuItemId(item))) ?? 0)
+
+    // A link with nothing recorded — the menu was edited, the language changed, or the whole
+    // header is hidden at the moment of measuring. Put every link back on the row and read it
+    // again next tick.
+    //
+    // The guard is cleared on the way OUT of a successful measurement, not on the way in to
+    // the retry: a retry that clears it first and then measures zero again re-arms itself, and
+    // that is an unbroken chain of nextTicks that never yields — a hidden header froze the tab.
+    // Left set, a second failure simply stops, with every link inline, which is the right
+    // answer for a menu whose width cannot be known.
+    if (widths.some((width: number) => width === 0)) {
+        desktopMenuIsCompact.value = false
+        desktopNavVisibleCount.value = Number.POSITIVE_INFINITY
+
+        if (! desktopNavRemeasureQueued) {
+            desktopNavRemeasureQueued = true
+            nextTick(() => measureDesktopMenuFit())
+        }
+
+        return
+    }
+
+    desktopNavRemeasureQueued = false
+
+    const rowStyle = getComputedStyle(row)
+    const rowGap = parseFloat(rowStyle.columnGap) || 0
+    const navGap = parseFloat(getComputedStyle(nav).columnGap) || 0
+    const rowInner = row.clientWidth - (parseFloat(rowStyle.paddingLeft) || 0) - (parseFloat(rowStyle.paddingRight) || 0)
+
+    // Both side columns are shrink-0, so what they measure is what they insist on, on
+    // whichever line they have landed on — including the second line this exists to undo.
+    // That keeps the two inputs below independent of the state being decided, so a
+    // measurement never argues with the one before it.
+    const spare = rowInner - logoColumn.getBoundingClientRect().width - actionColumn.getBoundingClientRect().width - (rowGap * 2)
+    const naturalNavWidth = widths.reduce((total: number, width: number, index: number) => total + width + (index ? navGap : 0), 0)
+
+    if (naturalNavWidth <= spare) {
+        reset()
+
+        return
+    }
+
+    // Room for every link is gone, so the "More" button is certain to be there. Charge for
+    // it before fitting anything, instead of filling space it is about to take back. The
+    // fallback covers the first pass, when it has not been rendered to measure yet.
+    const budget = spare - (desktopNavMoreWidth.value || 92) - navGap
+    let used = 0
+    let visible = 0
+
+    for (const width of widths) {
+        const next = used + (visible ? navGap : 0) + width
+        if (next > budget) break
+        used = next
+        visible++
+    }
+
+    desktopMenuIsCompact.value = true
+    desktopNavVisibleCount.value = visible
+}
 
 // Keep a mega-menu panel fully on screen: center it under its trigger, then
 // clamp horizontally to the viewport so the rightmost item never clips.
@@ -1567,7 +1705,10 @@ const menuAlignmentClass = (block: any) => {
     const alignment = String(block.config?.alignment || 'center')
     if (alignment === 'left') return 'justify-start'
     if (alignment === 'right') return 'justify-end'
-    return 'justify-center'
+    // Kept in step with mainNavClass('center'): both land on the same <nav>, and two
+    // disagreeing justify- utilities are settled by Tailwind's output order, not by the
+    // order they are listed in the class binding.
+    return desktopMenuIsCompact.value ? 'justify-start' : 'justify-center'
 }
 const menuHoverStyleClass = (block: any) => {
     const style = String(block.config?.hover_style || 'rounded_soft_bg')
@@ -1948,7 +2089,39 @@ onMounted(() => {
         bodyResizeObserver = new ResizeObserver(() => measureHeaderOffsets())
         bodyResizeObserver.observe(document.body)
     }
+
+    measureDesktopMenuFit()
+
+    // The row, not the window: the menu also runs out of room when the row itself narrows —
+    // a container_width change, a scrollbar appearing, a zoom step — with the window fixed.
+    // The side columns are watched with it, because they can take more of the row without
+    // the row changing size at all: signing in swaps a Sign In button for an avatar, credits
+    // and a name, and the space left for the menu moves under it with nothing to notice.
+    if (typeof ResizeObserver !== 'undefined' && mainRowEl.value) {
+        desktopMenuResizeObserver = new ResizeObserver(() => measureDesktopMenuFit())
+        desktopMenuResizeObserver.observe(mainRowEl.value)
+
+        const columns = Array.from(mainRowEl.value.children) as HTMLElement[]
+        for (const column of [columns[0], columns[columns.length - 1]]) {
+            if (column) desktopMenuResizeObserver.observe(column)
+        }
+    }
+
+    // Links measured against a fallback font are the wrong width once the real one lands,
+    // and the difference is easily a whole link's worth across a menu.
+    document.fonts?.ready?.then(() => measureDesktopMenuFit()).catch(() => {})
 })
+
+// Editing the menu, switching language or turning a header element on or off all change
+// what has to fit. Widths are re-read from scratch: the old ones belong to the old labels.
+watch(
+    [centeredNavItems, () => activeBlocks.value.length],
+    () => {
+        desktopNavItemWidths.clear()
+        nextTick(() => measureDesktopMenuFit())
+    },
+    { deep: true }
+)
 onUnmounted(() => {
     document.removeEventListener('click', close)
     document.removeEventListener('keydown', closeOnEscape)
@@ -1958,6 +2131,8 @@ onUnmounted(() => {
     window.removeEventListener('announcement:change', measureHeaderOffsets)
     bodyResizeObserver?.disconnect()
     bodyResizeObserver = null
+    desktopMenuResizeObserver?.disconnect()
+    desktopMenuResizeObserver = null
     document.documentElement.classList.remove('overflow-hidden')
 })
 </script>
@@ -2209,7 +2384,7 @@ onUnmounted(() => {
                 </template>
             </div>
         </div>
-        <div v-else class="flex min-h-[inherit] flex-wrap items-center py-1.5" :class="[containerClass(headerConfig), mainRowGapClass, mainRowLayoutClass]" :style="containerStyle(headerConfig)">
+        <div v-else ref="mainRowEl" class="flex min-h-[inherit] flex-wrap items-center py-1.5" :class="[containerClass(headerConfig), mainRowGapClass, mainRowLayoutClass]" :style="containerStyle(headerConfig)">
             <!-- Left Column -->
             <div class="flex items-center" :class="[mainColumnGroupClass('left'), mainColFlexClass('left')]">
                 <template v-for="block in mainLeftBlocks" :key="block.id">
@@ -2304,7 +2479,7 @@ onUnmounted(() => {
                     <!-- NAVIGATION -->
                     <nav v-if="block.type === 'navigation'" :class="[...mainNavClass('center'), menuAlignmentClass(block), menuHoverStyleClass(block), mainCenterNavClass]" :style="menuStyle(block)">
                         <template v-if="getMenu(block.config.menu_slug)">
-                            <div v-for="item in topMenuItems(block.config.menu_slug)" :key="menuItemId(item)" class="group relative" @mouseenter="onMenuItemEnter(item, $event)" @mouseleave="openDropdownKey = null">
+                            <div v-for="item in centeredNavInlineItems" :key="menuItemId(item)" :data-menu-item="menuItemId(item)" class="group relative" @mouseenter="onMenuItemEnter(item, $event)" @mouseleave="openDropdownKey = null">
                                 <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) || isDropdownOpen(block.config.menu_slug, item) }" class="header-menu-link px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
                                     <span class="header-menu-label-wrap inline-flex items-center gap-2">
                                         <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none']" aria-hidden="true" />
@@ -2369,6 +2544,60 @@ onUnmounted(() => {
                                         </div>
                                     </div>
                                     </template>
+                                </div>
+                            </div>
+                            <!-- WHAT DID NOT FIT ON THE ROW -->
+                            <!-- Rendered inside the nav so it is measured as part of it, and last so
+                                 the links keep the order they were given. -->
+                            <div
+                                v-if="centeredNavOverflowItems.length"
+                                data-menu-more
+                                class="group relative"
+                                @mouseenter="openDropdownKey = MORE_MENU_KEY"
+                                @mouseleave="openDropdownKey = null"
+                            >
+                                <button
+                                    type="button"
+                                    :class="{ 'header-menu-link-active': openDropdownKey === MORE_MENU_KEY }"
+                                    class="header-menu-link flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap"
+                                    :style="menuStyle(block)"
+                                    :aria-expanded="openDropdownKey === MORE_MENU_KEY"
+                                    aria-haspopup="true"
+                                >
+                                    <span>{{ t('More') }}</span>
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m5 9 7 7 7-7" /></svg>
+                                </button>
+                                <!-- Anchored to its own trailing edge: the button sits at the end of a
+                                     left-packed menu, so a panel opening the other way runs off screen. -->
+                                <div
+                                    class="header-submenu-panel invisible absolute inset-inline-end-0 top-full z-50 mt-0 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    :style="submenuStyle(block)"
+                                >
+                                    <div v-for="item in centeredNavOverflowItems" :key="menuItemId(item)" class="header-submenu-item">
+                                        <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-submenu-link flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(item) }}</span>
+                                            </span>
+                                            <span v-if="menuItemBadgeText(item)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                        </a>
+                                        <!-- Children are listed under their parent rather than behind a
+                                             second flyout. This panel is already the fallback for a header
+                                             that ran out of room; a submenu opening sideways out of it is
+                                             one more thing that has to be kept on screen. A mega item
+                                             contributes its column headings here, not the whole grid. -->
+                                        <a
+                                            v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))"
+                                            :key="menuItemId(child)"
+                                            :href="menuItemHref(child)"
+                                            :target="menuItemTarget(child)"
+                                            :rel="menuItemRel(child)"
+                                            class="header-submenu-link flex items-center gap-2 rounded-xl py-1.5 pe-3 ps-7 text-xs font-medium opacity-75 transition hover:bg-primary-50 hover:text-primary-600 hover:opacity-100 dark:hover:bg-primary-900/20"
+                                        >
+                                            <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-sm leading-none shrink-0']" aria-hidden="true" />
+                                            <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </template>
