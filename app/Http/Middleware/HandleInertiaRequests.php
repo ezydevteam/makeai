@@ -104,12 +104,12 @@ class HandleInertiaRequests extends Middleware
         $frontendCustomCodeSettings = $frontendPresetService->getStoredCustomCodeSettings();
         $frontendToolPageSettings = $frontendPresetService->getResolvedFrontendToolPage();
 
-        // Demo bar nav: a ?demo_home / ?demo_tool query param picks a page-level layout
+        // Demo bar nav: a ?demo_hero / ?demo_tool query param picks a page-level layout
         // variant only (never the preset — that is the modal's job). Gated on demo mode
         // so a production query string can never reshuffle the homepage or tool page.
         if (config('demo.enabled')) {
-            if ($homeKey = $request->query('demo_home')) {
-                $item = collect(config('demo.nav.home.items', []))->firstWhere('key', (string) $homeKey);
+            if ($heroKey = $request->query('demo_hero')) {
+                $item = collect(config('demo.nav.hero.items', []))->firstWhere('key', (string) $heroKey);
                 if ($item && ! empty($item['hero_variant'])) {
                     $frontendHomepageSettings['hero_variant'] = $item['hero_variant'];
                 }
@@ -422,7 +422,7 @@ class HandleInertiaRequests extends Middleware
                     }, 'items.page'])->get()->toArray()
                 );
 
-                // In demo mode, fold the demo nav (Home ▸ Home 1/2/3, Tool Page ▸ Page 1–4)
+                // In demo mode, fold the demo nav (Hero ▸ Hero 1–6, Tool Page ▸ Page 1–4)
                 // into the header's own menu so it renders through the normal menu-builder
                 // markup — same dropdowns, same styling — rather than a separate bar. Done
                 // outside the cache so it never persists into a buyer's real menu.
@@ -535,9 +535,10 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * The demo nav as menu-builder-shaped items: two parents (Home, Tool Page) each with
-     * child links carrying ?demo_home / ?demo_tool. Tool children target a real sample
-     * tool so "Page 2" opens an actual tool page in the chosen layout.
+     * The demo nav as menu-builder-shaped items: a parent per group (Hero, Tool Page, Blog,
+     * Pages), each with child links carrying the query param that group is driven by. Tool
+     * children target a real sample tool so "Page 2" opens an actual tool page in the chosen
+     * layout. Theme presets are not here — the selector modal is where a buyer picks those.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -547,8 +548,10 @@ class HandleInertiaRequests extends Middleware
         $toolBase = $sampleSlug ? "/ai-tools/{$sampleSlug}" : '/ai-tools';
 
         $groups = [
-            ['id' => 'demo-home', 'label' => (string) config('demo.nav.home.label', 'Home'), 'icon' => 'ti ti-home', 'items' => collect(config('demo.nav.home.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => '/?demo_home=' . $i['key']])->all()],
+            ['id' => 'demo-hero', 'label' => (string) config('demo.nav.hero.label', 'Hero'), 'icon' => 'ti ti-home', 'items' => collect(config('demo.nav.hero.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => '/?demo_hero=' . $i['key']])->all()],
             ['id' => 'demo-tools', 'label' => (string) config('demo.nav.tools.label', 'Tool Page'), 'icon' => 'ti ti-adjustments', 'items' => collect(config('demo.nav.tools.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => $toolBase . '?demo_tool=' . $i['key']])->all()],
+            ['id' => 'demo-blog', 'label' => (string) config('demo.nav.blog.label', 'Blog'), 'icon' => 'ti ti-article', 'items' => collect(config('demo.nav.blog.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => $this->demoBlogUrl($i)])->all()],
+            ['id' => 'demo-pages', 'label' => (string) config('demo.nav.pages.label', 'Pages'), 'icon' => 'ti ti-files', 'items' => $this->demoPageLinks()],
         ];
 
         $items = [];
@@ -569,6 +572,59 @@ class HandleInertiaRequests extends Middleware
         }
 
         return $items;
+    }
+
+    /**
+     * Where a Blog nav item points. The archive by default, since that is where a sidebar
+     * position reads; `'target' => 'post'` sends it to a real article instead, for a layout
+     * that only exists on the post itself. Falls back to the archive when the blog has no
+     * published post to link at.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function demoBlogUrl(array $item): string
+    {
+        $base = '/blog';
+
+        if (($item['target'] ?? null) === 'post') {
+            $slug = \App\Models\BlogPost::published()->latest('published_at')->value('slug');
+
+            if ($slug) {
+                $base = "/blog/{$slug}";
+            }
+        }
+
+        return $base . '?demo_blog=' . $item['key'];
+    }
+
+    /**
+     * The Pages group: config order, minus any CMS page that is not there to be linked to.
+     *
+     * An item naming a `page` slug is dropped when no published page answers to it — a demo
+     * nav is a tour, and a tour that opens a 404 is worse than one item shorter. Items
+     * carrying a plain `url` (a route, an on-page anchor) are taken as written.
+     *
+     * @return array<int, array{key: string, label: string, url: string}>
+     */
+    private function demoPageLinks(): array
+    {
+        $items = collect(config('demo.nav.pages.items', []));
+
+        $slugs = $items->pluck('page')->filter()->map(fn ($slug) => (string) $slug)->all();
+
+        $published = $slugs === []
+            ? collect()
+            : \App\Models\Page::published()->whereIn('slug', $slugs)->pluck('slug');
+
+        return $items
+            ->filter(fn (array $item) => ! isset($item['page']) || $published->contains($item['page']))
+            ->map(fn (array $item) => [
+                'key' => $item['key'],
+                'label' => $item['label'],
+                'url' => $item['url'] ?? '/' . $item['page'],
+            ])
+            ->values()
+            ->all();
     }
 
     /**

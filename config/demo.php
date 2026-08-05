@@ -84,23 +84,36 @@ return [
     | the right-side selector modal's job (presets + addon homepages, both
     | discovered automatically).
     |
-    | Each item maps a stable `key` (used in the ?demo_home / ?demo_tool query
-    | param) to a page-level layout the theme already ships:
-    |   - home items → a hero `hero_variant` (Home.vue renders it)
+    | Each item maps a stable `key` (used in the ?demo_hero / ?demo_tool / ?demo_blog
+    | query param) to a page-level layout the theme already ships:
+    |   - hero items → a hero `hero_variant` (Home.vue renders it)
     |   - tool items → a ToolPage `layout` (default | modern | minimalist | creative)
+    |   - blog items → a `settings` map applied in memory for the request
+    |     (DemoSelection), so the blog reads them exactly as if an admin had saved them
+    |   - page items → no override at all, just a link to a page worth showing off
     |
     | Selection is carried in the URL (GET only) so it never trips demo mode's
     | write-block and stays deep-linkable.
     |
+    | Theme presets are deliberately NOT listed in this nav — the right-side selector
+    | modal owns them, and repeating the whole preset catalog inside a dropdown made the
+    | Hero group a wall of links that had nothing to do with hero layouts.
+    |
     */
 
     'nav' => [
-        'home' => [
-            'label' => 'Home',
+        // Every hero layout HeroSection.vue ships, in the same order (and under the same
+        // names) as Appearance › Homepage › Hero › Select Style, so what a buyer picks here
+        // is findable in the admin afterwards.
+        'hero' => [
+            'label' => 'Hero',
             'items' => [
-                ['key' => 'home-1', 'label' => 'Home 1 — Gradient',   'hero_variant' => 'centered-gradient'],
-                ['key' => 'home-2', 'label' => 'Home 2 — Tools Grid', 'hero_variant' => 'tools-grid'],
-                ['key' => 'home-3', 'label' => 'Home 3 — Featured',   'hero_variant' => 'featured'],
+                ['key' => 'hero-1', 'label' => 'Hero 1 — Centered',   'hero_variant' => 'centered-gradient'],
+                ['key' => 'hero-2', 'label' => 'Hero 2 — Tools Grid', 'hero_variant' => 'tools-grid'],
+                ['key' => 'hero-3', 'label' => 'Hero 3 — Split',      'hero_variant' => 'split-gradient'],
+                ['key' => 'hero-4', 'label' => 'Hero 4 — Showcase',   'hero_variant' => 'app-showcase'],
+                ['key' => 'hero-5', 'label' => 'Hero 5 — Enterprise', 'hero_variant' => 'enterprise'],
+                ['key' => 'hero-6', 'label' => 'Hero 6 — Featured',   'hero_variant' => 'featured'],
             ],
         ],
         'tools' => [
@@ -110,6 +123,55 @@ return [
                 ['key' => 'tool-2', 'label' => 'Page 2 — Modern',      'layout' => 'modern'],
                 ['key' => 'tool-3', 'label' => 'Page 3 — Minimalist',  'layout' => 'minimalist'],
                 ['key' => 'tool-4', 'label' => 'Page 4 — Creative',    'layout' => 'creative'],
+            ],
+        ],
+
+        // Blog reading layouts. `blog_sidebar_position` drives the archive, and the two
+        // post_* keys the article itself, so "Centered" is the pair that turns a post into
+        // a single measure column with nothing beside it.
+        'blog' => [
+            'label' => 'Blog',
+            'items' => [
+                ['key' => 'blog-1', 'label' => 'Blog 1 — Right sidebar', 'settings' => [
+                    'blog_sidebar_position' => 'right',
+                    'blog_sidebar_post_position' => 'right',
+                    'blog_post_layout_centered' => false,
+                ]],
+                ['key' => 'blog-2', 'label' => 'Blog 2 — Left sidebar', 'settings' => [
+                    'blog_sidebar_position' => 'left',
+                    'blog_sidebar_post_position' => 'left',
+                    'blog_post_layout_centered' => false,
+                ]],
+                ['key' => 'blog-3', 'label' => 'Blog 3 — No sidebar', 'settings' => [
+                    'blog_sidebar_position' => 'none',
+                    'blog_sidebar_post_position' => 'none',
+                    'blog_post_layout_centered' => false,
+                ]],
+                // Opens an article rather than the archive: centering is a property of the
+                // post body, and on the listing this would look identical to "No sidebar".
+                // Same idea as the Tool Page group pointing at a real tool.
+                ['key' => 'blog-4', 'label' => 'Blog 4 — Centered', 'target' => 'post', 'settings' => [
+                    'blog_sidebar_position' => 'none',
+                    'blog_sidebar_post_position' => 'none',
+                    'blog_post_layout_centered' => true,
+                ]],
+            ],
+        ],
+
+        // The rest of the site, so a buyer can see that the pages exist and are styled by
+        // the same theme. `page` is a CMS slug (PageSeeder ships these) and is dropped from
+        // the menu when no published page answers to it; `url` is used exactly as written.
+        'pages' => [
+            'label' => 'Pages',
+            'items' => [
+                ['key' => 'page-features', 'label' => 'Features',  'url' => '/#features'],
+                ['key' => 'page-pricing',  'label' => 'Pricing',   'url' => '/pricing'],
+                ['key' => 'page-tools',    'label' => 'AI Tools',  'url' => '/ai-tools'],
+                ['key' => 'page-about',    'label' => 'About',     'page' => 'about'],
+                ['key' => 'page-contact',  'label' => 'Contact',   'page' => 'contact'],
+                ['key' => 'page-faq',      'label' => 'FAQ',       'page' => 'faq'],
+                ['key' => 'page-privacy',  'label' => 'Privacy Policy',   'page' => 'privacy-policy'],
+                ['key' => 'page-terms',    'label' => 'Terms of Service', 'page' => 'terms-of-service'],
             ],
         ],
     ],

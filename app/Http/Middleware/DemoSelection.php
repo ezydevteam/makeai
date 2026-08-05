@@ -41,6 +41,36 @@ class DemoSelection
             }
         }
 
+        $this->applyBlogLayout($request);
+
         return $next($request);
+    }
+
+    /**
+     * Apply the ?demo_blog=<key> layout from the demo nav's Blog group.
+     *
+     * Here rather than in HandleInertiaRequests, where its ?demo_hero / ?demo_tool siblings
+     * live: those two rewrite props the Inertia middleware builds itself, but the blog
+     * layout is read by BlogController through settings() — which has already run by the
+     * time props are shared. Installed as request overrides, it reaches the controller.
+     *
+     * The item carries a whole settings map rather than one named key, so a layout that
+     * needs two settings to agree (an archive with no sidebar AND a centered article) is
+     * one menu entry, and adding another needs no code here.
+     */
+    private function applyBlogLayout(Request $request): void
+    {
+        $key = (string) $request->query('demo_blog', '');
+
+        if ($key === '') {
+            return;
+        }
+
+        $item = collect(config('demo.nav.blog.items', []))->firstWhere('key', $key);
+        $settings = $item['settings'] ?? null;
+
+        if (is_array($settings) && $settings !== []) {
+            Setting::overrideForRequest($settings);
+        }
     }
 }

@@ -11,7 +11,7 @@ use Tests\TestCase;
 /**
  * The demo switcher has two independent, GET-only mechanisms, both of which must be
  * completely inert when demo mode is off:
- *   - Nav menu: ?demo_home / ?demo_tool swap a page-level layout variant only.
+ *   - Nav menu: ?demo_hero / ?demo_tool swap a page-level layout variant only.
  *   - Selector: a cookie-driven, in-memory setting override for a preset/addon.
  *
  * Nothing here may persist — demo mode blocks writes — so these tests pin the
@@ -64,21 +64,38 @@ class DemoSwitcherTest extends TestCase
 
     // ─── Nav menu (page-level layout only) ───
 
-    public function test_demo_home_query_overrides_hero_variant(): void
+    public function test_demo_hero_query_overrides_hero_variant(): void
     {
         config(['demo.enabled' => true]);
 
-        $this->get('/?demo_home=home-2')->assertInertia(
+        $this->get('/?demo_hero=hero-2')->assertInertia(
             fn (Assert $page) => $page->where('frontendHomepageSettings.hero_variant', 'tools-grid')
         );
     }
 
-    public function test_demo_home_query_is_ignored_when_demo_disabled(): void
+    /**
+     * Every hero layout the theme renders has to be reachable from the nav, or the demo
+     * quietly hides half the styles a buyer is paying for.
+     */
+    public function test_demo_hero_nav_covers_every_hero_layout(): void
+    {
+        $source = (string) file_get_contents(resource_path('themes/default/js/Sections/HeroSection.vue'));
+        preg_match_all("/heroLayoutVariant === '([a-z-]+)'/", $source, $matches);
+
+        $rendered = collect($matches[1])->unique()->sort()->values();
+
+        $configured = collect(config('demo.nav.hero.items'))->pluck('hero_variant')->sort()->values();
+
+        $this->assertNotEmpty($rendered, 'Could not read the hero layouts out of HeroSection.vue.');
+        $this->assertSame($rendered->all(), $configured->all());
+    }
+
+    public function test_demo_hero_query_is_ignored_when_demo_disabled(): void
     {
         config(['demo.enabled' => false]);
 
         // With demo off the query param must not reshuffle the homepage.
-        $this->get('/?demo_home=home-2')->assertInertia(
+        $this->get('/?demo_hero=hero-2')->assertInertia(
             fn (Assert $page) => $page->where(
                 'frontendHomepageSettings.hero_variant',
                 fn ($variant) => $variant !== 'tools-grid'
@@ -116,14 +133,20 @@ class DemoSwitcherTest extends TestCase
             $this->assertNotNull($main, 'Demo mode should ensure a "main" menu exists to host the nav.');
 
             $labels = collect($main['items'])->pluck('label');
-            $this->assertTrue($labels->contains('Home'), 'Header menu should carry the demo Home parent.');
+            $this->assertTrue($labels->contains('Hero'), 'Header menu should carry the demo Hero parent.');
             $this->assertTrue($labels->contains('Tool Page'), 'Header menu should carry the demo Tool Page parent.');
 
-            // A child links through ?demo_home so it changes only the target-page layout.
-            $home1 = collect($main['items'])->firstWhere('label', 'Home 1 — Gradient');
-            $this->assertNotNull($home1);
-            $this->assertSame('demo-home', $home1['parent_id']);
-            $this->assertStringContainsString('demo_home=home-1', $home1['url']);
+            // A child links through ?demo_hero so it changes only the target-page layout.
+            $hero1 = collect($main['items'])->firstWhere('label', 'Hero 1 — Centered');
+            $this->assertNotNull($hero1);
+            $this->assertSame('demo-hero', $hero1['parent_id']);
+            $this->assertStringContainsString('demo_hero=hero-1', $hero1['url']);
+
+            // Presets belong to the selector modal, not the nav.
+            $this->assertFalse(
+                collect($main['items'])->contains(fn (array $i) => str_contains((string) $i['url'], '/__demo/select')),
+                'Theme presets must not be listed in the demo nav.'
+            );
         });
     }
 
@@ -155,35 +178,33 @@ class DemoSwitcherTest extends TestCase
         $this->assertSame('default', $overrides['homepage_template']);
     }
 
+    /**
+     * The screenshot is found by probing the demos directory for the demo's own name, so
+     * every bundled demo is expected to have one and the extension is nobody's business but
+     * the file's. Pinning one (it used to assert midnight.png) meant re-shooting the cards
+     * as JPEG broke a test that has nothing to do with image formats.
+     */
     public function test_resolver_auto_picks_a_dropped_in_screenshot(): void
     {
-        $dir = public_path('assets/image/demos');
-        $file = $dir . '/midnight.png';
-        $preexisting = file_exists($file);
+        $dir = public_path('assets/image/demo-assets/demos');
+        $catalog = app(DemoSelectionResolver::class)->catalog();
 
-        if (! is_dir($dir)) {
-            mkdir($dir, 0777, true);
+        $this->assertNotEmpty($catalog, 'The demo catalog should list the bundled presets.');
+
+        foreach ($catalog as $demo) {
+            $name = str_contains($demo['key'], ':') ? explode(':', $demo['key'], 2)[1] : $demo['key'];
+
+            $onDisk = collect(['png', 'jpg', 'jpeg', 'webp'])
+                ->map(fn (string $ext) => "{$name}.{$ext}")
+                ->first(fn (string $file) => file_exists("{$dir}/{$file}"));
+
+            $this->assertNotNull($onDisk, "No screenshot in demo-assets/demos for [{$name}].");
+            $this->assertSame("/assets/image/demo-assets/demos/{$onDisk}", $demo['image'], "[{$name}] resolved to the wrong screenshot.");
         }
-        if (! $preexisting) {
-            file_put_contents($file, 'fake-png');
-        }
 
-        try {
-            $catalog = app(DemoSelectionResolver::class)->catalog();
-            $midnight = collect($catalog)->firstWhere('key', 'preset:midnight');
-
-            $this->assertNotNull($midnight);
-            $this->assertSame('/assets/image/demo-assets/demos/midnight.png', $midnight['image']);
-
-            // A preset with no screenshot dropped in reports null, so the UI falls back
-            // to its icon placeholder.
-            $unknown = app(DemoSelectionResolver::class);
-            $this->assertNull($this->invokeDemoImage($unknown, 'no-such-demo'));
-        } finally {
-            if (! $preexisting) {
-                @unlink($file);
-            }
-        }
+        // A demo with no screenshot dropped in reports null, so the UI falls back to its
+        // icon placeholder.
+        $this->assertNull($this->invokeDemoImage(app(DemoSelectionResolver::class), 'no-such-demo'));
     }
 
     private function invokeDemoImage(DemoSelectionResolver $resolver, string $name): ?string
