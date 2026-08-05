@@ -453,6 +453,24 @@ step('Building frontend assets');
 if ($skipDeps) {
     info('skipped (--skip-deps)');
 } else {
+    // `npm ci` deletes node_modules outright before reinstalling, and a running Vite dev
+    // server holds native modules (lightningcss, esbuild, rolldown) open the whole time it
+    // is up. On Windows that unlink fails with EPERM and the build dies twenty lines into
+    // an npm trace that names a .node file — never the dev server actually holding it.
+    //
+    // public/hot exists exactly while that server runs, which is the same marker the
+    // verification pass below refuses to ship, so there is no extra state to track.
+    if (file_exists($srcDir . '/public/hot')) {
+        fail(
+            "the Vite dev server is running (public/hot exists).\n"
+            . "  npm ci has to delete node_modules, and Windows will not let it remove the\n"
+            . "  native modules that server holds open.\n\n"
+            . "  Stop it (Ctrl+C in the `npm run dev` terminal) and run this again.\n\n"
+            . "  --skip-deps is NOT a way around this: it copies your dev vendor/ verbatim\n"
+            . "  and the build is marked DO NOT SHIP."
+        );
+    }
+
     // npm runs in the source tree: it only writes public/build and leaves the
     // developer's environment intact, unlike composer --no-dev.
     run('npm ci', $srcDir, 'npm ci');
