@@ -354,6 +354,7 @@
                 {
                     "type": "features",
                     "config": {
+                        "section_anchor": "features",
                         "title": "Supercharge your workflow",
                         "subtitle": "Everything you need to build the future, powered by AI.",
                         "layout": "3-column",
@@ -582,38 +583,38 @@
                         "items": [
                             {
                                 "_key": "slide_1",
-                                "title": "",
-                                "description": "",
+                                "title": "Homepage",
+                                "description": "The marketing homepage your visitors land on.",
                                 "link_url": "",
-                                "image_url": "/assets/image/demo-assets/carousel/slide-1.svg"
+                                "image_url": "/assets/image/demo-assets/carousel/screenshot-home.jpg"
                             },
                             {
                                 "_key": "slide_2",
-                                "title": "",
-                                "description": "",
+                                "title": "AI Tools directory",
+                                "description": "Hundreds of ready-to-use AI tools, organised by category.",
                                 "link_url": "",
-                                "image_url": "/assets/image/demo-assets/carousel/slide-2.svg"
+                                "image_url": "/assets/image/demo-assets/carousel/screenshot-ai-tools.jpg"
                             },
                             {
                                 "_key": "slide_3",
-                                "title": "",
-                                "description": "",
+                                "title": "Tool workspace",
+                                "description": "Guided inputs on the left, generated output on the right.",
                                 "link_url": "",
-                                "image_url": "/assets/image/demo-assets/carousel/slide-3.svg"
+                                "image_url": "/assets/image/demo-assets/carousel/screenshot-tool-workspace.jpg"
                             },
                             {
                                 "_key": "slide_4",
-                                "title": "",
-                                "description": "",
+                                "title": "User dashboard",
+                                "description": "Credits, usage and quick tools in one place.",
                                 "link_url": "",
-                                "image_url": "/assets/image/demo-assets/carousel/slide-4.svg"
+                                "image_url": "/assets/image/demo-assets/carousel/screenshot-dashboard.jpg"
                             },
                             {
                                 "_key": "slide_5",
-                                "title": "",
-                                "description": "",
+                                "title": "Pricing page",
+                                "description": "Clear plans with monthly, yearly and lifetime billing.",
                                 "link_url": "",
-                                "image_url": "/assets/image/demo-assets/carousel/slide-5.svg"
+                                "image_url": "/assets/image/demo-assets/carousel/screenshot-pricing.jpg"
                             }
                         ],
                         "hide_captions": true,

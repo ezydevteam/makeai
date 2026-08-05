@@ -91,6 +91,41 @@ class DemoSweepUploadsTest extends TestCase
         Storage::disk('local_public_media')->assertMissing('avatars/user-812.png');
     }
 
+    /**
+     * A local disk creates its root the moment it is resolved, so an unusable root throws
+     * before the sweep reaches a single one of its own guards. That is not exotic: a checkout
+     * served both natively and from a container has one public/storage link and two absolute
+     * paths it would have to be, and the host that loses the coin toss meets a dangling link.
+     * The sweep runs first in demo:reset, so this used to abort the whole reset — schema
+     * dropped, nothing seeded back.
+     */
+    public function test_it_skips_a_disk_whose_root_cannot_be_created(): void
+    {
+        config(['demo.enabled' => true]);
+        Storage::fake('local');
+        Storage::disk('local')->put('payment-proofs/receipt-9.jpg', 'x');
+
+        // A plain file standing where the root's parent directory should be. mkdir fails with
+        // ENOTDIR, which is the same class of hard failure a dangling symlink raises with
+        // EEXIST, and needs no symlink to set up on any host the suite runs on.
+        $blocker = storage_path('framework/testing/blocked-root');
+        @mkdir(dirname($blocker), 0755, true);
+        file_put_contents($blocker, '');
+        config(['filesystems.disks.local_public_media' => [
+            'driver' => 'local',
+            'root' => $blocker.'/media',
+        ]]);
+
+        try {
+            $this->artisan('demo:sweep-uploads')->assertSuccessful();
+        } finally {
+            @unlink($blocker);
+        }
+
+        // ...and the disk that was fine still got swept.
+        Storage::disk('local')->assertMissing('payment-proofs/receipt-9.jpg');
+    }
+
     public function test_it_refuses_outside_demo_mode(): void
     {
         config(['demo.enabled' => false]);
