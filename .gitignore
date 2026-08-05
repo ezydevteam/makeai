@@ -10,8 +10,13 @@ pnpm-debug.log
 /vendor/
 .env
 .env.backup
+.env.laragon
 .env.production
 .env.testing
+# Hand-made copies of an env file. Named per-host and per-experiment, so the list above
+# can never keep up — and every one of them holds the same credentials .env does.
+.env.*.bak
+.env.bak
 /bootstrap/cache/*
 /public/hot
 /public/storage

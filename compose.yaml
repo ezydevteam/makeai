@@ -1,0 +1,96 @@
+services:
+    laravel.test:
+        build:
+            context: './vendor/laravel/sail/runtimes/8.4'
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+                MYSQL_CLIENT: mariadb-client
+        image: 'sail-8.4/app'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${APP_PORT:-80}:80'
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            # This project is also served natively by Laragon from the same tree, where
+            # `artisan storage:link` creates a Windows JUNCTION (Laravel uses mklink /J on
+            # Windows) holding an absolute D:\ path. That path does not exist in here, so
+            # public/storage dangles, and every local disk rooted at public_path('storage')
+            # dies at construction: Flysystem mkdir's its root, gets EEXIST off the dangling
+            # link, and reports "Unable to create a directory at /var/www/html/public/storage".
+            # That is what killed `sail artisan demo:reset` at the upload-sweep step.
+            #
+            # A real environment variable wins over .env (Dotenv does not overwrite what the
+            # environment already set), so the container gets a container-valid media root
+            # while the .env both hosts share stays untouched. The mount below keeps
+            # /storage/... URLs serving in here too.
+            PUBLIC_DISK_ROOT: /var/www/html/storage/app/public
+        volumes:
+            - '.:/var/www/html'
+            - './storage/app/public:/var/www/html/public/storage'
+        networks:
+            - sail
+        depends_on:
+            - mariadb
+            - redis
+            - mailpit
+    mariadb:
+        image: 'mariadb:11'
+        ports:
+            - '${FORWARD_DB_PORT:-3306}:3306'
+        environment:
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ROOT_HOST: '%'
+            MYSQL_DATABASE: '${DB_DATABASE}'
+            MYSQL_USER: '${DB_USERNAME}'
+            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        volumes:
+            - 'sail-mariadb:/var/lib/mysql'
+            - './vendor/laravel/sail/database/mariadb/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+        networks:
+            - sail
+        healthcheck:
+            test:
+                - CMD
+                - healthcheck.sh
+                - '--connect'
+                - '--innodb_initialized'
+            retries: 3
+            timeout: 5s
+    redis:
+        image: 'redis:alpine'
+        ports:
+            - '${FORWARD_REDIS_PORT:-6379}:6379'
+        volumes:
+            - 'sail-redis:/data'
+        networks:
+            - sail
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            retries: 3
+            timeout: 5s
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        networks:
+            - sail
+networks:
+    sail:
+        driver: bridge
+volumes:
+    sail-mariadb:
+        driver: local
+    sail-redis:
+        driver: local
