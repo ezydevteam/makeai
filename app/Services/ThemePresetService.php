@@ -55,6 +55,17 @@ class ThemePresetService
                 continue;
             }
 
+            // A preset may name an addon it is built around ("requires_addon": "<slug>"), and
+            // is then listed only while that addon is active — for both the admin picker and
+            // the demo selector, which read this same list. A preset whose homepage points at
+            // a route the addon owns is a broken homepage without it, and the declaration
+            // lives in the preset file so core never has to name an addon of its own.
+            $requiredAddon = $data['requires_addon'] ?? null;
+
+            if (is_string($requiredAddon) && $requiredAddon !== '' && ! is_addon_active($requiredAddon)) {
+                continue;
+            }
+
             $presets[] = [
                 'id' => $id,
                 'name' => (string) ($data['name'] ?? ucfirst($id)),

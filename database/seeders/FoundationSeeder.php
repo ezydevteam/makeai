@@ -91,96 +91,24 @@ class FoundationSeeder extends Seeder
             ['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'system'],
             ['key' => 'active_theme', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
             ['key' => 'homepage_template', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
-            ['key' => 'frontend_theme_settings', 'value' => json_encode([
-                'theme_default_mode' => 'light',
-                'theme_allow_user_toggle' => true,
-                'page_loading_animation' => 'none',
-                'smooth_scroll' => true,
-                'nav_progress_bar' => true,
-                'show_back_to_top' => true,
-                'primary_color' => '#10b981',
-                'secondary_color' => '#3b82f6',
-                'accent_color' => '#8b5cf6',
-                'bg_color' => '#f0fdf8',
-                'bg_image' => '',
-                'bg_image_enabled' => false,
-                'heading_color' => '#111827',
-                'body_text_color' => '#374151',
-                'muted_text_color' => '#6b7280',
-                'border_color' => '#dbe4ea',
-                'font_body' => 'Inter',
-                'heading_font' => 'Plus Jakarta Sans',
-                'base_font_size' => '15px',
-                'heading_weight' => '700',
-                'line_height' => '1.5',
-                'letter_spacing' => 'normal',
-                'container_width' => '1280px',
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
-            ['key' => 'frontend_header_settings', 'value' => json_encode([
-                'desktop' => [
-                    'layout' => 'classic',
-                    'sticky' => true,
-                    'show_language_switcher' => true,
-                    'show_dark_mode_toggle' => true,
-                    'show_cta_button' => true,
-                    'cta_text' => translate('Get Started'),
-                    'cta_link' => '/register',
-                    'menu_source' => 'primary',
-                ],
-                'mobile_top' => [
-                    'enabled' => true,
-                    'layout' => 'compact',
-                    'height' => 64,
-                    'bg_color' => '',
-                    'text_color' => '',
-                    'show_shadow' => 'none',
-                    'sticky_behavior' => 'always',
-                    'show_logo' => true,
-                    'show_hamburger' => true,
-                    'show_dark_mode_toggle' => true,
-                ],
-                'mobile_bottom' => [
-                    'enabled' => false,
-                    'hide_menu_labels' => false,
-                    'show_glassmorphism' => true,
-                    'show_home' => true,
-                    'show_search_icon' => false,
-                    'show_tools' => true,
-                    'show_notification_bell' => false,
-                    'show_hamburger' => false,
-                    'show_profile' => true,
-                ],
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
-            ['key' => 'frontend_footer_settings', 'value' => json_encode([
-                // Must be one of the footer styles the theme ships (see AppFooter's
-                // footerStyle list) — an unknown value falls back to 'default' when
-                // rendering but leaves the admin footer editor with no matching style.
-                'layout' => 'default',
-                'show_newsletter' => false,
-                'show_social_icons' => true,
-                'show_payment_icons' => true,
-                'show_back_to_top' => true,
-                'copyright_text' => '',
-                'menu_column' => 'footer-company',
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
-            ['key' => 'frontend_homepage_settings', 'value' => json_encode([
-                'hero_variant' => 'centered-gradient',
-                'show_social_proof' => true,
-                'show_features' => true,
-                'show_tools' => true,
-                'show_steps' => true,
-                'show_pricing' => false,
-                'show_testimonials' => true,
-                'show_faq' => true,
-                'show_cta' => true,
-                'show_blog' => true,
-                'show_newsletter' => true,
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
-            ['key' => 'frontend_custom_code', 'value' => json_encode([
-                'custom_css' => '',
-                'custom_header_code' => '',
-                'custom_footer_code' => '',
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
+            // NB: no frontend_theme_settings / frontend_header_settings / frontend_footer_settings /
+            // frontend_homepage_settings / frontend_custom_code seeds. The active theme's
+            // settings.json ("defaults" in resources/themes/{active_theme}/settings.json) IS the
+            // default, and ThemeSettingsService already reads it: every getResolvedFrontend*()
+            // merges the stored value OVER those defaults, and a missing key resolves to the
+            // theme's own value.
+            //
+            // These rows are the admin's OVERRIDES, so seeding them is not a default — it is a
+            // full override of the theme applied before an admin has touched anything, and the
+            // two copies drifted exactly as you would expect: a fresh install came up with a
+            // green primary (#10b981) while the theme file said blue (#1F75FE), and with the
+            // language switcher on while the theme file said off. Restore Defaults on the
+            // appearance screen has always meant "delete this row and let settings.json show
+            // through" (ThemeSettingsService::restoreDefaults), so a fresh install now starts in
+            // exactly the state that button produces. Change a default by editing settings.json.
+            //
+            // Existing installs keep their row — this loop is firstOrCreate, and their stored
+            // values are indistinguishable from deliberate admin choices at this point.
 
             // AI
             // NB: no daily_token_limit / monthly_token_limit / global_daily_budget_usd seeds —
@@ -329,10 +257,8 @@ class FoundationSeeder extends Seeder
             ['code' => 'bn', 'name' => 'বাংলা', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
             ['code' => 'ar', 'name' => 'العربية', 'flag' => null, 'is_rtl' => true, 'is_default' => false, 'is_active' => true],
             ['code' => 'es', 'name' => 'Español', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
-            ['code' => 'zh', 'name' => '中文', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
-            ['code' => 'ru', 'name' => 'Русский', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
-            ['code' => 'pt', 'name' => 'Português', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
             ['code' => 'fr', 'name' => 'Français', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
+            ['code' => 'hi', 'name' => 'हिन्दी', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
         ];
 
         foreach ($languages as $language) {

@@ -223,10 +223,17 @@ class ThemeController extends Controller
                         'site_og_image'      => settings('site_og_image', ''),
                     ]
                 ),
-                'frontendThemeSettings' => $this->frontendPresetService->getStoredThemeSettings(),
-                'frontendHeaderSettings' => $this->frontendPresetService->getStoredHeaderSettings(),
-                'frontendFooterSettings' => $this->frontendPresetService->getStoredFooterSettings(),
-                'frontendHomepageSettings' => $this->frontendPresetService->getStoredHomepageSettings(),
+                // Resolved, not stored: these seed the editor's form state, and the editor has
+                // to open on what the site is actually rendering. Stored holds only what an
+                // admin has overridden — nothing at all on a fresh install now that the theme's
+                // settings.json is the default (see FoundationSeeder) — and the form's own `??`
+                // fallbacks would then fill the gaps with a third set of literals that answers
+                // to nobody. Resolved is defaults-from-settings.json with the overrides on top,
+                // which is the same merge the frontend renders from.
+                'frontendThemeSettings' => $this->frontendPresetService->getResolvedFrontendTheme(),
+                'frontendHeaderSettings' => $this->frontendPresetService->getResolvedFrontendHeader(),
+                'frontendFooterSettings' => $this->frontendPresetService->getResolvedFrontendFooter(),
+                'frontendHomepageSettings' => $this->frontendPresetService->getResolvedFrontendHomepage(),
                 'frontendHomepageConfig' => $this->frontendPresetService->getResolvedFrontendHomepageConfig(),
                 // Addons that can take over `/`. Empty unless one is active, which is
                 // what keeps the picker off the page on a stock install.
@@ -235,8 +242,11 @@ class ThemeController extends Controller
                 'themePresets' => $this->themePresetService->listPresets($slug),
                 'activePreset' => settings('active_theme_preset'),
                 'presetBackup' => $this->themePresetService->backupSummary(),
+                // Custom code stays stored: its settings.json defaults are three empty strings,
+                // so there is nothing for a merge to contribute, and the frontend reads the
+                // stored value directly (HandleInertiaRequests) rather than a resolved one.
                 'frontendCustomCodeSettings' => $this->frontendPresetService->getStoredCustomCodeSettings(),
-                'frontendToolPageSettings' => $this->frontendPresetService->getStoredToolPageSettings(),
+                'frontendToolPageSettings' => $this->frontendPresetService->getResolvedFrontendToolPage(),
                 'menus' => $menus,
                 'aiCategories' => Category::aiTools()
                     ->active()

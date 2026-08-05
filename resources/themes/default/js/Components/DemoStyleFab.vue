@@ -36,7 +36,7 @@ function selectDemo(key: string) {
         <!-- Floating brush launcher, pinned to the right edge -->
         <button
             type="button"
-            class="fixed right-0 top-1/2 z-[110] flex -translate-y-1/2 items-center gap-2 rounded-l-xl bg-gray-900 py-3 pl-3 pr-3.5 text-white shadow-xl ring-1 ring-white/10 transition-all hover:pr-5 dark:bg-gray-800"
+            class="fixed right-0 top-1/2 z-[110] flex -translate-y-1/2 items-center gap-2 rounded-l-xl bg-gray-100 py-3 pl-3 pr-3.5 text-gray-900 shadow-xl ring-1 ring-white/10 transition-all hover:pr-5 dark:bg-gray-800 dark:text-gray-100"
             :title="t('Demo styles')"
             @click="modalOpen = true"
         >
@@ -78,29 +78,12 @@ function selectDemo(key: string) {
                     </div>
 
                     <!-- Cards -->
+                    <!-- No "Site Default" card: the catalog's own Default preset already is the
+                         site's configuration — applying it clears every stored override
+                         (ThemePresetService), so the two cards did the same thing under
+                         different names, and the hand-written one was the only card in the grid
+                         with no screenshot behind it. -->
                     <div class="grid grid-cols-1 gap-6 px-6 pb-8 sm:grid-cols-2 sm:px-8">
-                        <!-- Reset to the site's real configuration -->
-                        <button type="button" class="group text-center" @click="selectDemo('default')">
-                            <div
-                                class="relative rounded-2xl transition"
-                                :class="activeKey === '' ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900' : ''"
-                            >
-                                <div class="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-2xl border-[6px] border-white bg-white text-gray-300 shadow-lg transition group-hover:shadow-xl dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600">
-                                    <i class="ti ti-home-cog text-5xl" />
-                                </div>
-                                <span class="absolute bottom-3 right-3 rounded-lg border border-gray-100 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-md dark:border-white/10 dark:bg-gray-900 dark:text-gray-200">
-                                    {{ t('Default') }}
-                                </span>
-                            </div>
-                            <div class="mt-4">
-                                <div class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Default') }}</div>
-                                <div class="mt-1 flex items-center justify-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                                    {{ t('Current configuration') }}
-                                </div>
-                            </div>
-                        </button>
-
                         <button
                             v-for="option in selectable"
                             :key="option.key"
