@@ -1118,10 +1118,10 @@ const themeForm = useForm({
         nav_progress_bar: normalizeBooleanValue(resolvedThemeDefaults.value.nav_progress_bar, true),
         show_back_to_top: normalizeBooleanValue(resolvedThemeDefaults.value.show_back_to_top, true),
         hide_scroll_top_mobile: normalizeBooleanValue(resolvedThemeDefaults.value.hide_scroll_top_mobile, false),
-        primary_color: resolvedThemeDefaults.value.primary_color ?? currentSettingString('primary_color', '#10b981'),
+        primary_color: resolvedThemeDefaults.value.primary_color ?? currentSettingString('primary_color', '#1F75FE'),
         secondary_color: resolvedThemeDefaults.value.secondary_color ?? currentSettingString('secondary_color', '#3b82f6'),
         accent_color: resolvedThemeDefaults.value.accent_color ?? currentSettingString('accent_color', '#8b5cf6'),
-        bg_color: resolvedThemeDefaults.value.bg_color ?? currentSettingString('bg_color', '#f0fdf8'),
+        bg_color: resolvedThemeDefaults.value.bg_color ?? currentSettingString('bg_color', '#ffffff'),
         bg_image: resolvedThemeDefaults.value.bg_image ?? currentSettingString('bg_image', ''),
         bg_image_enabled: normalizeBooleanValue(resolvedThemeDefaults.value.bg_image_enabled, false),
         heading_color: resolvedThemeDefaults.value.heading_color ?? currentSettingString('heading_color', '#111827'),
@@ -2617,7 +2617,7 @@ watch(() => [
                                     class="relative aspect-[16/10] w-full overflow-hidden"
                                     :style="{ backgroundColor: preset.preview.bg || '#f8fafc' }"
                                 >
-                                    <div class="flex h-[22%] items-center gap-1.5 px-3" :style="{ backgroundColor: preset.preview.primary || '#10b981' }">
+                                    <div class="flex h-[22%] items-center gap-1.5 px-3" :style="{ backgroundColor: preset.preview.primary || '#1F75FE' }">
                                         <span class="h-1.5 w-1.5 rounded-full bg-white/70"></span>
                                         <span class="h-1.5 w-1.5 rounded-full bg-white/50"></span>
                                         <span class="ml-auto h-1.5 w-8 rounded-full bg-white/40"></span>
@@ -2627,12 +2627,12 @@ watch(() => [
                                         <div class="h-1.5 w-full rounded-full opacity-60" :style="{ backgroundColor: preset.preview.text || '#6b7280' }"></div>
                                         <div class="h-1.5 w-5/6 rounded-full opacity-60" :style="{ backgroundColor: preset.preview.text || '#6b7280' }"></div>
                                         <div class="flex items-center gap-2 pt-1.5">
-                                            <span class="h-4 w-12 rounded-md" :style="{ backgroundColor: preset.preview.primary || '#10b981' }"></span>
+                                            <span class="h-4 w-12 rounded-md" :style="{ backgroundColor: preset.preview.primary || '#1F75FE' }"></span>
                                             <span class="h-4 w-10 rounded-md border" :style="{ borderColor: preset.preview.secondary || '#3b82f6', color: preset.preview.secondary }"></span>
                                         </div>
                                     </div>
                                     <div class="absolute bottom-2 right-2 flex items-center gap-1">
-                                        <span class="h-3.5 w-3.5 rounded-full border border-white/60 shadow-sm" :style="{ backgroundColor: preset.preview.primary || '#10b981' }"></span>
+                                        <span class="h-3.5 w-3.5 rounded-full border border-white/60 shadow-sm" :style="{ backgroundColor: preset.preview.primary || '#1F75FE' }"></span>
                                         <span class="h-3.5 w-3.5 rounded-full border border-white/60 shadow-sm" :style="{ backgroundColor: preset.preview.secondary || '#3b82f6' }"></span>
                                         <span class="h-3.5 w-3.5 rounded-full border border-white/60 shadow-sm" :style="{ backgroundColor: preset.preview.accent || '#8b5cf6' }"></span>
                                     </div>

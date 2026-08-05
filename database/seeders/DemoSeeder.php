@@ -1742,6 +1742,8 @@ class DemoSeeder extends Seeder
         // Merged into what is already stored, not passed alone: save*Settings() writes the
         // whole blob, so a bare ['desktop' => …] would blank any mobile_top/mobile_bottom
         // overrides already configured.
+        app(\App\Services\ThemePresetService::class)->applyPreset('default', 'default');
+
         $themeSettings = app(\App\Services\ThemeSettingsService::class);
 
         $storedHeader = $themeSettings->getStoredHeaderSettings();

@@ -152,7 +152,7 @@ const bootThemeSettings = readBootThemeSettings()
 let navProgressSettingEnabled = isSettingEnabled(bootThemeSettings.nav_progress_bar, true)
 const navProgressColor = typeof bootThemeSettings.primary_color === 'string' && bootThemeSettings.primary_color.trim()
     ? bootThemeSettings.primary_color.trim()
-    : '#10b981'
+    : '#1F75FE'
 
 // Show the bar on admin pages regardless; on the frontend, honour the theme setting.
 // Decided per-navigation from the destination URL so it reacts as the user moves around.
