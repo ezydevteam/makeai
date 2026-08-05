@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\CaptchaService;
 use App\Services\NotificationEventService;
 use App\Services\RateLimiterService;
+use App\Support\DemoCredentials;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -113,6 +114,15 @@ class LoginController extends Controller
                         ? translate('Too many attempts. Try again in :seconds seconds.', ['seconds' => $seconds])
                         : translate('Too many attempts. Try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
                 ],
+            ]);
+        }
+
+        // The seeded demo accounts are published credentials, so they are refused
+        // outright once demo mode is off — before authentication, so no session is
+        // ever created for one.
+        if (DemoCredentials::blocked($request->input('email'), $request->input('password'))) {
+            throw ValidationException::withMessages([
+                'email' => [DemoCredentials::message()],
             ]);
         }
 

@@ -13,6 +13,7 @@ use App\Models\Admin;
 use App\Services\CaptchaService;
 use App\Services\RateLimiterService;
 use App\Services\Security\TotpService;
+use App\Support\DemoCredentials;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -54,6 +55,15 @@ class AdminLoginController extends Controller
         }
 
         $credentials = $request->only('email', 'password');
+
+        // The demo super admin and the three demo staff admins are published credentials.
+        // Once demo mode is off they are refused before authentication, so no admin
+        // session is ever created for one.
+        if (DemoCredentials::blocked($credentials['email'] ?? null, $credentials['password'] ?? null)) {
+            throw ValidationException::withMessages([
+                'email' => [DemoCredentials::message()],
+            ]);
+        }
 
         if (! Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             $rateLimiter->hit('auth', $throttleKey, 900);
