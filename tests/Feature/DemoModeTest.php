@@ -145,6 +145,53 @@ class DemoModeTest extends TestCase
         $this->assertStringContainsString('demo mode', (string) $response->getContent());
     }
 
+    /**
+     * A demo package ships with DEMO_ENABLED=true already set in .env, so demo mode is
+     * live before the site is installed. Every wizard action is a POST — each step
+     * submit, the database probe, finalize — and blocking them refused the first
+     * "Next" with "This action is disabled in demo mode.", leaving the buyer with a
+     * site that could never be installed.
+     */
+    public function test_installer_writes_survive_demo_mode(): void
+    {
+        config(['demo.enabled' => true]);
+
+        $paths = [
+            'install/step/3',
+            'install/test-database',
+            'install/goto-step/2',
+            'install/finalize',
+        ];
+
+        foreach ($paths as $path) {
+            $request = \Illuminate\Http\Request::create('/' . $path, 'POST');
+
+            $response = (new DemoMode())->handle($request, fn () => response('reached handler'));
+
+            $this->assertSame(
+                'reached handler',
+                (string) $response->getContent(),
+                "Demo mode must not block [{$path}] or the site cannot be installed.",
+            );
+        }
+    }
+
+    /**
+     * The exemption is scoped to the wizard itself. A path that merely begins with the
+     * same letters is a normal route and stays blocked.
+     */
+    public function test_install_exemption_does_not_leak_to_lookalike_paths(): void
+    {
+        config(['demo.enabled' => true]);
+
+        $request = \Illuminate\Http\Request::create('/installments/pay', 'POST');
+        $request->headers->set('Accept', 'application/json');
+
+        $response = (new DemoMode())->handle($request, fn () => response('reached handler'));
+
+        $this->assertSame(403, $response->getStatusCode());
+    }
+
     public function test_demo_mode_is_inert_when_disabled(): void
     {
         config(['demo.enabled' => false]);

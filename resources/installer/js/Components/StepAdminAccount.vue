@@ -35,7 +35,7 @@ defineExpose({ getData: () => ({ ...admin }) })
                     v-model="admin.admin_name"
                     type="text"
                     placeholder="John Doe"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                 />
             </label>
 
@@ -45,7 +45,7 @@ defineExpose({ getData: () => ({ ...admin }) })
                     v-model="admin.admin_email"
                     type="email"
                     placeholder="admin@example.com"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                 />
             </label>
 
@@ -57,7 +57,7 @@ defineExpose({ getData: () => ({ ...admin }) })
                             v-model="admin.admin_password"
                             :type="showPassword ? 'text' : 'password'"
                             placeholder="Minimum 8 characters"
-                            class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 pr-10 text-sm"
+                            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 pr-10 text-sm"
                         />
                         <button
                             type="button"
@@ -79,7 +79,7 @@ defineExpose({ getData: () => ({ ...admin }) })
                     v-model="admin.admin_password_confirmation"
                     type="password"
                     placeholder="Re-enter your password"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                 />
             </label>
         </div>

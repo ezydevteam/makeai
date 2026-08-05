@@ -27,8 +27,19 @@ class LicenseService
      */
     public function verify(string $purchaseCode, bool $store = true): LicenseResult
     {
-        // Block verification in demo mode
-        if (config('demo.enabled')) {
+        // Block verification in demo mode — but only once the site is actually
+        // installed. The point of this guard is to stop a demo VISITOR reaching the
+        // license server through the admin panel; during the installation wizard there
+        // is no visitor, only the operator standing up the host. A demo package ships
+        // with DEMO_ENABLED=true already set, so guarding unconditionally failed the
+        // wizard's License Activation step with "Verification is disabled in demo
+        // mode." and left no way to finish installing the demo at all — not even with
+        // a LICENSE_TEST_MODE test code, since that branch sits below this one.
+        //
+        // Same reasoning as the /install exemption in the DemoMode middleware.
+        $installed = filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN);
+
+        if (config('demo.enabled') && $installed) {
             return LicenseResult::failure(
                 translate('Verification is disabled in demo mode.'),
                 'demo_mode'

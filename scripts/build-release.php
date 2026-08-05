@@ -99,6 +99,11 @@ const DENY_SUBPATHS = [
     // reference class each so `db:seed` and `User::factory()` still work.
     'database/seeders',
     'database/factories',
+    // The demo's data dump. Never ships under its own name: a --demo build copies it
+    // over database/data/data.sql inside the package (see the demo bootstrap step), and
+    // a buyer build must not carry it at all — it is full of seeded demo users, chats and
+    // fake content that has no business in a customer's install.
+    'database/data/demo-data.sql',
 ];
 
 /**
@@ -225,6 +230,28 @@ $denySubpaths = $demo
     : DENY_SUBPATHS;
 
 $srcDir = dirname(__DIR__);
+
+// Checked here rather than at the staging step further down: that runs after Composer and
+// npm, so a missing dump would cost six minutes before saying so.
+if ($demo) {
+    $demoDumpPath = $srcDir . '/database/data/demo-data.sql';
+    $regenerate   = "           php artisan demo:reset --force\n"
+        . "           php artisan installer:export-data --output=database/data/demo-data.sql";
+
+    if (! is_file($demoDumpPath)) {
+        fwrite(STDERR, "Error: database/data/demo-data.sql is missing — a demo build has no data to install.\n"
+            . "       Generate it with:\n" . $regenerate . "\n");
+        exit(1);
+    }
+
+    // No users means someone copied the buyer baseline into place. It would build and
+    // install cleanly, then leave the demo showing empty dashboards.
+    if (! str_contains((string) file_get_contents($demoDumpPath), 'INSERT INTO `users`')) {
+        fwrite(STDERR, "Error: database/data/demo-data.sql has no `users` rows — that is the buyer\n"
+            . "       baseline, not a demo dump. Regenerate it with:\n" . $regenerate . "\n");
+        exit(1);
+    }
+}
 
 // Staging lives outside the repo so a botched build can never dirty the source
 // tree, and so composer runs against a copy — never the developer's vendor/.
@@ -719,22 +746,124 @@ if (! $demo) {
     info(sprintf('%d addons bundled, %d files', count(DEMO_ADDONS), $addonFiles));
 }
 
-// The demo host's logo and favicon. ALLOW_DIRS deliberately omits public/ — the buyer
-// package's webroot is assembled file by file — so this one directory has to be carried
-// over explicitly, and only for a demo build. It lands in
-// core/public/assets/image/demo-assets/logo, from which DemoProvisionSeeder copies each image
-// onto the public disk on every demo:reset. Without this step the demo would come up
-// with no logo, and no way to set one (the admin write is blocked in demo mode).
+// The demo host's imagery. ALLOW_DIRS deliberately omits public/ — the buyer package's
+// webroot is assembled file by file — so this directory has to be carried over
+// explicitly, and only for a demo build.
+//
+// It lands in the WEBROOT (next to index.php and build/), never under core/. Two
+// separate things break when it goes into core/public:
+//
+//   1. core/ is denied by the web server (core/.htaccess, deploy/nginx.conf.example),
+//      so every /assets/image/demo-assets/... URL the demo renders 404s. Locally this
+//      is invisible: Laragon serves public/ as the document root, so the same relative
+//      path resolves.
+//   2. Worse, and not obvious: bootstrap/app.php binds public_path() for CLI runs with
+//      `file_exists(base_path('../index.php')) && ! is_dir(base_path('public'))`.
+//      Creating core/public makes that guard false, so artisan, cron and queue workers
+//      fall back to public_path() === core/public — and config/filesystems.php roots the
+//      public disk at public_path('storage'). The six-hourly `demo:reset` cron would
+//      write every seeded upload into the denied core/ tree.
+//
+// The WHOLE tree ships, not just logo/. Every subdirectory has a consumer on the live
+// demo: DemoProvisionSeeder copies logo/ onto the public disk on each demo:reset,
+// DemoSelectionResolver auto-picks the demo switcher's preset and addon screenshots out
+// of demos/ by filename, and brands/, carousel/ and hero/ back the seeded homepage and
+// advertisement content. Bundling logo/ alone left all of those resolving to files that
+// were never in the package — a demo full of broken images, with no way to upload
+// replacements because demo mode blocks the admin write.
+// The demo's data source. It is imported by the installer exactly like the buyer's
+// data.sql — same code path, same speed — rather than by running DemoSeeder live: that
+// seeder plus migrate:fresh and addon activation is minutes of work, and running it
+// inside the finalize HTTP request blew past the PHP-FPM/proxy timeout and reported
+// "Installation failed" on every attempt.
+//
+// It ships AS database/data/data.sql, replacing the buyer baseline, so finalize() needs
+// no demo-specific branch at all. Regenerate it whenever the seeders or schema change:
+//
+//   php artisan demo:reset --force
+//   php artisan installer:export-data --output=database/data/demo-data.sql
 if ($demo) {
-    step('Bundling demo branding assets');
+    step('Installing the demo data bootstrap');
 
-    $assetSource = $srcDir . '/public/assets/image/demo-assets/logo';
+    $demoDump = $srcDir . '/database/data/demo-data.sql';
+
+    if (! is_file($demoDump)) {
+        fail(
+            "database/data/demo-data.sql is missing — a demo build has no data to install.\n"
+            . "         Generate it with:\n"
+            . "           php artisan demo:reset --force\n"
+            . "           php artisan installer:export-data --output=database/data/demo-data.sql"
+        );
+    }
+
+    // A dump with no users is the buyer baseline that someone copied into place: it would
+    // install cleanly and leave the demo showing empty dashboards, which is the exact
+    // failure this whole step exists to prevent.
+    if (! str_contains((string) file_get_contents($demoDump), 'INSERT INTO `users`')) {
+        fail(
+            "database/data/demo-data.sql contains no `users` rows — it looks like the buyer\n"
+            . "         baseline rather than a demo dump. Regenerate it with:\n"
+            . "           php artisan demo:reset --force\n"
+            . "           php artisan installer:export-data --output=database/data/demo-data.sql"
+        );
+    }
+
+    ensureDir($appRoot . '/database/data');
+
+    if (! copy($demoDump, $appRoot . '/database/data/data.sql')) {
+        fail('could not stage demo-data.sql as database/data/data.sql');
+    }
+
+    info(sprintf('demo-data.sql → database/data/data.sql (%.1f MB)', filesize($demoDump) / 1048576));
+}
+
+if ($demo) {
+    step('Bundling demo assets');
+
+    $assetSource = $srcDir . '/public/assets/image/demo-assets';
 
     if (! is_dir($assetSource)) {
+        fail('public/assets/image/demo-assets is missing — the demo host has no imagery source');
+    }
+
+    // logo/ stays a hard failure of its own: it is the only source for the site logo and
+    // favicon, and unlike a missing screenshot that degrades to a gap, an unbranded demo
+    // cannot be corrected after the fact from inside demo mode.
+    if (! is_dir($assetSource . '/logo')) {
         fail('public/assets/image/demo-assets/logo is missing — the demo host has no logo or favicon source');
     }
 
-    $assetFiles = copyTree($assetSource, $appRoot . '/public/assets/image/demo-assets/logo', null, 'public/assets/image/demo-assets/logo');
+    $assetDest  = $webroot . '/assets/image/demo-assets';
+    $assetFiles = copyTree($assetSource, $assetDest, null, 'assets/image/demo-assets');
+
+    // Per-subdirectory counts, so a folder that silently arrives empty is visible in the
+    // build log rather than discovered on the live demo.
+    foreach (scandir($assetSource) ?: [] as $item) {
+        if ($item === '.' || $item === '..' || ! is_dir($assetSource . DIRECTORY_SEPARATOR . $item)) {
+            continue;
+        }
+
+        $n = is_dir($assetDest . DIRECTORY_SEPARATOR . $item)
+            ? iterator_count(new RecursiveIteratorIterator(new RecursiveDirectoryIterator(
+                $assetDest . DIRECTORY_SEPARATOR . $item,
+                FilesystemIterator::SKIP_DOTS
+            )))
+            : 0;
+
+        info(sprintf('%-22s %d files', $item . '/', $n));
+    }
+
+    // Loose files at the root (payment-icons.png) belong to no subdirectory, so without
+    // this the per-folder lines would not add up to the total and read as a short copy.
+    $looseFiles = count(array_filter(
+        scandir($assetDest) ?: [],
+        fn ($item) => $item !== '.' && $item !== '..' && is_file($assetDest . DIRECTORY_SEPARATOR . $item)
+    ));
+
+    if ($looseFiles > 0) {
+        info(sprintf('%-22s %d files', '(root)', $looseFiles));
+    }
+
     info("{$assetFiles} files copied");
 }
 
@@ -889,10 +1018,20 @@ foreach ($oversized as $file) {
 $checksRun++;
 
 if ($demo) {
-    // The demo bootstraps from the seeders it ships, so data.sql is not load-bearing here
-    // and the addon-table check below would fail by design: the dev export legitimately
-    // contains tables that the bundled addons' own migrations create.
-    info('data.sql checks skipped (demo bootstraps from seeders)');
+    // The demo now installs from a data.sql of its own (demo-data.sql, staged above), so
+    // presence IS load-bearing here too — but the per-table check below still cannot run:
+    // the dump is taken from a dev database with every bundled addon installed, so it
+    // legitimately references tables created by the addons' own migrations rather than by
+    // a core one.
+    if (! is_file($appRoot . '/database/data/data.sql')) {
+        $failures[] = 'database/data/data.sql is missing from the demo package — the staging step '
+            . 'that copies demo-data.sql into place did not run';
+    } elseif (! str_contains((string) file_get_contents($appRoot . '/database/data/data.sql'), 'INSERT INTO `users`')) {
+        $failures[] = 'the demo package\'s database/data/data.sql has no `users` rows — the buyer '
+            . 'baseline was shipped instead of the demo dump, and the demo will install empty';
+    } else {
+        info('demo data.sql present and carries seeded users (per-table check skipped: addon tables)');
+    }
 } elseif (! is_file($appRoot . '/database/data/data.sql')) {
     $failures[] = 'database/data/data.sql is missing — it is the only data source left now that '
         . 'database/seeders is excluded. Generate it with: php artisan installer:export-data';
@@ -938,6 +1077,29 @@ if ($demo) {
     }
 }
 
+// core/public must never exist in a package. Three separate mechanisms read
+// `is_dir(base_path('public'))` as the "dev checkout, not the shipped layout" signal, and
+// each one silently takes the wrong branch the moment the packaged app has a public/ of
+// its own:
+//
+//   - bootstrap/app.php stops binding public_path() to the webroot on CLI runs, so
+//     artisan, cron and queue workers root the public disk (config/filesystems.php:
+//     public_path('storage')) inside core/ — the tree the web server denies. Every upload
+//     the six-hourly demo:reset writes then 404s.
+//   - SystemController::appDirectoryExposureCheck() returns "not applicable" and quietly
+//     stops verifying that core/.env is unreachable from the web.
+//   - Anything actually served from it 404s, core/ being denied.
+//
+// A demo build did ship its imagery there, which is how all three surfaced at once.
+$checksRun++;
+
+if (is_dir($appRoot . '/public')) {
+    $failures[] = APP_DIR . '/public exists in the package — it must not. Web assets belong in the '
+        . 'webroot beside index.php; a public/ inside ' . APP_DIR . '/ defeats the layout test '
+        . 'bootstrap/app.php and the health check both rely on, and sends the public disk into the '
+        . 'denied ' . APP_DIR . '/ tree on every CLI run.';
+}
+
 // The product's own seeders and factories must genuinely be gone: each directory
 // may contain nothing beyond its reference stub. A leaked AiToolSeeder would
 // also mask the check above, since finalize() would find a usable seeder.
@@ -957,6 +1119,14 @@ if ($demo) {
         if (! is_file($appRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required))) {
             $failures[] = "{$required} is missing — demo:reset cannot seed the demo without it";
         }
+    }
+
+    // The demo's imagery must be reachable by URL, so it belongs beside index.php.
+    $checksRun++;
+
+    if (! is_dir($webroot . '/assets/image/demo-assets/logo')) {
+        $failures[] = 'assets/image/demo-assets/logo is missing from the WEBROOT — the demo host has no '
+            . 'servable logo or favicon source';
     }
 
     // Each bundled addon must have arrived whole. A truncated copy activates and then

@@ -62,6 +62,18 @@ export default defineConfig({
         manifest: 'manifest.json',
         outDir: 'public/build',
         chunkSizeWarningLimit: 1000, // Increase limit to 1MB to suppress expected warnings for large admin components
+        rollupOptions: {
+            // @vueuse/core 14 ships two misplaced PURE annotations in its prebuilt
+            // dist — one on its own line above the statement it means to mark, one in
+            // front of an object literal (they are only meaningful before a call or
+            // `new`). Rolldown reports both as [INVALID_ANNOTATION] on every build.
+            // Nothing here can fix a dependency's published bundle, and the only
+            // consequence is that those two expressions miss out on tree-shaking, so
+            // the warnings are pure noise that buries real ones. Safe to silence
+            // project-wide: no file we author contains a PURE annotation. Drop this
+            // once @vueuse/core corrects its build.
+            checks: { invalidAnnotation: false },
+        },
     },
     server: {
         ...httpsServer,

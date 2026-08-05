@@ -16,10 +16,10 @@ const stepLabels = [
 
 function circleClass(step: number, current: number, completed: number[]): string {
     if (completed.includes(step)) {
-        return 'bg-emerald-600 text-white border-emerald-600'
+        return 'bg-[#1F75FE] text-white border-[#1F75FE]'
     }
     if (step === current) {
-        return 'bg-white text-emerald-600 border-2 border-emerald-600'
+        return 'bg-white text-[#1F75FE] border-2 border-[#1F75FE]'
     }
     return 'bg-slate-200 text-slate-500 border-slate-200'
 }
@@ -51,7 +51,7 @@ function circleClass(step: number, current: number, completed: number[]): string
                 <div
                     v-if="step < totalSteps"
                     class="h-0.5 flex-1"
-                    :class="stepsCompleted.includes(step) ? 'bg-emerald-600' : 'bg-slate-200'"
+                    :class="stepsCompleted.includes(step) ? 'bg-[#1F75FE]' : 'bg-slate-200'"
                 />
             </template>
         </div>

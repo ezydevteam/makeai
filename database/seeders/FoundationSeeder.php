@@ -212,7 +212,7 @@ class FoundationSeeder extends Seeder
     {
         $appearance = [
             // Admin panel
-            ['scope' => 'admin', 'key' => 'primary_color', 'value' => '#6366f1'],
+            ['scope' => 'admin', 'key' => 'primary_color', 'value' => '#1F75FE'],
             ['scope' => 'admin', 'key' => 'secondary_color', 'value' => '#3b82f6'],
             ['scope' => 'admin', 'key' => 'sidebar_bg', 'value' => '#ffffff'],
             ['scope' => 'admin', 'key' => 'sidebar_text_color', 'value' => '#000000'],

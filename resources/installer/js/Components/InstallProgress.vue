@@ -68,7 +68,7 @@ function phaseState(i: number): 'done' | 'active' | 'pending' {
     <div class="my-8 animate-fade-in rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
         <!-- Header -->
         <div class="flex items-center gap-3">
-            <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30">
+            <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1F75FE] to-[#5e9cfe] text-white shadow-lg shadow-[#1F75FE]/30">
                 <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
                     <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
@@ -90,7 +90,7 @@ function phaseState(i: number): 'done' | 'active' | 'pending' {
             </div>
             <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
-                    class="relative h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-[length:200%_100%] transition-[width] duration-200 ease-out animate-gradient-x"
+                    class="relative h-full rounded-full bg-gradient-to-r from-[#1F75FE] via-[#5e9cfe] to-[#1F75FE] bg-[length:200%_100%] transition-[width] duration-200 ease-out animate-gradient-x"
                     :style="{ width: pct + '%' }"
                 >
                     <span class="progress-shimmer absolute inset-0"></span>
@@ -120,7 +120,7 @@ function phaseState(i: number): 'done' | 'active' | 'pending' {
                     v-else-if="phaseState(i) === 'active'"
                     class="flex h-6 w-6 shrink-0 items-center justify-center"
                 >
-                    <svg class="h-5 w-5 animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24">
+                    <svg class="h-5 w-5 animate-spin text-[#1F75FE]" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                         <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                     </svg>

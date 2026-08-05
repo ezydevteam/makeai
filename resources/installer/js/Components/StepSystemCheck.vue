@@ -25,7 +25,7 @@ defineExpose({ getData: () => ({ confirmed: confirmed.value }) })
                 {{ category.replace(/_/g, ' ') }}
             </h3>
 
-            <div class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <div class="divide-y divide-slate-100 rounded-xl border border-slate-200">
                 <div
                     v-for="(check, idx) in checks"
                     :key="idx"
@@ -69,19 +69,19 @@ defineExpose({ getData: () => ({ confirmed: confirmed.value }) })
         </div>
 
         <!-- Global fail warning -->
-        <div v-if="!allPass" class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div v-if="!allPass" class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <p class="font-semibold">Some requirements are not met</p>
             <p class="mt-1">Please resolve the failed items above before continuing. Items marked "Warning" can be skipped but may affect functionality.</p>
         </div>
 
         <!-- Confirmation -->
-        <div class="mt-6 rounded-lg border border-slate-200 p-4">
+        <div class="mt-6 rounded-xl border border-slate-200 p-4">
             <label class="flex cursor-pointer items-center gap-3">
                 <input
                     v-model="confirmed"
                     type="checkbox"
                     :disabled="!allPass"
-                    class="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                    class="h-5 w-5 rounded border-slate-300 text-[#1F75FE] focus:ring-[#1F75FE] disabled:opacity-50"
                 />
                 <span class="text-sm text-slate-700">
                     I confirm all system requirements are met

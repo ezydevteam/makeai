@@ -27,6 +27,7 @@ class InstallerExportData extends Command
         {--output= : Destination path (default: database/data/data.sql)}
         {--mysqldump= : Path to the mysqldump binary if it is not on PATH}
         {--fresh : Run migrate:fresh --seed before exporting (guarantees a clean baseline)}
+        {--with-addons : Keep addon-owned tables in the dump (demo builds, which bundle their addons)}
         {--force : Skip confirmations (for --fresh and the dirty-data guard)}';
 
     protected $description = 'Export the current database as the installer data-only bootstrap (data.sql)';
@@ -154,10 +155,26 @@ class InstallerExportData extends Command
                 '--skip-comments',        // no host/version/timestamp noise in the diff
             ];
 
-            $addonTables = $this->addonOwnedTables();
+            // A demo package bundles its addons, so their migrations DO run on the demo
+            // host and their tables DO exist at import time — the reason for excluding
+            // them (ERROR 1146 on a core-only install) does not apply. Excluding them
+            // anyway is what leaves a demo with an empty Knowledge Base, no chatbot
+            // conversations and a blank assistant: the exact screens the addons are
+            // bundled to show off.
+            $withAddons  = (bool) $this->option('with-addons');
+            $addonTables = $withAddons ? [] : $this->addonOwnedTables();
+
             $ignored = array_merge(self::IGNORED_TABLES, $addonTables);
 
-            if ($addonTables !== []) {
+            if ($withAddons) {
+                // addon_licenses stays out regardless: it holds this machine's own purchased
+                // keys, which must never leave it. The registry tables come along so the
+                // bundled addons arrive already activated rather than needing a manual pass.
+                $ignored = array_values(array_diff($ignored, ['addons', 'addon_settings']));
+
+                $this->line('Including addon-owned tables (--with-addons): the demo ships its addons, so their tables exist on import.');
+                $this->line('addon_licenses still excluded — it holds this machine\'s purchased keys.');
+            } elseif ($addonTables !== []) {
                 $this->line(sprintf(
                     'Skipping %d addon-owned table(s): %s',
                     count($addonTables),

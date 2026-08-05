@@ -26,7 +26,7 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
         <h2 class="text-xl font-bold text-slate-900">License Activation</h2>
         <p class="mt-1 text-sm text-slate-500">
             Enter your Envato purchase code to activate MakeAI. Find it in your
-            <a href="https://codecanyon.net/downloads" target="_blank" rel="noopener" class="text-emerald-600 underline hover:text-emerald-500">CodeCanyon downloads</a>.
+            <a href="https://codecanyon.net/downloads" target="_blank" rel="noopener" class="text-[#1F75FE] underline hover:text-[#1b65da]">CodeCanyon downloads</a>.
         </p>
 
         <ErrorAlert :message="error" />
@@ -40,11 +40,11 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
                     type="text"
                     autocomplete="off"
                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
                 />
             </label>
 
-            <div v-if="licenseTestMode" class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            <div v-if="licenseTestMode" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
                 <p class="font-semibold">Developer test mode active</p>
                 <p class="mt-1 text-xs">Use one of these fake codes to test license-gated features without contacting Envato:</p>
                 <ul class="mt-2 list-inside list-disc space-y-1 font-mono text-xs">
@@ -53,7 +53,7 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
                 </ul>
             </div>
 
-            <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+            <div class="rounded-xl border border-[#b7d3ff] bg-[#edf4ff] p-4 text-sm text-[#1757bc]">
                 <p class="font-semibold">Why activate?</p>
                 <ul class="mt-2 list-inside list-disc space-y-1 text-xs">
                     <li>Unlock all AI features and tools</li>

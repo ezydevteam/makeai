@@ -66,7 +66,15 @@ class DemoProvisionSeeder extends Seeder
             'site_favicon_png' => 'favicon_png',
         ];
 
-        $sourceDir = base_path('public/assets/image/demo-assets/logo');
+        // public_path(), not base_path('public/…'). In the shipped layout the webroot is
+        // the package root and the application sits under core/, so base_path('public/…')
+        // pointed at core/public — a directory that must not exist at all: creating it
+        // makes bootstrap/app.php's CLI public-path guard
+        // (`! is_dir(base_path('public'))`) fail, and every artisan/cron run then roots the
+        // public disk at core/public/storage, inside the tree the web server denies.
+        // public_path() resolves to the webroot there and to public/ in a dev checkout, so
+        // the one helper is correct in both.
+        $sourceDir = public_path('assets/image/demo-assets/logo');
         $provisioned = [];
         $missing = [];
 

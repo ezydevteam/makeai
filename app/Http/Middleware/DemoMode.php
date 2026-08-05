@@ -123,6 +123,19 @@ class DemoMode
             return $next($request);
         }
 
+        // The installation wizard is not part of the demo. Every step submit, the
+        // database probe and finalize are POSTs, and a demo package ships with
+        // DEMO_ENABLED=true already set — so without this exemption the wizard answers
+        // the first "Next" with "This action is disabled in demo mode." and the site
+        // can never be installed at all.
+        //
+        // Safe to exempt permanently rather than only while uninstalled: once
+        // INSTALLED=true, InstallationMiddleware 404s /install and /install/*, so none
+        // of these routes stay reachable for a demo visitor to reach.
+        if ($request->is('install') || $request->is('install/*')) {
+            return $next($request);
+        }
+
         $destructiveMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
         if (! in_array($request->method(), $destructiveMethods)) {

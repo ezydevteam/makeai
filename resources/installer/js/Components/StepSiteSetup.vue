@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import ErrorAlert from './ErrorAlert.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 
 const props = defineProps<{
     formData: Record<string, any>
@@ -63,6 +64,16 @@ if (props.timezones?.length && !props.timezones.includes(site.site_timezone)) {
     site.site_timezone = 'UTC'
 }
 
+/**
+ * Falls back to the detected zone as the sole option so the field still shows what
+ * will be saved when the server sends no list — the same guarantee the plain
+ * <select> gave with its `v-if="!timezones?.length"` option.
+ */
+const timezoneOptions = computed<SelectOption[]>(() =>
+    (props.timezones?.length ? props.timezones : [site.site_timezone])
+        .map((zone) => ({ value: zone, label: zone })),
+)
+
 defineExpose({ getData: () => ({ ...site }) })
 </script>
 
@@ -80,7 +91,7 @@ defineExpose({ getData: () => ({ ...site }) })
                     v-model="site.site_name"
                     type="text"
                     placeholder="My MakeAI Site"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                 />
             </label>
 
@@ -90,7 +101,7 @@ defineExpose({ getData: () => ({ ...site }) })
                     v-model="site.site_tagline"
                     type="text"
                     placeholder="One platform. Every AI tool."
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                 />
                 <span class="mt-1 block text-xs text-slate-400">A short slogan shown in the header and browser title.</span>
             </label>
@@ -101,25 +112,29 @@ defineExpose({ getData: () => ({ ...site }) })
                     v-model="site.site_url"
                     type="text"
                     placeholder="https://example.com"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
                 />
                 <span class="mt-1 block text-xs text-slate-400">Auto-detected from your current URL — change if needed.</span>
             </label>
 
-            <label class="block">
+            <!-- Plain <label> would make the whole block a control for AppSelect's
+                 inner <button>, so clicking the hint text below would reopen it. -->
+            <div class="block">
                 <span class="text-sm font-medium text-slate-700">Timezone</span>
-                <select
-                    v-model="site.site_timezone"
-                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                >
-                    <option v-if="!timezones?.length" :value="site.site_timezone">{{ site.site_timezone }}</option>
-                    <option v-for="zone in timezones" :key="zone" :value="zone">{{ zone }}</option>
-                </select>
+                <div class="mt-1.5">
+                    <AppSelect
+                        v-model="site.site_timezone"
+                        :options="timezoneOptions"
+                        live-search
+                        search-placeholder="Search timezones..."
+                        placeholder="Select a timezone"
+                    />
+                </div>
                 <span class="mt-1 block text-xs text-slate-400">
                     Auto-detected from your browser — change if needed. Dates are stored in UTC and
                     displayed in this zone.
                 </span>
-            </label>
+            </div>
         </div>
     </div>
 </template>

@@ -225,7 +225,7 @@ async function finalizeInstall() {
                     v-if="!isLastStep"
                     type="button"
                     :disabled="!canGoNext"
-                    class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-[#1F75FE] bg-[#1F75FE] px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#1b65da] disabled:cursor-not-allowed disabled:opacity-50"
                     @click="goNext"
                 >
                     {{ submitting ? 'Please wait...' : 'Next' }}
@@ -242,7 +242,7 @@ async function finalizeInstall() {
                     v-else
                     type="button"
                     :disabled="installing"
-                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-emerald-500 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center gap-2 rounded-xl bg-[#1F75FE] px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1b65da] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
                     @click="finalizeInstall"
                 >
                     <svg v-if="installing" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">

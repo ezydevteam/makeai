@@ -427,6 +427,52 @@ class LicenseServiceTest extends TestCase
         $this->assertNull(settings('license_purchase_code'));
     }
 
+    /**
+     * A --demo package ships with DEMO_ENABLED=true already set, so demo mode is live
+     * before the site is installed. Guarding verification unconditionally failed the
+     * wizard's License Activation step with "Verification is disabled in demo mode."
+     * and left no way to finish installing the demo host at all.
+     */
+    public function test_license_verifies_during_installation_even_in_demo_mode(): void
+    {
+        config(['app.installed' => false, 'demo.enabled' => true]);
+
+        Http::fake([
+            'https://license.ezydev.net/api/v1/verify' => Http::response(
+                $this->generateSignedResponse([
+                    'valid' => true,
+                    'license_type' => 1,
+                    'buyer' => 'john_doe',
+                    'purchased_at' => '2026-05-01T10:00:00Z',
+                    'supported_until' => '2026-11-01T10:00:00Z',
+                    'error' => null,
+                ])
+            ),
+        ]);
+
+        $result = app(LicenseService::class)->verify('12345678-1234-1234-1234-123456789012', false);
+
+        $this->assertTrue($result->valid, 'A demo host must be able to activate its license while installing.');
+        $this->assertSame(1, $result->type);
+    }
+
+    /**
+     * The exemption is scoped to the install. Once the site is up, a demo visitor
+     * reaching the license server through the admin panel stays blocked.
+     */
+    public function test_license_verification_stays_blocked_in_demo_mode_once_installed(): void
+    {
+        config(['app.installed' => true, 'demo.enabled' => true]);
+
+        Http::fake();
+
+        $result = app(LicenseService::class)->verify('12345678-1234-1234-1234-123456789012', false);
+
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('demo mode', $result->error);
+        Http::assertNothingSent();
+    }
+
     public function test_manual_activation_via_controller_succeeds_with_valid_license(): void
     {
         $role = \App\Models\AdminRole::where('slug', 'super-admin')->first()

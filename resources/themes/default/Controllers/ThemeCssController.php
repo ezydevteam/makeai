@@ -15,7 +15,7 @@ class ThemeCssController extends Controller
         $customCode = $presetService->getStoredCustomCodeSettings();
         $settings['custom_css'] = $customCode['custom_css'] ?? '';
 
-        $primary = $settings['primary_color'] ?? '#10b981';
+        $primary = $settings['primary_color'] ?? '#1F75FE';
         $secondary = $settings['secondary_color'] ?? '#3b82f6';
         $accent = $settings['accent_color'] ?? '#8b5cf6';
         $background = $settings['bg_color'] ?? '#f0fdf8';

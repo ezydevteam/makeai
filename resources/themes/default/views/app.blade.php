@@ -125,7 +125,17 @@
     <noscript><link rel="stylesheet" href="{{ $fontHref }}"></noscript>
     @endif
 
+    {{-- Only once the app is installed. This palette comes from a web route, and
+         InstallationMiddleware redirects every non-/install request to the wizard
+         while INSTALLED=false — so linking it during an install points a
+         <link rel="stylesheet"> at an HTML redirect, and the browser refuses it:
+         "MIME type ('text/html') is not a supported stylesheet MIME type".
+         Nothing is lost by skipping it: there is no admin-chosen palette before the
+         install writes one, and the wizard's own styling ships in the app bundle. --}}
+    @php $appInstalled = filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN); @endphp
+    @if($appInstalled)
     <link rel="stylesheet" href="{{ route('theme-variables.css') }}?v={{ $themeCssTimestamp }}" />
+    @endif
 
     @routes
     @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
@@ -136,7 +146,7 @@
          override the admin's dynamic theme palette (loaded above, before @vite).
          Re-load the theme variables AFTER the bundle so the brand primary wins on
          addon pages (KB, chatbot, …) too. Scoped to addons — theme pages unaffected. --}}
-    @if(($page['component'] ?? '') && str_starts_with($page['component'], 'Addons/'))
+    @if($appInstalled && ($page['component'] ?? '') && str_starts_with($page['component'], 'Addons/'))
     <link rel="stylesheet" href="{{ route('theme-variables.css') }}?v={{ $themeCssTimestamp }}" />
     @endif
     {!! $customCodeSettings['custom_header_code'] ?? '' !!}

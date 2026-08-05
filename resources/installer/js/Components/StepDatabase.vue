@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, nextTick, watch } from 'vue'
 import axios from 'axios'
 import ErrorAlert from './ErrorAlert.vue'
 import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
@@ -41,6 +41,24 @@ const existingState = computed(() => {
 const showReset = computed(
     () => existingState.value === 'app' || existingState.value === 'foreign',
 )
+
+// The flashed populated-database error and the reset card say the same sentence, so
+// rendering both stacks two warnings for one problem. The card wins: it is the only
+// one carrying the checkbox that resolves it. Every other database error — bad
+// credentials, unreachable host, field validation — still goes to the alert.
+const inlineError = computed(() => (showReset.value ? null : props.error ?? null))
+
+const resetCard = ref<HTMLElement | null>(null)
+
+// With the alert suppressed, the card is the sole signal that the click did
+// something — and step submits use preserveScroll, so a buyer who was looking at the
+// Next button when the server refused would otherwise see the page sit still.
+watch(showReset, async (visible) => {
+    if (!visible) return
+
+    await nextTick()
+    resetCard.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
 
 watch(
     () => [db.db_driver, db.db_host, db.db_port, db.db_database, db.db_username, db.db_password],
@@ -92,7 +110,21 @@ async function testConnection() {
 }
 
 defineExpose({
-    getData: () => ({ ...db }),
+    // Called once by the wizard immediately before the step is POSTed. Whatever is
+    // typed at this point is exactly what the server is about to judge, so the edits
+    // that raised `dirtied` are no longer unverified and the flag has to drop — the
+    // db_state flashed back describes these very credentials.
+    //
+    // Clearing it here rather than on the response is deliberate: Vue skips a
+    // watcher when a prop is re-assigned its current value, so a second refusal
+    // carrying the same state ('app' → 'app') would never re-trigger one, and the
+    // stale flag would keep the reset card hidden behind an error the buyer cannot
+    // act on.
+    getData: () => {
+        dirtied.value = false
+
+        return { ...db }
+    },
 })
 </script>
 
@@ -101,7 +133,7 @@ defineExpose({
         <h2 class="text-xl font-bold text-slate-900">Database Configuration</h2>
         <p class="mt-1 text-sm text-slate-500">Enter the database details from your hosting panel. Create an empty database and user first, then paste the credentials here.</p>
 
-        <ErrorAlert :message="error" />
+        <ErrorAlert :message="inlineError" />
 
         <div class="mt-6 space-y-4">
             <div class="block">
@@ -113,122 +145,121 @@ defineExpose({
                 />
             </div>
 
-            <div class="space-y-4">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                    <label class="block sm:col-span-3">
-                        <span class="text-sm font-medium text-slate-700">Host</span>
-                        <input
-                            v-model="db.db_host"
-                            type="text"
-                            placeholder="127.0.0.1"
-                            class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                        />
-                    </label>
-                    <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Port</span>
-                        <input
-                            v-model.number="db.db_port"
-                            type="number"
-                            placeholder="3306"
-                            class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                        />
-                    </label>
-                </div>
-
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">Database Name</span>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                <label class="block sm:col-span-3">
+                    <span class="text-sm font-medium text-slate-700">Host</span>
                     <input
-                        v-model="db.db_database"
+                        v-model="db.db_host"
                         type="text"
-                        placeholder="makeai"
-                        class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                        placeholder="127.0.0.1"
+                        class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                     />
                 </label>
+                <label class="block">
+                    <span class="text-sm font-medium text-slate-700">Port</span>
+                    <input
+                        v-model.number="db.db_port"
+                        type="number"
+                        placeholder="3306"
+                        class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    />
+                </label>
+            </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Username</span>
-                        <input
-                            v-model="db.db_username"
-                            type="text"
-                            placeholder="root"
-                            class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                        />
-                    </label>
-                    <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Password</span>
-                        <input
-                            v-model="db.db_password"
-                            type="password"
-                            placeholder="••••••"
-                            class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                        />
-                    </label>
-                </div>
+            <label class="block">
+                <span class="text-sm font-medium text-slate-700">Database Name</span>
+                <input
+                    v-model="db.db_database"
+                    type="text"
+                    placeholder="makeai"
+                    class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                />
+            </label>
 
-                <!-- Test Connection -->
-                <div class="flex items-center gap-3">
-                    <button
-                        type="button"
-                        :disabled="testing || !db.db_host || !db.db_database || !db.db_username"
-                        class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                        @click="testConnection"
-                    >
-                        <svg v-if="testing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                        </svg>
-                        {{ testing ? 'Testing...' : 'Test Connection' }}
-                    </button>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label class="block">
+                    <span class="text-sm font-medium text-slate-700">Username</span>
+                    <input
+                        v-model="db.db_username"
+                        type="text"
+                        placeholder="root"
+                        class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    />
+                </label>
+                <label class="block">
+                    <span class="text-sm font-medium text-slate-700">Password</span>
+                    <input
+                        v-model="db.db_password"
+                        type="password"
+                        placeholder="••••••"
+                        class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    />
+                </label>
+            </div>
 
-                    <span
-                        v-if="testResult"
-                        class="text-sm font-medium"
-                        :class="testResult.pass ? 'text-emerald-600' : 'text-red-600'"
-                    >
-                        {{ testResult.message }}
-                    </span>
-                </div>
-
-                <!-- Existing-data warning + destructive reset confirmation -->
-                <div
-                    v-if="showReset"
-                    class="rounded-lg border p-4"
-                    :class="existingState === 'app' ? 'border-amber-300 bg-amber-50' : 'border-red-300 bg-red-50'"
+            <!-- Test Connection -->
+            <div class="flex items-center gap-3">
+                <button
+                    type="button"
+                    :disabled="testing || !db.db_host || !db.db_database || !db.db_username"
+                    class="inline-flex items-center gap-2 rounded-xl border border-[#93bdff] bg-[#edf4ff] px-4 py-2 text-sm font-medium text-[#1757bc] transition-colors hover:bg-[#d7e6ff] disabled:opacity-50"
+                    @click="testConnection"
                 >
-                    <div class="flex items-start gap-3">
-                        <i
-                            class="ti ti-alert-triangle mt-0.5 text-lg"
-                            :class="existingState === 'app' ? 'text-amber-600' : 'text-red-600'"
-                        />
-                        <div class="flex-1">
-                            <p
-                                class="text-sm font-semibold"
-                                :class="existingState === 'app' ? 'text-amber-800' : 'text-red-800'"
-                            >
-                                {{ existingState === 'app'
-                                    ? 'A previous installation was found in this database'
-                                    : 'This database already contains data from another application' }}
-                            </p>
-                            <p
-                                class="mt-1 text-xs"
-                                :class="existingState === 'app' ? 'text-amber-700' : 'text-red-700'"
-                            >
-                                The installer will not overwrite it unless you reset. Resetting permanently
-                                erases every table in this database before installing — there is no undo.
-                            </p>
-                            <label
-                                class="mt-3 flex items-start gap-2 text-sm font-medium"
-                                :class="existingState === 'app' ? 'text-amber-900' : 'text-red-900'"
-                            >
-                                <input
-                                    v-model="db.db_reset"
-                                    type="checkbox"
-                                    class="mt-0.5 h-4 w-4 rounded border-slate-300"
-                                />
-                                <span>Reset the database and reinstall (permanently erases all existing data)</span>
-                            </label>
-                        </div>
+                    <svg v-if="testing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    {{ testing ? 'Testing...' : 'Test Connection' }}
+                </button>
+
+                <span
+                    v-if="testResult"
+                    class="text-sm font-medium"
+                    :class="testResult.pass ? 'text-emerald-600' : 'text-red-600'"
+                >
+                    {{ testResult.message }}
+                </span>
+            </div>
+
+            <!-- Existing-data warning + destructive reset confirmation -->
+            <div
+                v-if="showReset"
+                ref="resetCard"
+                class="rounded-xl border p-4"
+                :class="existingState === 'app' ? 'border-amber-300 bg-amber-50' : 'border-red-300 bg-red-50'"
+            >
+                <div class="flex items-start gap-3">
+                    <i
+                        class="ti ti-alert-triangle mt-0.5 text-lg"
+                        :class="existingState === 'app' ? 'text-amber-600' : 'text-red-600'"
+                    />
+                    <div class="flex-1">
+                        <p
+                            class="text-sm font-semibold"
+                            :class="existingState === 'app' ? 'text-amber-800' : 'text-red-800'"
+                        >
+                            {{ existingState === 'app'
+                                ? 'A previous installation was found in this database'
+                                : 'This database already contains data from another application' }}
+                        </p>
+                        <p
+                            class="mt-1 text-xs"
+                            :class="existingState === 'app' ? 'text-amber-700' : 'text-red-700'"
+                        >
+                            The installer will not overwrite it unless you reset. Resetting permanently
+                            erases every table in this database before installing — there is no undo.
+                        </p>
+                        <label
+                            class="mt-3 flex items-start gap-2 text-sm font-medium"
+                            :class="existingState === 'app' ? 'text-amber-900' : 'text-red-900'"
+                        >
+                            <input
+                                v-model="db.db_reset"
+                                type="checkbox"
+                                class="mt-0.5 h-4 w-4 rounded border-slate-300"
+                            />
+                            <span>Reset the database and reinstall (permanently erases all existing data)</span>
+                        </label>
                     </div>
                 </div>
             </div>
