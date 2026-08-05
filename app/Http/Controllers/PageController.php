@@ -2,10 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiTool;
+use App\Models\Category;
+use App\Models\Document;
+use App\Models\Language;
 use App\Models\Page;
+use App\Models\Testimonial;
+use App\Models\User;
 use App\Support\ContentShortcodes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Number;
 use Inertia\Inertia;
 
 class PageController extends Controller
@@ -97,6 +105,9 @@ class PageController extends Controller
                 'og_image' => $ogImage,
                 'schema' => $schema,
             ],
+            // Extras for the designed About layout (About.vue). Null on every other page,
+            // so no other page pays for the counts.
+            'about' => $page->slug === 'about' ? $this->aboutData() : null,
             'contactChannels' => $page->slug === 'contact' ? $this->contactChannels() : null,
             'contactSettings' => $page->slug === 'contact' ? [
                 'enabled' => (bool) settings('contact_enabled', true),
@@ -109,6 +120,117 @@ class PageController extends Controller
                 'success_message' => settings('contact_success_message', 'Your message has been sent successfully. We will get back to you soon!'),
             ] : null,
         ]);
+    }
+
+    /**
+     * The numbers, quotes and calls to action the About page is built around.
+     *
+     * Every figure is counted from this install's own tables. A count that comes back zero
+     * is dropped rather than padded, so a site on day one shows three honest stats instead
+     * of claiming a milestone it has not reached — and a demo, with its seeded users and
+     * documents, fills all four slots on its own.
+     *
+     * @return array<string, mixed>
+     */
+    private function aboutData(): array
+    {
+        return [
+            'stats' => $this->aboutStats(),
+            'testimonials' => $this->aboutTestimonials(),
+            'cta' => $this->aboutCta(),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function aboutStats(): array
+    {
+        // Ordered by how much each one says about the platform, then truncated — the four
+        // that survive are the four most meaningful ones this install can actually prove.
+        $candidates = [
+            ['icon' => 'ti ti-wand', 'label' => translate('AI tools'), 'count' => fn (): int => AiTool::active()->count()],
+            ['icon' => 'ti ti-sparkles', 'label' => translate('Generations run'), 'count' => fn (): int => (int) AiTool::sum('usage_count')],
+            ['icon' => 'ti ti-users', 'label' => translate('Creators on board'), 'count' => fn (): int => User::count()],
+            ['icon' => 'ti ti-file-text', 'label' => translate('Documents saved'), 'count' => fn (): int => Document::count()],
+            ['icon' => 'ti ti-category', 'label' => translate('Tool categories'), 'count' => fn (): int => Category::aiTools()->active()->count()],
+            ['icon' => 'ti ti-language', 'label' => translate('Languages'), 'count' => fn (): int => Language::where('is_active', true)->count()],
+        ];
+
+        $stats = collect($candidates)
+            ->map(fn (array $stat): array => [
+                'icon' => $stat['icon'],
+                'label' => $stat['label'],
+                'total' => ($stat['count'])(),
+            ])
+            // Single digits are dropped, not just zeros: "4 documents saved" standing next to
+            // "1.1M generations" reads worse than three stats would.
+            ->filter(fn (array $stat): bool => $stat['total'] >= 10)
+            ->take(4)
+            ->map(fn (array $stat): array => [
+                'icon' => $stat['icon'],
+                'label' => $stat['label'],
+                // "1.2K" rather than "1,240": the strip is scanned, not read, and the
+                // counter animation in About.vue counts up to whatever prefix this leaves.
+                'value' => Number::abbreviate($stat['total'], maxPrecision: 1),
+            ])
+            ->values();
+
+        // One lonely figure is not a strip. Below two, About.vue skips the band entirely.
+        return $stats->count() >= 2 ? $stats->all() : [];
+    }
+
+    /**
+     * Featured testimonials, falling back to any active one so the band is not empty on an
+     * install that never marked a favourite. Returns [] when there are none at all, and the
+     * page simply skips the section.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function aboutTestimonials(): array
+    {
+        if (! Schema::hasTable('testimonials')) {
+            return [];
+        }
+
+        $columns = ['name', 'role', 'company', 'avatar', 'content', 'rating'];
+
+        $testimonials = Testimonial::active()->featured()->ordered()->limit(3)->get($columns);
+
+        if ($testimonials->count() < 3) {
+            $testimonials = Testimonial::active()->ordered()->limit(3)->get($columns);
+        }
+
+        return $testimonials
+            ->map(fn (Testimonial $testimonial): array => [
+                'name' => $testimonial->name,
+                'role' => trim(implode(', ', array_filter([$testimonial->role, $testimonial->company]))),
+                'avatar' => $testimonial->avatar ? media_url($testimonial->avatar) : null,
+                'content' => $testimonial->content,
+                'rating' => (int) $testimonial->rating,
+            ])
+            ->all();
+    }
+
+    /**
+     * The two buttons in the hero and the closing band. Both point at routes that exist for
+     * the current visitor: a signed-in reader is offered their dashboard rather than a
+     * sign-up form, and sign-up is skipped entirely where registration is closed.
+     *
+     * @return array<string, array<string, string>|null>
+     */
+    private function aboutCta(): array
+    {
+        $primary = match (true) {
+            auth()->check() => ['label' => translate('Open your dashboard'), 'href' => route('user.dashboard')],
+            (bool) settings('registration_enabled', true) => ['label' => translate('Create a free account'), 'href' => route('register')],
+            default => null,
+        };
+
+        return [
+            'primary' => $primary,
+            'secondary' => ['label' => translate('Explore the AI tools'), 'href' => route('ai.tools.index')],
+        ];
     }
 
     /**

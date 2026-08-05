@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Layout from '@themes/default/js/Layouts/AppLayout.vue';
+import AboutPage from '@themes/default/js/Components/AboutPage.vue';
 import ContactForm from '@themes/default/js/Components/ContactForm.vue';
 import ContactInfoPanel from '@themes/default/js/Components/ContactInfoPanel.vue';
 import FaqAccordion from '@themes/default/js/Components/FaqAccordion.vue';
@@ -17,6 +18,7 @@ type ContentBlock =
 const props = defineProps<{
     page: any
     seo?: any
+    about?: any
     contactSettings?: any
     contactChannels?: any[] | null
     contentBlocks?: ContentBlock[]
@@ -50,6 +52,15 @@ const blocks = computed<ContentBlock[]>(() =>
 // once the page uses a shortcode, so the two renderers can't both claim the content.
 const usesShortcodes = computed(() => blocks.value.some((block) => block.type !== 'html'));
 
+// The About page gets its own full-bleed layout (hero band, stats, sticky section index),
+// so it is rendered outside the standard container below. Its story is built from the HTML
+// blocks; any shortcode block still renders, underneath, through the normal components.
+const isAboutPage = computed(() => props.page?.slug === 'about');
+const aboutHtml = computed(() =>
+    blocks.value.filter((block) => block.type === 'html').map((block) => (block as { html: string }).html).join('')
+);
+const aboutExtraBlocks = computed(() => blocks.value.filter((block) => block.type !== 'html'));
+
 const pageMaxWidth = computed(() => {
     const width = props.page?.container_width;
     if (width === 'full') return '100%';
@@ -78,7 +89,15 @@ const pageMaxWidth = computed(() => {
     </Head>
 
     <Layout>
-        <div class="w-full pt-6 md:pt-10 pb-12">
+        <AboutPage v-if="isAboutPage" :page="page" :about="about" :content="aboutHtml">
+            <template #after-content>
+                <template v-for="(block, i) in aboutExtraBlocks" :key="i">
+                    <FaqBlock v-if="block.type === 'faqs'" v-bind="block.props" />
+                </template>
+            </template>
+        </AboutPage>
+
+        <div v-else class="w-full pt-6 md:pt-10 pb-12">
             <div :style="{ '--page-width': pageMaxWidth, maxWidth: pageMaxWidth }" class="mx-auto px-4 sm:px-6">
 
                 <div class="flex flex-col lg:flex-row gap-12">
