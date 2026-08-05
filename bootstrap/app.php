@@ -40,6 +40,21 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             MakeAiPreventRequestsDuringMaintenance::class,
         );
 
+        // Where an already-authenticated visitor lands when they open a guest-only route.
+        //
+        // The framework picks ONE destination for the whole application — route('home')
+        // here — and the guard that actually matched is not passed to this callback. So a
+        // signed-in admin who opened /admin/login was bounced to the public homepage, out
+        // of the panel they were already inside. The panel is recognised by its own route
+        // names rather than by the URL prefix, which routes/web.php owns and can change.
+        $middleware->redirectUsersTo(function (Illuminate\Http\Request $request): string {
+            $route = (string) $request->route()?->getName();
+
+            return str_starts_with($route, 'admin.')
+                ? route('admin.dashboard')
+                : route('home');
+        });
+
         // Runs before session/CSRF so an "entire site" IP ban short-circuits
         // early and cheaply (it exempts /admin/* internally).
         $middleware->web(prepend: [
