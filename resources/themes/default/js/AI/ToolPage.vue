@@ -867,8 +867,8 @@ const copyToolLink = () => {
             <div v-if="toolPageSettings.layout === 'default'" class="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-card dark:border-white/5 dark:bg-[#111827] sm:px-6">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-3" :class="{ 'lg:justify-end': toolPageSettings.hide_breadcrumbs }">
                     <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm">
-                        <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-primary-400">
-                            <i class="ti ti-home"></i>
+                        <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-primary-400" :aria-label="t('Home')">
+                            <i class="ti ti-home" aria-hidden="true"></i>
                         </Link>
                         <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
                         <Link :href="routeTo('ai.tools.index')" class="text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-primary-400">{{ t('AI Tools') }}</Link>
@@ -965,8 +965,8 @@ const copyToolLink = () => {
                 <div v-if="toolPageSettings.layout !== 'modern'" class="flex flex-wrap items-center justify-between gap-4 mb-3">
                     <!-- Breadcrumbs -->
                     <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm">
-                        <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">
-                            <i class="ti ti-home"></i>
+                        <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white" :aria-label="t('Home')">
+                            <i class="ti ti-home" aria-hidden="true"></i>
                         </Link>
                         <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
                         <Link :href="routeTo('ai.tools.index')" class="text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">{{ t('AI Tools') }}</Link>
@@ -1021,8 +1021,8 @@ const copyToolLink = () => {
                     <!-- Inside Card Top Row for Modern Layout only (Breadcrumbs, Share, Favorite) -->
                     <div v-if="toolPageSettings.layout === 'modern'" class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between pb-4 mb-3 border-b border-gray-100 dark:border-white/5" :class="{ 'lg:justify-end': toolPageSettings.hide_breadcrumbs }">
                         <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm">
-                            <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">
-                                <i class="ti ti-home"></i>
+                            <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white" :aria-label="t('Home')">
+                                <i class="ti ti-home" aria-hidden="true"></i>
                             </Link>
                             <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
                             <Link :href="routeTo('ai.tools.index')" class="text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">{{ t('AI Tools') }}</Link>
@@ -1139,8 +1139,8 @@ const copyToolLink = () => {
 
                         <!-- Breadcrumbs -->
                         <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 mb-4">
-                            <Link :href="routeTo('home')" class="text-gray-500 hover:text-primary-600 dark:hover:!text-white">
-                                <i class="ti ti-home"></i>
+                            <Link :href="routeTo('home')" class="text-gray-500 hover:text-primary-600 dark:hover:!text-white" :aria-label="t('Home')">
+                                <i class="ti ti-home" aria-hidden="true"></i>
                             </Link>
                             <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-[10px]"></i>
                             <Link :href="routeTo('ai.tools.index')" class="text-gray-500 hover:text-primary-600 dark:hover:!text-white">{{ t('AI Tools') }}</Link>
@@ -1226,7 +1226,7 @@ const copyToolLink = () => {
                                     </div>
                                 </div>
                                 <Tooltip v-if="hasUsageExamples && usageExamples.length > 0" :content="t('Try example')" placement="left">
-                                    <button type="button" :disabled="applyingExampleIndex !== null" class="text-gray-400 transition-colors hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 disabled:opacity-50" @click="applyExample(usageExamples[0], 0)">
+                                    <button type="button" :disabled="applyingExampleIndex !== null" :aria-label="t('Try example')" class="text-gray-400 transition-colors hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 disabled:opacity-50" @click="applyExample(usageExamples[0], 0)">
                                         <i class="ti ti-refresh text-base"></i>
                                     </button>
                                 </Tooltip>
