@@ -1222,7 +1222,7 @@ const copyToolLink = () => {
                                 <div class="flex items-center gap-2">
                                     <i :class="['ti ti-sparkles', 'text-[20px]']" :style="{ color: tool.color || '#1F75FE' }"></i>
                                     <div class="min-w-0 flex-1">
-                                        <h6 class="text-sm font-semibold text-gray-700 dark:text-white">{{ t('Prompt Parameters') }}</h6>
+                                        <h2 class="text-sm font-semibold text-gray-700 dark:text-white">{{ t('Prompt Parameters') }}</h2>
                                     </div>
                                 </div>
                                 <Tooltip v-if="hasUsageExamples && usageExamples.length > 0" :content="t('Try example')" placement="left">

@@ -909,7 +909,7 @@ const hasFooterContent = computed(() => {
                             :icon-use-platform-surface="false"
                         />
                         <form method="post" action="/newsletter/subscribe" class="default-newsletter-form w-full">
-                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="default-newsletter-input  min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" :aria-label="newsletterPlaceholder || t('Email address')" class="default-newsletter-input  min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
                             <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
                                 {{ newsletterButtonLabel }}
                             </button>

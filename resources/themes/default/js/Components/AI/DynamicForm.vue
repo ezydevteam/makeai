@@ -41,6 +41,19 @@ const values = computed({
 
 const fieldName = (field: ToolField): string => field.name || field.key || field.id || ''
 
+/**
+ * DOM id for a field's control, so the visible <label> can point at it.
+ *
+ * Without this the label rendered but carried no `for`, and no control carried an
+ * `id` — so every prompt field was visually labelled and anonymous in the
+ * accessibility tree. Placeholders do not name a control, so screen readers and
+ * agents saw a form of unidentified boxes.
+ *
+ * Prefixed because fieldName() comes from tool config and is only unique within
+ * this form; an unprefixed "topic" could collide with anything else on the page.
+ */
+const fieldId = (field: ToolField): string => `tool-field-${fieldName(field)}`
+
 const fieldError = (field: ToolField): string => {
     if (!props.fieldErrors) return ''
     const name = fieldName(field)
@@ -255,13 +268,14 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 <template>
     <form class="space-y-4" @submit.prevent="emit('submit')">
         <div v-for="field in fields" :key="fieldName(field)">
-            <label v-if="field.type !== 'toggle' && field.type !== 'checkbox' && field.type !== 'hidden'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label v-if="field.type !== 'toggle' && field.type !== 'checkbox' && field.type !== 'hidden'" :for="fieldId(field)" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 {{ field.label }}
                 <span v-if="field.required" class="text-danger-500">*</span>
             </label>
 
             <!-- textarea / code_input -->
             <textarea
+                :id="fieldId(field)"
                 v-if="field.type === 'textarea' || field.type === 'code_input'"
                 :value="String(values[fieldName(field)] ?? '')"
                 :rows="field.type === 'code_input' ? 8 : (field.rows || 4)"
@@ -277,6 +291,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- select / tone_select / language_select / length_select / model_select / audience_select -->
             <AppSelect
                 v-else-if="['select', 'tone_select', 'language_select', 'length_select', 'model_select', 'audience_select'].includes(field.type)"
+                :id="fieldId(field)"
                 :model-value="String(values[fieldName(field)] ?? '') || null"
                 :options="normalizedOptions(field)"
                 :placeholder="field.placeholder || `Select ${field.label.toLowerCase()}...`"
@@ -287,6 +302,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- number -->
             <input
+                :id="fieldId(field)"
                 v-else-if="field.type === 'number'"
                 :value="String(values[fieldName(field)] ?? '')"
                 type="number"
@@ -303,6 +319,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- slider -->
             <div v-else-if="field.type === 'slider'" class="space-y-2">
                 <input
+                    :id="fieldId(field)"
                     :value="getSliderValue(field)"
                     type="range"
                     :min="parseFloat(String(field.min ?? 0))"
@@ -336,6 +353,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- color -->
             <AppColorPicker
                 v-else-if="field.type === 'color'"
+                :id="fieldId(field)"
                 :model-value="String(values[fieldName(field)] ?? field.default ?? '#10b981')"
                 :disabled="disabled"
                 :error="fieldError(field)"
@@ -345,6 +363,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- tags_input -->
             <div v-else-if="field.type === 'tags_input'" class="space-y-2">
                 <input
+                    :id="fieldId(field)"
                     type="text"
                     :placeholder="field.placeholder || 'Type and press Enter'"
                     :disabled="disabled"
@@ -366,6 +385,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- file_upload / image_upload -->
             <input
+                :id="fieldId(field)"
                 v-else-if="field.type === 'file_upload' || field.type === 'image_upload'"
                 :accept="field.type === 'image_upload' ? 'image/*' : undefined"
                 type="file"
@@ -377,6 +397,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- date -->
             <input
+                :id="fieldId(field)"
                 v-else-if="field.type === 'date'"
                 :value="String(values[fieldName(field)] ?? '')"
                 type="date"
@@ -390,6 +411,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- datetime_local -->
             <input
+                :id="fieldId(field)"
                 v-else-if="field.type === 'datetime_local'"
                 :value="String(values[fieldName(field)] ?? '')"
                 type="datetime-local"
@@ -422,6 +444,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- multi_select -->
             <AppSelect
                 v-else-if="field.type === 'multi_select'"
+                :id="fieldId(field)"
                 :model-value="Array.isArray(values[fieldName(field)]) ? values[fieldName(field)] as (string | number)[] : []"
                 :options="normalizedOptions(field)"
                 :placeholder="field.placeholder || `Select ${field.label.toLowerCase()}...`"
@@ -433,6 +456,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- hidden -->
             <input
+                :id="fieldId(field)"
                 v-else-if="field.type === 'hidden'"
                 :value="String(values[fieldName(field)] ?? field.default ?? '')"
                 type="hidden"
@@ -440,6 +464,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
 
             <!-- fallback: url, text, or unknown type -->
             <input
+                :id="fieldId(field)"
                 v-else
                 :value="String(values[fieldName(field)] ?? '')"
                 :type="field.type === 'url' ? 'url' : 'text'"
