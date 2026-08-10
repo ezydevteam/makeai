@@ -143,7 +143,7 @@ const icons: [string, string][] = [
     ['ti ti-language', 'Language'],
     ['ti ti-abc', 'Text'],
     ['ti ti-keyboard', 'Input'],
-    ['ti ti-scan-text', 'OCR'],
+    ['ti ti-text-scan-2', 'OCR'],
 
     // ── Content & Writing ─────────────────────────────
     ['ti ti-writing', 'Writing'],
@@ -263,7 +263,7 @@ const icons: [string, string][] = [
     ['ti ti-circle-minus', 'Remove Circle'],
 
     // ── Layout ────────────────────────────────────────
-    ['ti ti-sliders', 'Sliders'],
+    ['ti ti-adjustments-horizontal', 'Sliders'],
     ['ti ti-layout-list', 'List View'],
     ['ti ti-layout-grid', 'Grid View'],
     ['ti ti-layout-columns', 'Columns'],
