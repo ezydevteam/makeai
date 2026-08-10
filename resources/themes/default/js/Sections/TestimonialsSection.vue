@@ -230,11 +230,11 @@ onUnmounted(() => gsapCtx?.revert())
 
                     <!-- Navigation buttons -->
                     <div v-if="!hideControls" class="hidden md:block">
-                        <button class="testimonials-button-prev absolute -left-4 top-1/2 z-20 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 hover:text-primary-600 active:scale-95 transition-all dark:!border-surface-800/60 dark:!bg-surface-900/60 dark:!text-gray-300 dark:hover:!bg-surface-800/80 dark:hover:!border-primary-500/30">
-                            <i class="ti ti-chevron-left text-lg"></i>
+                        <button class="testimonials-button-prev absolute -left-4 top-1/2 z-20 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 hover:text-primary-600 active:scale-95 transition-all dark:!border-surface-800/60 dark:!bg-surface-900/60 dark:!text-gray-300 dark:hover:!bg-surface-800/80 dark:hover:!border-primary-500/30" type="button" :aria-label="t('Previous testimonial')">
+                            <i class="ti ti-chevron-left text-lg" aria-hidden="true"></i>
                         </button>
-                        <button class="testimonials-button-next absolute -right-4 top-1/2 z-20 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 hover:text-primary-600 active:scale-95 transition-all dark:!border-surface-800/60 dark:!bg-surface-900/60 dark:!text-gray-300 dark:hover:!bg-surface-800/80 dark:hover:!border-primary-500/30">
-                            <i class="ti ti-chevron-right text-lg"></i>
+                        <button class="testimonials-button-next absolute -right-4 top-1/2 z-20 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 hover:text-primary-600 active:scale-95 transition-all dark:!border-surface-800/60 dark:!bg-surface-900/60 dark:!text-gray-300 dark:hover:!bg-surface-800/80 dark:hover:!border-primary-500/30" type="button" :aria-label="t('Next testimonial')">
+                            <i class="ti ti-chevron-right text-lg" aria-hidden="true"></i>
                         </button>
                     </div>
 
