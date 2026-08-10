@@ -77,3 +77,15 @@ storage/app/exports/
 
 # Playwright MCP browser console logs (tooling artefact, not project state)
 /.playwright-mcp/
+
+# Built documentation. `docs:build-html` regenerates both from database/docs, and
+# together they are ~930MB — a single `git add -A` would put that in history for
+# good. The release build generates documentation/docs.html into its own staging
+# tree, so nothing here needs to ship from the repo.
+/docs/html/
+/docs/makeai-docs.zip
+
+# Saved page renders from debugging. These are dumps of authenticated admin pages
+# (they carry the CSRF token of whoever produced them) and they sit in the webroot,
+# where anything not matched by the front-controller rewrite is served as a file.
+/public/dump_*.html
