@@ -1,1 +1,0 @@
-import{o as e}from"./app-BC3XmBC5.js";function t(e,t){let n=e.response;return n?.data?.message?n.data.message:n?.data?.error?n.data.error:n?.status===429?`Too many requests. Please slow down.`:n?.status===419?`Your session expired. Please reload the page.`:t}function n(n,r){let i=t(n,r);return e().error(i),i}export{n,t};

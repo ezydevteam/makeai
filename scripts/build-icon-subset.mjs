@@ -33,7 +33,12 @@ const pkg = resolve(root, 'node_modules/@tabler/icons-webfont/dist')
 
 // Directories scanned for `ti-<name>` occurrences.
 const SCAN_DIRS = ['resources', 'addons', 'database', 'app', 'config']
-const SCAN_EXTS = ['vue', 'ts', 'js', 'php', 'css', 'blade.php']
+// `sql` is load-bearing: database/data/data.sql is the baseline the installer
+// imports, and it carries icon names for tools, categories and homepage sections
+// that appear in no source file. Without it those glyphs are absent from the
+// subset and render as blank boxes on a fresh install — ti-confetti,
+// ti-hand-click and ti-heart-handshake were exactly that.
+const SCAN_EXTS = ['vue', 'ts', 'js', 'php', 'css', 'blade.php', 'sql']
 
 // Icons that the scan cannot see (rendered from admin-authored data rather than
 // a literal in source). Keep this list short and explain each entry.
