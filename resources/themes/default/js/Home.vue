@@ -120,6 +120,57 @@ const buildSimpleHomepageConfig = (): HomepageConfig => {
 
 const homepageConfig = computed<HomepageConfig>(() => props.homepage ?? buildSimpleHomepageConfig())
 const enabledSections = computed(() => homepageConfig.value.sections.filter((s) => isEnabled(s.enabled, true)))
+
+// ─── Below-the-fold sections ───
+//
+// Sections/index.ts splits every non-hero section into its own chunk, but that alone
+// buys nothing: the v-for renders all of them on mount, so all their chunks are
+// requested at once anyway — measured as MORE files and MORE bytes than the single
+// bundle, because each chunk carries its own wrapper. The saving only exists if the
+// section is not rendered yet, which is what this does.
+//
+// EAGER_SECTIONS covers what can be on screen at first paint. The rest render a bare
+// spacer until they come within EAGER_MARGIN of the viewport, then swap to the real
+// component — and the spacer is dropped entirely rather than left as a wrapper, so a
+// rendered section has exactly the same parentage and CSS it had before.
+//
+// Loading a screen ahead means the swap happens off-screen, where a height correction
+// costs no CLS. Without IntersectionObserver every section renders immediately, which
+// is the old behaviour rather than a broken page.
+const EAGER_SECTIONS = 2
+const EAGER_MARGIN = '800px'
+
+// Keyed by position, not section.id — these config objects carry no id (the existing
+// :key="section.id" has always been undefined), so an id-keyed Set never matches and
+// nothing would ever reveal. Position is stable for a given enabledSections render.
+const revealed = ref(new Set<number>())
+const supportsObserver = typeof IntersectionObserver !== 'undefined'
+let sectionObserver: IntersectionObserver | null = null
+
+const isRevealed = (index: number): boolean =>
+    index < EAGER_SECTIONS || ! supportsObserver || revealed.value.has(index)
+
+const observeSection = (el: Element | null, index: number): void => {
+    if (! el || ! sectionObserver) return
+    ;(el as HTMLElement).dataset.sectionIndex = String(index)
+    sectionObserver.observe(el)
+}
+
+if (supportsObserver) {
+    sectionObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (! entry.isIntersecting) continue
+            const raw = (entry.target as HTMLElement).dataset.sectionIndex
+            if (raw === undefined) continue
+            sectionObserver?.unobserve(entry.target)
+            // Reassigned rather than mutated: a Set mutation is not reactive in Vue 3.
+            revealed.value = new Set(revealed.value).add(Number(raw))
+        }
+    }, { rootMargin: EAGER_MARGIN })
+}
+
+onUnmounted(() => sectionObserver?.disconnect())
+
 const showScrollButton = ref(false)
 interface SimpleHeaderSettings {
     mobile_bottom?: {
@@ -205,10 +256,20 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     </Head>
 
     <Layout>
+        <!-- Keyed by type+position, not section.id: these configs carry no id, so the old
+             :key="section.id" gave every item the same undefined key. Vue then reconciled
+             them positionally and, once an item could switch between a spacer and a real
+             section, patched the wrong nodes — leaving spacers that never resolved. -->
+        <template v-for="(section, sectionIndex) in enabledSections" :key="`${section.type}-${sectionIndex}`">
+        <div
+            v-if="! isRevealed(sectionIndex)"
+            :ref="(el) => observeSection(el as Element | null, sectionIndex)"
+            class="min-h-[50vh]"
+            aria-hidden="true"
+        ></div>
         <component
+            v-else
             :is="sectionComponentMap[section.type]"
-            v-for="section in enabledSections"
-            :key="section.id"
             :section="section"
             :testimonials="section.type === 'testimonials' ? testimonials : undefined"
             :faqs="section.type === 'faq' ? faqs : undefined"
@@ -219,6 +280,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             :recent-posts="section.type === 'latest_posts' ? (recentBlogPosts || []) : undefined"
             :announcements="section.type === 'announcement' ? allAnnouncements : undefined"
         />
+        </template>
 
         <button
             v-if="showScrollButton && themeShowBackToTop"
