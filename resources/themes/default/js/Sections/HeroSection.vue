@@ -330,6 +330,31 @@ const headlineParts = computed(() => {
     return { prefix: parts[0] ?? '', phrases: parts.slice(1) }
 })
 
+// CLS: the phrase span reserves room for the longest phrase — do not "simplify" it
+// back to a plain inline-block.
+//
+// The rotating phrase flows inline after the prefix, so a swap to a word of a
+// different length used to re-wrap the heading and move the subheading ~60px up and
+// down, on a loop that never settled because the animation never stops. That measured
+// 0.115 CLS on mobile — essentially the page's entire CLS budget.
+//
+// The template stacks every phrase in one CSS grid cell (all `col-start-1 row-start-1`),
+// visibility-hidden except the live one. The cell therefore sizes itself to the widest
+// phrase, so the phrase's footprint is constant from the first typed character and the
+// heading's line breaking can never change. The alternative — a hard-coded <br> before
+// the phrase — was rejected because the headline is admin-editable config: a break that
+// suits today's copy orphans a word in the next person's.
+//
+// Sizing from `headlineParts.phrases` is what makes it safe for arbitrary config: no
+// fixed width to keep in step with the text, and it re-measures on resize and locale
+// change for free. Cost is trailing space after phrases shorter than the longest.
+//
+// Do not add `justify-items-start` to that grid. The cell is deliberately left on the
+// default `stretch` so the live text fills it and then follows whatever `text-align`
+// the variant sets — left in the split/asymmetric heroes, centred in the two that
+// centre their headline, and either one in variant 1, where alignment is admin-chosen.
+// Pinning it to the start looks right only in the left-aligned variants and hangs the
+// text off-centre in the rest.
 const showTypewriter = computed(() => headlineParts.value.phrases.length > 0)
 
 let typewriterTimer: ReturnType<typeof setInterval> | null = null
@@ -622,7 +647,7 @@ onUnmounted(() => {
                         <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]" class="mb-8 font-black leading-[1.25] tracking-tight gsap-heading">
                             <template v-if="showTypewriter">
                                 <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                                &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                                &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                             </template>
                             <template v-else-if="headlineSplitLines.length">
                                 <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -717,7 +742,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                            &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -820,7 +845,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                            &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -940,7 +965,7 @@ onUnmounted(() => {
                     <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), 'font-black leading-[1.15] tracking-tight mb-6 gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                            &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -1105,7 +1130,7 @@ onUnmounted(() => {
                 <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                     <template v-if="showTypewriter">
                         <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                        &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                        &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                     </template>
                     <template v-else-if="headlineSplitLines.length">
                         <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -1219,7 +1244,7 @@ onUnmounted(() => {
                     <h1 :class="['mb-5 text-4xl font-black leading-[1.25] tracking-tight md:text-5xl lg:text-6xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
                             <template v-for="(line, i) in typewriterPrefixLines" :key="'p'+i">{{ line }}<br v-if="i < typewriterPrefixLines.length - 1"></template>
-                            &nbsp;<span class="inline-block min-w-[2ch]" :class="accentColorClass">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span>
+                            &nbsp;<span class="hero-phrase inline-grid min-w-[2ch] align-bottom" :class="accentColorClass"><span v-for="(phrase, pi) in headlineParts.phrases" :key="'sizer' + pi" class="hero-phrase__sizer invisible col-start-1 row-start-1" aria-hidden="true">{{ phrase }}</span><span class="col-start-1 row-start-1">{{ typewriterText }}<span class="hero-caret" :style="caretStyle" aria-hidden="true"></span></span></span>
                         </template>
                         <template v-else-if="headlineSplitLines.length">
                             <template v-for="(line, i) in headlineSplitLines" :key="i">{{ line }}<br v-if="i < headlineSplitLines.length - 1"></template>
@@ -1407,9 +1432,22 @@ onUnmounted(() => {
    animate-pulse's sine fade — a caret that eases in and out looks like it is breathing,
    not typing. The colour arrives inline (see caretStyle) because `currentColor` is
    transparent inside the gradient headline. */
+/* The phrase sizers set the grid cell's width, but the caret rides along with the live
+   text — so once the longest phrase is fully typed, the visible cell child overhangs
+   every sizer by exactly the caret's footprint and the cell grows. Reserving the same
+   footprint on each sizer keeps the cell width constant. Keep --hero-caret-space equal
+   to .hero-caret's width + margin-inline-start below. */
+.hero-phrase {
+    --hero-caret-space: 0.135em;
+}
+
+.hero-phrase__sizer {
+    margin-inline-end: var(--hero-caret-space);
+}
+
 .hero-caret {
     display: inline-block;
-    width: 0.055em;
+    width: 0.055em; /* 0.055em + 0.08em = --hero-caret-space */
     min-width: 2px;
     height: 0.78em;
     margin-inline-start: 0.08em;

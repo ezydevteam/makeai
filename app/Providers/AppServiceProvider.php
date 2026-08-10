@@ -10,6 +10,7 @@ use App\Policies\BlogPostPolicy;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Vite;
 use App\Services\AddonService;
 use Illuminate\Support\ServiceProvider;
 
@@ -50,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         // composer and not Inertia shared props.
         \Illuminate\Support\Facades\View::composer('app', \App\View\Composers\AppHeadComposer::class);
 
+        $this->configureViteAssetPaths();
         $this->configureHttps();
         $this->recordQueueWorkerHeartbeat();
         $this->configureInfrastructureFallbacks();
@@ -125,6 +127,38 @@ class AppServiceProvider extends ServiceProvider
                 Log::debug('Queue worker heartbeat could not be recorded: '.$e->getMessage());
             }
         });
+    }
+
+    /**
+     * Emit Vite asset URLs root-relative so the client-side loader recognises them.
+     *
+     * Laravel builds these through asset(), which prefixes APP_URL and yields an
+     * ABSOLUTE url. Vite's own preload helper resolves the same dependency against
+     * its configured base ('/build/' — see vite.config.ts) and skips injecting a
+     * tag only when it finds a match with:
+     *
+     *     document.querySelector(`link[href="${dep}"][rel="stylesheet"]`)
+     *
+     * That is an ATTRIBUTE selector, so "https://host/build/assets/app.css" never
+     * matches the "/build/assets/app.css" it looks for. The result was a second
+     * <link> injected at runtime for every stylesheet the server had already sent
+     * — seven of them on the homepage. Free in bytes (the browser serves the
+     * second from cache) but not free at all in CPU: each duplicate is another
+     * entry in the CSSOM, and style recalculation cost scales with rules matched
+     * against elements. The homepage was recalculating ~1,600 elements against a
+     * doubled stylesheet set seven times per load.
+     *
+     * Matching Vite's form fixes it at the source. Skipped when a CDN/ASSET_URL is
+     * configured, where assets legitimately live on another origin and the
+     * duplicate tag is the lesser evil versus pointing at the wrong host.
+     */
+    private function configureViteAssetPaths(): void
+    {
+        if (filled(config('app.asset_url'))) {
+            return;
+        }
+
+        Vite::createAssetPathsUsing(static fn (string $path): string => '/'.ltrim($path, '/'));
     }
 
     private function configureHttps(): void

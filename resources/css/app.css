@@ -1,5 +1,8 @@
 @import 'tailwindcss';
-@import '@tabler/icons-webfont/dist/tabler-icons.css';
+/* Subset of @tabler/icons-webfont — the 432 glyphs this app can actually render,
+   not all 5,147. Regenerate with `node scripts/build-icon-subset.mjs` after
+   introducing an icon that was not previously used anywhere. */
+@import './tabler-icons-subset.css';
 
 /* =============================================
    MakeAI — Design System
@@ -1396,29 +1399,12 @@ input[type="checkbox"]:disabled {
 
 /* =============================================
    Tabler Icons — Filled Webfont Support
-   ============================================= */
-@font-face {
-    font-family: "tabler-icons-filled";
-    font-style: normal;
-    font-weight: 400;
-    src: url('@tabler/icons-webfont/dist/fonts/tabler-icons-filled.woff2') format('woff2'),
-         url('@tabler/icons-webfont/dist/fonts/tabler-icons-filled.woff') format('woff'),
-         url('@tabler/icons-webfont/dist/fonts/tabler-icons-filled.ttf') format('truetype');
-}
-
-.ti-heart-filled {
-    font-family: "tabler-icons-filled" !important;
-}
-.ti-heart-filled:before {
-    content: "\f67c" !important;
-}
-
-.ti-star-filled {
-    font-family: "tabler-icons-filled" !important;
-}
-.ti-star-filled:before {
-    content: "\f6a6" !important;
-}
+   =============================================
+   The @font-face and the per-icon .ti-*-filled rules are now generated into
+   tabler-icons-subset.css (imported at the top of this file) from the icons the
+   repo actually references — which also picked up ti-alert-triangle-filled and
+   ti-circle-check-filled, both of which were in use here but had no rule at all
+   and were silently rendering as blank boxes. */
 
 /* =============================================
    Support Ticket Message Content (sanitized rich HTML)

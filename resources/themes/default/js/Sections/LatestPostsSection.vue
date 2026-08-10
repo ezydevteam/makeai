@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadGsapNearViewport } from '../composables/useGsapScrollAnimation'
 import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import { usePage } from '@inertiajs/vue3'
@@ -119,9 +120,9 @@ const initAnimations = async () => {
     gsapCtx.revert()
   }
 
-  const { gsap } = await import('gsap')
-  const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-  gsap.registerPlugin(ScrollTrigger)
+  const gsapLoaded = await loadGsapNearViewport(sectionRef)
+  if (! gsapLoaded) { isInitializing = false; return }
+  const { gsap, ScrollTrigger } = gsapLoaded
 
   gsapCtx = gsap.context(() => {
     // Section Header Entrance

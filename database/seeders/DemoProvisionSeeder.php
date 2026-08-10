@@ -35,12 +35,31 @@ class DemoProvisionSeeder extends Seeder
             return;
         }
 
-        $this->provisionAiKeys();
-        $this->provisionGateways();
-        $this->provisionOauth();
-        $this->provisionExtensions();
-        $this->provisionCaptcha();
-        $this->provisionBranding();
+        // Each step is isolated so one failure cannot take the rest with it. These read
+        // DEMO_* values straight from a public host's .env and provisioning is the last
+        // thing demo:reset does, so a single malformed credential used to abort the whole
+        // chain silently. Branding paid for that: demo:sweep-uploads deletes branding/
+        // early in the reset and provisionBranding() restores it last, so any earlier
+        // throw left the site_logo_* settings pointing at files that had already been
+        // swept — a demo with a 404 for its own logo until the next reset happened to
+        // succeed. A step that fails now says so and the others still run.
+        $steps = [
+            'ai keys' => $this->provisionAiKeys(...),
+            'gateways' => $this->provisionGateways(...),
+            'oauth' => $this->provisionOauth(...),
+            'extensions' => $this->provisionExtensions(...),
+            'captcha' => $this->provisionCaptcha(...),
+            'branding' => $this->provisionBranding(...),
+        ];
+
+        foreach ($steps as $label => $step) {
+            try {
+                $step();
+            } catch (\Throwable $e) {
+                $this->note("{$label}: FAILED — {$e->getMessage()} (remaining steps still run)", true);
+                report($e);
+            }
+        }
     }
 
     /**

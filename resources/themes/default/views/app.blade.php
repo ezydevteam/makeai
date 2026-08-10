@@ -137,7 +137,26 @@
     <link rel="stylesheet" href="{{ route('theme-variables.css') }}?v={{ $themeCssTimestamp }}" />
     @endif
 
-    @routes
+    {{-- Ship the admin route table only where an admin route can actually be resolved.
+         Three cases need it:
+           - a signed-in admin;
+           - an impersonating admin, who browses the public site under the user guard,
+             so the impersonation session counts too — the "Stop impersonating" button
+             in UserLayout resolves route('admin.users.stop_impersonating');
+           - any admin.* page, signed in or not. The panel's login, password-reset and
+             2FA screens are admin routes served to guests by definition and they link
+             to one another, so gating on the guard alone makes route() throw — e.g.
+             Admin/Auth/Login.vue resolving route('admin.password.request').
+         Keyed off the route name rather than the URL so it follows the panel wherever
+         its prefix is configured to. See config/ziggy.php for what "public" drops. --}}
+    @php
+        $ziggyGroup = str_starts_with((string) request()->route()?->getName(), 'admin.')
+            || auth('admin')->check()
+            || session()->has('admin_impersonator_id')
+                ? null
+                : 'public';
+    @endphp
+    @routes($ziggyGroup)
     @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ settings('adsense_publisher_id') }}" crossorigin="anonymous"></script>
     @endif

@@ -25,6 +25,23 @@ use RuntimeException;
 
 class RagToolService
 {
+    /**
+     * Disk that holds RAG source documents.
+     *
+     * Explicitly `local` (storage/app/private), never the default disk. The
+     * installer writes FILESYSTEM_DISK=public so media resolves without a
+     * storage:link symlink, which makes the default disk's root the WEBROOT —
+     * so an unqualified storeAs() published every uploaded document at
+     * <app>/storage/rag-uploads/<user>/<hash>, downloadable by anyone with the
+     * URL and no session. These files are kept for the life of the session
+     * (getSessionFileLocation reads them back for preview), so unlike a scratch
+     * copy the exposure did not end when ingestion finished.
+     *
+     * Uploads written before this change still live on the default disk; the
+     * resolver below falls back to it so old sessions keep working.
+     */
+    private const UPLOAD_DISK = 'local';
+
     public function __construct(
         private AiService $ai,
     ) {}
@@ -126,7 +143,7 @@ class RagToolService
             $queued = [];
 
             foreach ($input['files'] as $file) {
-                $path = $file->storeAs($directory, $file->hashName());
+                $path = $file->storeAs($directory, $file->hashName(), self::UPLOAD_DISK);
                 $filenames[] = $file->getClientOriginalName();
                 $filepaths[] = $path;
                 $queued[] = ['path' => $path, 'name' => $file->getClientOriginalName()];
@@ -148,7 +165,7 @@ class RagToolService
                 try {
                     IngestDocumentJob::dispatch(
                         $kbId,
-                        Storage::path($item['path']),
+                        Storage::disk(self::UPLOAD_DISK)->path($item['path']),
                         $item['name'],
                         $userId,
                         $session->id,
@@ -171,8 +188,8 @@ class RagToolService
             throw new RuntimeException('No file provided.');
         }
 
-        $path = $file->storeAs($directory, $file->hashName());
-        $fullPath = Storage::path($path);
+        $path = $file->storeAs($directory, $file->hashName(), self::UPLOAD_DISK);
+        $fullPath = Storage::disk(self::UPLOAD_DISK)->path($path);
 
         $session->update([
             'source_meta' => [
@@ -1124,6 +1141,22 @@ Cited as [1], [2], etc.';
      */
     public function getSessionFilePath(RagSession $session): ?string
     {
+        return $this->getSessionFileLocation($session)['path'] ?? null;
+    }
+
+    /**
+     * As above, but also names the disk the file is actually on.
+     *
+     * Uploads now go to UPLOAD_DISK, but sessions created before that change
+     * recorded paths on the default disk. Both are checked — same recorded path,
+     * two possible homes — so a preview keeps working across the switch. Callers
+     * must read through the returned disk rather than the default one, or new
+     * uploads 404 and legacy ones resolve against the wrong root.
+     *
+     * @return array{disk: string, path: string}|null
+     */
+    public function getSessionFileLocation(RagSession $session): ?array
+    {
         $meta = $session->source_meta;
         if (! is_array($meta)) {
             return null;
@@ -1135,11 +1168,18 @@ Cited as [1], [2], etc.';
             return null;
         }
 
-        if (! Storage::exists($path)) {
-            return null;
+        // Current location first, then the legacy default disk. Skip the second
+        // probe when they are the same disk so this is one lookup on a stock
+        // FILESYSTEM_DISK=local install.
+        $candidates = array_values(array_unique([self::UPLOAD_DISK, config('filesystems.default')]));
+
+        foreach ($candidates as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return ['disk' => $disk, 'path' => $path];
+            }
         }
 
-        return $path;
+        return null;
     }
 
     /**

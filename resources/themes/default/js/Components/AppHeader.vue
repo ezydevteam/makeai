@@ -2884,7 +2884,7 @@ onUnmounted(() => {
                         <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" aria-hidden="true" />
                     </button>
                     <NotificationBell v-else-if="block.type === 'notification_bell'" context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
-                    <button v-else-if="block.type === 'dark_mode'" type="button" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" @click="toggleDark()">
+                    <button v-else-if="block.type === 'dark_mode'" type="button" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="isDark ? t('Light mode') : t('Dark mode')" @click="toggleDark()">
                         <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                     </button>
@@ -3152,19 +3152,23 @@ onUnmounted(() => {
     >
         <div class="flex h-full items-center justify-between gap-1" :class="containerClass({ ...mobileBottomHeaderConfig, container_width: '1280px' }, true)">
             <template v-for="block in activeMobileBottomBlocks" :key="block.id">
-                <Link v-if="block.type === 'home_link'" :href="String(block.config.link || '/')" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Home')">
+                <!-- aria-label only when the block renders no visible text. These blocks are
+                     admin-relabelled and re-pointed (a "home" block may read "AI Tools"), so a
+                     fixed aria-label would override the visible text with a different accessible
+                     name — WCAG 2.5.3 Label in Name. With a label shown the text is the name. -->
+                <Link v-if="block.type === 'home_link'" :href="String(block.config.link || '/')" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="showBlockLabel(block) ? undefined : blockLabel(block, t('Home'))">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
                     <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v9A2.25 2.25 0 0 0 6.75 21h10.5a2.25 2.25 0 0 0 2.25-2.25v-9" /></svg>
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Home')) }}</span>
                 </Link>
-                <button v-else-if="block.type === 'command_palette'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="openCommandPalette()">
+                <button v-else-if="block.type === 'command_palette'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="showBlockLabel(block) ? undefined : blockLabel(block, t('Search'))" @click="openCommandPalette()">
                     <i :class="[blockIconClass(block, 'ti ti-search'), 'text-xl leading-none']" aria-hidden="true" />
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Search')) }}</span>
                 </button>
                 <div v-else-if="block.type === 'notification_bell' && user" class="flex min-w-0 flex-1 justify-center">
                     <NotificationBell context="user" :label="showBlockLabel(block) ? blockLabel(block, t('Notifications')) : ''" :ui="{ wrapperClass: 'flex min-w-0 w-full', triggerClass: notificationButtonClass(block, true).join(' '), triggerStyle: blockVisualStyle(block), dropdownClass: 'fixed inset-x-4 bottom-20 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-700 shadow-xl dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300', iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                 </div>
-                <button v-else-if="block.type === 'dark_mode'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="isDark ? t('Light mode') : t('Dark mode')" @click="toggleDark()">
+                <button v-else-if="block.type === 'dark_mode'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="showBlockLabel(block) ? undefined : (isDark ? t('Light mode') : t('Dark mode'))" @click="toggleDark()">
                     <i :class="[isDark ? 'ti ti-sun' : 'ti ti-moon', 'text-xl leading-none']" aria-hidden="true" />
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Theme')) }}</span>
                 </button>
@@ -3176,7 +3180,7 @@ onUnmounted(() => {
                     :ui="{ buttonClass: iconSurfaceClass(block, '').join(' '), buttonStyle: blockVisualStyle(block), iconStyle: blockVisualStyle(block) }"
                 />
                 <div v-else-if="block.type === 'user_menu_icon'" class="relative flex min-w-0 flex-1 justify-center" @click.stop>
-                    <button v-if="user" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel" @click="toggleUserMenu('mobile_bottom')">
+                    <button v-if="user" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="showBlockLabel(block) ? undefined : userIconLabel" @click="toggleUserMenu('mobile_bottom')">
                         <span :class="[
                             'flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white',
                             (userMenuAvatarUrl && !avatarLoadError) ? 'bg-gray-100 dark:bg-surface-800' : 'bg-gradient-to-br from-primary-500 to-accent-500'
@@ -3186,7 +3190,7 @@ onUnmounted(() => {
                         </span>
                         <span v-if="showBlockLabel(block)">{{ userFirstName }}</span>
                     </button>
-                    <Link v-else :href="userIconHref" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
+                    <Link v-else :href="userIconHref" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="showBlockLabel(block) ? undefined : userIconLabel">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
                         <span v-if="showBlockLabel(block)">{{ String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>

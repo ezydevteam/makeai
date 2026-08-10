@@ -5,6 +5,8 @@ namespace App\Services\AI\Rag;
 use App\Models\User;
 use App\Services\AI\AiService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -14,6 +16,19 @@ use RuntimeException;
  */
 class DocumentIngestionService
 {
+    /**
+     * Scratch space for files being ingested.
+     *
+     * Pinned to `local` (storage/app/private) rather than the default disk on
+     * purpose. filesystems.default ships as `public`, whose root IS the webroot
+     * (public/storage) — so writing scratch copies there published every document
+     * a user ingested at a guessable-shaped URL, unauthenticated, for as long as
+     * the pipeline ran. `local` is outside the document root, and unlike a remote
+     * default disk it can answer path(), which the extractors need to read the
+     * file off the filesystem.
+     */
+    private const TEMP_DISK = 'local';
+
     public function __construct(
         private TextExtractionService $extractor,
         private SemanticChunkingService $chunker,
@@ -34,8 +49,13 @@ class DocumentIngestionService
                 throw new RuntimeException("Unsupported file type: {$file->getClientOriginalExtension()}");
             }
 
-            $tempPath = $file->store('temp/ingest');
-            $filePath = \Illuminate\Support\Facades\Storage::path($tempPath);
+            $tempPath = $file->store('temp/ingest', self::TEMP_DISK);
+
+            if ($tempPath === false) {
+                throw new RuntimeException('Could not write the upload to temporary storage. Check that storage/app/private is writable.');
+            }
+
+            $filePath = Storage::disk(self::TEMP_DISK)->path($tempPath);
         } else {
             $filePath = $file;
         }
@@ -135,9 +155,11 @@ class DocumentIngestionService
             }
             throw $e;
         } finally {
-            // Cleanup temp file
-            if ($tempPath && \Storage::exists($tempPath)) {
-                \Storage::delete($tempPath);
+            // Cleanup temp file. Must name the same disk it was written to — the
+            // old default-disk delete() silently no-opped whenever the two
+            // differed, leaving every ingested document behind under the webroot.
+            if ($tempPath && Storage::disk(self::TEMP_DISK)->exists($tempPath)) {
+                Storage::disk(self::TEMP_DISK)->delete($tempPath);
             }
         }
     }
@@ -152,11 +174,16 @@ class DocumentIngestionService
         $notify('scraping');
         $text = $this->extractor->extractFromUrl($url);
 
-        // Save as temp file for the pipeline
-        $tempPath = 'temp/ingest_url_'.md5($url).'.txt';
-        \Storage::put($tempPath, $text);
+        // Save as temp file for the pipeline. Random name, not md5($url): on the
+        // old public default disk the path was both web-served and derivable by
+        // anyone who knew which URL had been scraped. Random keeps the name from
+        // being a lookup key even if this ever lands somewhere reachable again,
+        // and stops two concurrent ingests of the same URL sharing one file —
+        // whichever finished first deleted it out from under the other.
+        $tempPath = 'temp/ingest_url_'.Str::random(40).'.txt';
+        Storage::disk(self::TEMP_DISK)->put($tempPath, $text);
 
-        $filePath = \Illuminate\Support\Facades\Storage::path($tempPath);
+        $filePath = Storage::disk(self::TEMP_DISK)->path($tempPath);
 
         // Derive a readable name from the URL
         $parsedUrl = parse_url($url);
@@ -177,8 +204,8 @@ class DocumentIngestionService
 
             return $result;
         } finally {
-            if (\Storage::exists($tempPath)) {
-                \Storage::delete($tempPath);
+            if (Storage::disk(self::TEMP_DISK)->exists($tempPath)) {
+                Storage::disk(self::TEMP_DISK)->delete($tempPath);
             }
         }
     }

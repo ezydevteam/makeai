@@ -5,7 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import AppModal from '@/Components/UI/AppModal.vue';
 import Tooltip from '@/Components/UI/Tooltip.vue';
 import AppSwitch from '@/Components/UI/AppSwitch.vue';
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 import { useTranslate } from '@/Composables/useTranslate';
 import { useDateFormat } from '@/Composables/useDateFormat';
 
@@ -19,9 +19,15 @@ const props = defineProps<{
     mediaCreditDefaults: { image: number; audio: number; transcription: number }
 }>();
 
-props.models.forEach((m: any) => {
-    if (!m.meta || typeof m.meta !== 'object') m.meta = {};
-});
+// meta is a nullable json column, and PHP serializes an emptied array as [].
+// The per-unit inputs v-model straight into model.meta.*, so every model needs a
+// plain object there. Watched (not a one-shot loop) because Inertia hands us a
+// brand-new models array after each save/partial reload, with meta null again.
+watch(() => props.models, (models) => {
+    (models ?? []).forEach((m: any) => {
+        if (!m.meta || typeof m.meta !== 'object' || Array.isArray(m.meta)) m.meta = {};
+    });
+}, { immediate: true });
 
 const showKeyModal = ref(false);
 const deleteKeyId = ref<number | null>(null);

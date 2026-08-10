@@ -104,6 +104,17 @@ const DENY_SUBPATHS = [
     // a buyer build must not carry it at all — it is full of seeded demo users, chats and
     // fake content that has no business in a customer's install.
     'database/data/demo-data.sql',
+    // The documentation corpus. The buyer's offline manual is documentation/docs.html,
+    // rendered from this markdown in the SOURCE tree during step 7 — so excluding the
+    // source files costs the buyer nothing. Nothing in core reads the corpus at runtime:
+    // its only consumer is the AI Assistant addon, which now carries its own copy (see
+    // scripts/build-addon.php). Shipping it here left every buyer without that addon
+    // holding 168 KB of markdown no feature on their site could open.
+    //
+    // Kept in a --demo build, which bundles the assistant and must have it grounded —
+    // the bundled addon is copied from addons/ in the repo, not from a built package,
+    // so it carries only its own two pages.
+    'resources/docs',
 ];
 
 /**
@@ -222,11 +233,12 @@ $allowPlaceholderKey = in_array('--allow-placeholder-key', $options, true);
 $demo      = in_array('--demo', $options, true);
 
 /**
- * The seeders and factories are the demo's only data source (see the DEMO BUILD note),
- * so the deny list is relaxed for it. Everything else about the two builds is identical.
+ * The seeders and factories are the demo's only data source (see the DEMO BUILD note), and
+ * the demo's bundled assistant grounds on resources/docs/core, so the deny list is relaxed
+ * for it. Everything else about the two builds is identical.
  */
 $denySubpaths = $demo
-    ? array_values(array_diff(DENY_SUBPATHS, ['database/seeders', 'database/factories']))
+    ? array_values(array_diff(DENY_SUBPATHS, ['database/seeders', 'database/factories', 'resources/docs']))
     : DENY_SUBPATHS;
 
 $srcDir = dirname(__DIR__);

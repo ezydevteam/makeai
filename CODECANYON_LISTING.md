@@ -19,7 +19,7 @@ This document contains everything you need to launch **MakeAI** on CodeCanyon / 
   <p style="font-size:16px; color:#475569; max-width:640px; margin:0 auto 24px auto; line-height:1.6;">
     Build and launch your own enterprise-grade AI Software-as-a-Service business in minutes. Powered by <strong>Laravel 13</strong>, <strong>Vue 3</strong>, <strong>Real-time Reverb WebSockets</strong>, and <strong>10+ AI Provider Engines</strong>.
   </p>
-  
+
   <a href="https://demo.yourdomain.com" target="_blank">
     <img src="https://cdn.yourdomain.com/makeai/01_makeai_hero_banner.jpg" alt="MakeAI Hero Banner" width="100%" style="border-radius:16px;" />
   </a>
@@ -30,10 +30,10 @@ This document contains everything you need to launch **MakeAI** on CodeCanyon / 
 <!-- TOP BADGES & HIGHLIGHTS -->
 <div align="center">
   <p style="font-size:15px; color:#334155;">
-    <strong>Laravel 13.x</strong> &bull; 
-    <strong>Vue 3 & Inertia.js</strong> &bull; 
-    <strong>Tailwind CSS v4</strong> &bull; 
-    <strong>Real-time WebSockets</strong> &bull; 
+    <strong>Laravel 13.x</strong> &bull;
+    <strong>Vue 3 & Inertia.js</strong> &bull;
+    <strong>Tailwind CSS v4</strong> &bull;
+    <strong>Real-time WebSockets</strong> &bull;
     <strong>Multi-Model AI (OpenAI, Claude, Gemini, DeepSeek, Grok, Ollama)</strong>
   </p>
 </div>
@@ -433,7 +433,7 @@ This document contains everything you need to launch **MakeAI** on CodeCanyon / 
 
   <img src="https://cdn.yourdomain.com/makeai/screenshot_01_homepage.jpg" alt="MakeAI Marketing Homepage & Theme" width="100%" style="border-radius:12px; margin-bottom:12px;" />
   <p><em>Modern, responsive landing page with customizable sections, light/dark mode, and live pricing tables.</em></p>
-  
+
   <br/>
 
   <img src="https://cdn.yourdomain.com/makeai/screenshot_02_tools_catalog.jpg" alt="400+ AI Tools Directory" width="100%" style="border-radius:12px; margin-bottom:12px;" />

@@ -24,7 +24,9 @@ class TranslationService
             return [];
         }
 
-        $cacheKey = "makeai:translations:{$locale}";
+        // v2: entries whose value equals their key are no longer stored (see below).
+        // The suffix invalidates caches written by the previous format.
+        $cacheKey = "makeai:translations:v2:{$locale}";
         $cached = Cache::get($cacheKey);
 
         if (is_array($cached)) {
@@ -42,6 +44,12 @@ class TranslationService
 
             return $default
                 ->merge($current->filter(fn ($value) => filled($value)))
+                // Drop identity entries ("Save" => "Save"). Both consumers — translate()
+                // in PHP and t() in useTranslate.ts — already fall back to the key when a
+                // entry is absent, so these carry no information. On an untranslated
+                // English install that is ~5,000 of ~5,040 keys, and this catalogue is
+                // serialised into the HTML of every page as an Inertia prop.
+                ->reject(fn ($value, $key) => $value === $key)
                 ->toArray();
         });
     }
@@ -95,10 +103,12 @@ class TranslationService
         if ($langCode) {
             Cache::forget("translations_{$langCode}");
             Cache::forget("makeai:translations:{$langCode}");
+            Cache::forget("makeai:translations:v2:{$langCode}");
         } else {
             foreach (Language::pluck('code') as $code) {
                 Cache::forget("translations_{$code}");
                 Cache::forget("makeai:translations:{$code}");
+                Cache::forget("makeai:translations:v2:{$code}");
             }
         }
     }

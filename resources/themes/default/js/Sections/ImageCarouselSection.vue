@@ -288,21 +288,28 @@ const effectiveCardWrapperClass = computed(() => {
 
                     <!-- Pagination bullets. Mobile only: the arrows above reveal on group-hover,
                          which never fires on touch, leaving the carousel undriveable there. -->
-                    <div v-if="maxIndex > 0" class="mt-6 flex items-center justify-center gap-2 md:hidden">
+                    <!-- The dot is 8px of paint inside a 24x24 button: WCAG 2.5.8 sizes the
+                         touch target, not the visual, so the bullets stay small while the
+                         tappable area meets the minimum. -->
+                    <div v-if="maxIndex > 0" class="mt-6 flex items-center justify-center md:hidden">
                         <button
                             v-for="page in maxIndex + 1"
                             :key="page"
                             type="button"
+                            class="flex h-6 w-6 shrink-0 items-center justify-center"
                             :aria-label="t('Go to slide :number', { number: page })"
                             :aria-current="currentIndex === page - 1 ? 'true' : undefined"
-                            :class="[
-                                'h-2 rounded-full transition-all duration-300',
-                                currentIndex === page - 1
-                                    ? 'w-6 bg-primary-500'
-                                    : 'w-2 bg-gray-300 hover:bg-gray-400 dark:bg-surface-700 dark:hover:bg-surface-600',
-                            ]"
                             @click="goToSlide(page - 1)"
-                        ></button>
+                        >
+                            <span
+                                :class="[
+                                    'block h-2 rounded-full transition-all duration-300',
+                                    currentIndex === page - 1
+                                        ? 'w-4 bg-primary-500'
+                                        : 'w-2 bg-gray-300 hover:bg-gray-400 dark:bg-surface-700 dark:hover:bg-surface-600',
+                                ]"
+                            ></span>
+                        </button>
                     </div>
                 </div>
 

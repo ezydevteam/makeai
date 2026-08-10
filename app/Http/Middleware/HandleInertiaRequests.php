@@ -419,7 +419,14 @@ class HandleInertiaRequests extends Middleware
                     3600,
                     fn () => Menu::with(['items' => function ($q) {
                         $q->orderBy('sort_order');
-                    }, 'items.page'])->get()->toArray()
+                    }, 'items.page:id,slug'])
+                        ->get()
+                        // The `page` relation exists only so the final_url accessor can
+                        // read $this->page->slug. Hiding it keeps the computed final_url
+                        // (all the client reads) while dropping ~52KB of full page rows —
+                        // meta, content and all — out of every page's HTML.
+                        ->each(fn (Menu $menu) => $menu->items->each->makeHidden('page'))
+                        ->toArray()
                 );
 
                 // In demo mode, fold the demo nav (Hero ▸ Hero 1–6, Tool Page ▸ Page 1–4)

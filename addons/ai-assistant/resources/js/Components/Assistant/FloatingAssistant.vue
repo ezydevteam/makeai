@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { mediaUrl } from '@/lib/media'
 import AssistantTrigger from './AssistantTrigger.vue'
 import AssistantHeaderButton from './AssistantHeaderButton.vue'
-import AssistantShell from './AssistantShell.vue'
+
+/*
+ | The panel is `v-if="isOpen"`, so it never renders until the visitor opens the
+ | assistant — but a static import downloaded it on every page load anyway, and it
+ | drags in the whole markdown pipeline (marked + DOMPurify) plus the message,
+ | input and history components. That was ~90KB of JavaScript parsed on a homepage
+ | visit that never touches the assistant.
+ |
+ | Async keeps the trigger bubble eager (it has to paint) and defers everything
+ | behind it to the click that actually needs it.
+ */
+const AssistantShell = defineAsyncComponent(() => import('./AssistantShell.vue'))
 import type { AssistantSettings } from '../../types'
 
 const page = usePage()

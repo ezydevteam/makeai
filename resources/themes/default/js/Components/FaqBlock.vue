@@ -91,7 +91,7 @@ watch(selectedCategoryId, () => {
                 <span
                     :class="[
                         selectedCategoryId === cat.id
-                            ? 'bg-white/25 text-white'
+                            ? 'bg-black/20 text-white'
                             : 'bg-gray-200/80 text-gray-500 dark:bg-surface-800 dark:text-gray-400'
                     ]"
                     class="rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-all duration-200"
@@ -155,7 +155,7 @@ watch(selectedCategoryId, () => {
                             <span
                                 :class="[
                                     selectedCategoryId === cat.id
-                                        ? 'bg-white/25 text-white'
+                                        ? 'bg-black/20 text-white'
                                         : 'bg-gray-200/80 text-gray-500 dark:bg-surface-800 dark:text-gray-400'
                                 ]"
                                 class="rounded-full px-1.5 text-[10px] font-bold"

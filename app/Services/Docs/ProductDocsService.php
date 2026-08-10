@@ -96,12 +96,18 @@ final class ProductDocsService
 
     /**
      * Every directory searched: the core corpus, plus a `docs/` folder inside each installed
-     * addon.
+     * addon and any one directory below it.
      *
      * Addons document themselves and ship their own pages, so the assistant is grounded on
      * exactly what the buyer actually has. Before this, every addon's manual lived in core
      * and was searchable on every install — so the assistant would confidently walk an admin
      * through configuring an addon they had never bought.
+     *
+     * The extra level exists because core no longer ships the corpus — the assistant's
+     * package carries it, filed under `docs/core/` so the product manual stays visibly
+     * separate from the two pages that are actually about the addon. One level, not a
+     * recursive walk: the shape is a deliberate convention, not an invitation for an addon
+     * to nest arbitrarily deep.
      *
      * An explicit constructor path opts out entirely: that caller asked for one directory.
      *
@@ -119,6 +125,10 @@ final class ProductDocsService
         // package creates it empty, but a stripped one must not fatal here.
         foreach (glob(base_path('addons/*/docs'), GLOB_ONLYDIR) ?: [] as $dir) {
             $paths[] = $dir;
+
+            foreach (glob($dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR) ?: [] as $sub) {
+                $paths[] = $sub;
+            }
         }
 
         return $paths;
@@ -469,9 +479,22 @@ final class ProductDocsService
     private function files(): array
     {
         $files = [];
+        $seen = [];
 
         foreach ($this->paths() as $dir) {
             foreach (glob(rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . '*.md') ?: [] as $file) {
+                // The same page can legitimately appear twice: core no longer ships the
+                // corpus (the assistant's package carries it instead), but an install
+                // whose core predates that change still has resources/docs/core while the
+                // updated addon brings its own copy. Indexing both double-weights the page
+                // in scoring and cites it twice, so first path wins — core before addons.
+                $name = strtolower(basename($file));
+
+                if (isset($seen[$name])) {
+                    continue;
+                }
+
+                $seen[$name] = true;
                 $files[] = $file;
             }
         }

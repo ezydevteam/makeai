@@ -78,6 +78,18 @@ class UpdateService
      */
     public function applyUpdateFromZip(string $uploadedZipPath): bool
     {
+        // Fail before runUpdate() takes the site down for maintenance: a missing or
+        // unreadable upload here means the caller resolved it on a different disk
+        // than it was written to, and the raw copy() warning ("Failed to open
+        // stream") gives an admin nothing to act on.
+        if (! File::exists($uploadedZipPath) || ! File::isReadable($uploadedZipPath)) {
+            throw new \Exception(
+                'The uploaded package could not be read at '.$uploadedZipPath.'. '
+                .'Check that FILESYSTEM_DISK points at a local driver and that '
+                .'storage/app/private is writable.'
+            );
+        }
+
         return $this->runUpdate(function (string $tempDir) use ($uploadedZipPath): array {
             $zipPath = $tempDir . '/update.zip';
             File::copy($uploadedZipPath, $zipPath);

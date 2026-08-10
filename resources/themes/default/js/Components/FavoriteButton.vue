@@ -30,7 +30,15 @@ const iconSize = computed(() => {
     return 'h-5 w-5'
 })
 
-const label = computed(() => favorited.value ? t('Remove from favorites') : t('Add to favorites'))
+// With showCount the button renders the count as its only visible text, so the
+// accessible name has to contain that number too — otherwise the name a screen
+// reader announces ("Add to favorites") has nothing in common with what a speech
+// -input user would say to activate it ("12"). WCAG 2.5.3 Label in Name.
+const label = computed(() => {
+    const action = favorited.value ? t('Remove from favorites') : t('Add to favorites')
+
+    return props.showCount ? `${action} (${favoriteCount.value})` : action
+})
 
 watch(() => props.isFavorited, (value) => {
     favorited.value = value

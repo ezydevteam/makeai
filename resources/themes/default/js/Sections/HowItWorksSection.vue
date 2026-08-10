@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadGsapNearViewport } from '../composables/useGsapScrollAnimation'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useSectionStyle } from '../composables/useSectionStyle'
 import { Swiper, SwiperSlide } from 'swiper/vue'
@@ -50,11 +51,9 @@ const sectionRef = ref<HTMLElement | null>(null)
 let gsapCtx: any = null
 
 onMounted(async () => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-  const { gsap } = await import('gsap')
-  const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-  gsap.registerPlugin(ScrollTrigger)
+  const gsapLoaded = await loadGsapNearViewport(sectionRef)
+  if (! gsapLoaded) return
+  const { gsap, ScrollTrigger } = gsapLoaded
 
   gsapCtx = gsap.context(() => {
     // Section heading
@@ -154,7 +153,7 @@ onUnmounted(() => gsapCtx?.revert())
                         <article v-for="(item, index) in howItWorksSteps()" :key="`${item.title}_${index}`" :class="[howItWorksStepCardClass(asString(section.config.step_card_style, 'bordered')), 'flex flex-col h-full step-item']">
                             <div class="mb-5 flex items-center justify-between gap-3">
                                 <span :class="['inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black', howItWorksStepIndexClass(asString(section.config.step_card_style, 'bordered'))]">{{ String(index + 1).padStart(2, '0') }}</span>
-                                <p class="text-[10px] font-black uppercase tracking-[0.28em] text-primary-500 dark:text-primary-300">{{ t('Step :count', { count: String(index + 1).padStart(2, '0') }) }}</p>
+                                <p class="text-[10px] font-black uppercase tracking-[0.28em] text-primary-700 dark:text-primary-300">{{ t('Step :count', { count: String(index + 1).padStart(2, '0') }) }}</p>
                                 <span v-if="item.icon" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:!bg-primary-500/20 dark:!text-primary-400 dark:border dark:border-primary-500/30"><i :class="String(item.icon)"></i></span>
                             </div>
                             <h3 class="text-xl font-black !text-gray-900 dark:!text-white">{{ item.title || item.label || item.name }}</h3>
@@ -179,7 +178,7 @@ onUnmounted(() => gsapCtx?.revert())
                                 <article :class="[howItWorksStepCardClass(asString(section.config.step_card_style, 'bordered')), 'h-full flex-1 flex flex-col']">
                                     <div class="mb-5 flex items-center justify-between gap-3">
                                         <span :class="['inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black', howItWorksStepIndexClass(asString(section.config.step_card_style, 'bordered'))]">{{ String(index + 1).padStart(2, '0') }}</span>
-                                        <p class="text-[10px] font-black uppercase tracking-[0.28em] text-primary-500 dark:text-primary-300">{{ t('Step :count', { count: String(index + 1).padStart(2, '0') }) }}</p>
+                                        <p class="text-[10px] font-black uppercase tracking-[0.28em] text-primary-700 dark:text-primary-300">{{ t('Step :count', { count: String(index + 1).padStart(2, '0') }) }}</p>
                                         <span v-if="item.icon" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:!bg-primary-500/20 dark:!text-primary-400 dark:border dark:border-primary-500/30"><i :class="String(item.icon)"></i></span>
                                     </div>
                                     <h3 class="text-xl font-black !text-gray-900 dark:!text-white">{{ item.title || item.label || item.name }}</h3>

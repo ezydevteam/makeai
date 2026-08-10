@@ -68,18 +68,34 @@ class HomepageController extends Controller
                     ->toArray()
                 : [];
 
+            // The column list MUST be applied with select() rather than passed to get().
+            // withCount() sets `select ai_tools.*` on the underlying query, and the query
+            // builder only honours get()'s columns when none are set yet — so a get([...])
+            // list here is silently discarded and every column (including the private
+            // prompt_system / prompt_user) would be serialised into the page HTML.
             $allTools = AiTool::active()
+                ->select(['id', 'slug', 'name', 'description', 'icon', 'color', 'category_id', 'tags', 'usage_count', 'avg_rating', 'is_featured', 'created_at'])
                 ->with('category:id,name')
                 ->withCount('favorites')
                 ->orderBy('name')
-                ->get(['id', 'slug', 'name', 'description', 'icon', 'color', 'category_id', 'tags', 'usage_count', 'avg_rating', 'is_featured', 'created_at'])
+                ->get()
                 ->map(function (AiTool $tool) use ($userFavoriteToolIds): array {
-                    $data = $tool->toArray();
-                    $data['category'] = $tool->category?->name;
-                    $data['is_favorited'] = in_array($tool->id, $userFavoriteToolIds);
-                    $data['favorites_count'] = $tool->favorites_count ?? 0;
-
-                    return $data;
+                    return [
+                        'id' => $tool->id,
+                        'slug' => $tool->slug,
+                        'name' => $tool->name,
+                        'description' => $tool->description,
+                        'icon' => $tool->icon,
+                        'color' => $tool->color,
+                        'category' => $tool->category?->name,
+                        'tags' => $tool->tags,
+                        'usage_count' => $tool->usage_count,
+                        'avg_rating' => $tool->avg_rating,
+                        'is_featured' => $tool->is_featured,
+                        'created_at' => $tool->created_at?->toDateString(),
+                        'is_favorited' => in_array($tool->id, $userFavoriteToolIds),
+                        'favorites_count' => $tool->favorites_count ?? 0,
+                    ];
                 })
                 ->toArray();
 

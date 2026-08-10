@@ -103,6 +103,43 @@ class RagAuditFixesTest extends TestCase
         );
     }
 
+    // ─── Uploads are private, not web-served ───────────────────────
+
+    /**
+     * The installer sets FILESYSTEM_DISK=public, whose root is the webroot, so an
+     * unqualified storeAs() published every uploaded document. Uploads must name
+     * the private `local` disk.
+     */
+    public function test_a_new_upload_resolves_on_the_private_disk(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create(['is_active' => true]);
+        Storage::disk('local')->put("rag-uploads/{$user->id}/new.pdf", 'hello');
+
+        $session = $this->ragSession($user, ['filepath' => "rag-uploads/{$user->id}/new.pdf"]);
+
+        $location = app(RagToolService::class)->getSessionFileLocation($session);
+
+        $this->assertSame('local', $location['disk']);
+        $this->assertSame("rag-uploads/{$user->id}/new.pdf", $location['path']);
+    }
+
+    /**
+     * A file on neither disk resolves to nothing rather than a path the caller
+     * would then fail to read.
+     */
+    public function test_a_missing_upload_resolves_to_null(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create(['is_active' => true]);
+        $session = $this->ragSession($user, ['filepath' => "rag-uploads/{$user->id}/gone.pdf"]);
+
+        $this->assertNull(app(RagToolService::class)->getSessionFileLocation($session));
+        $this->assertNull(app(RagToolService::class)->getSessionFilePath($session));
+    }
+
     // ─── Ingestion refund (mode-aware) ─────────────────────────────
 
     public function test_failed_ingestion_refunds_the_charge_in_metered_mode(): void

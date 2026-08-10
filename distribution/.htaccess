@@ -14,6 +14,24 @@ RedirectMatch 404 ^/core(/|$)
     </IfModule>
 </FilesMatch>
 
+# Long-lived caching for fingerprinted build output.
+#
+# Everything under /build/assets carries a content hash in its filename (Vite),
+# so a changed file is a NEW url and can never be served stale — the only safe
+# place for `immutable`. Without this the host default applies, and cPanel/
+# LiteSpeed commonly ship 4 hours, which makes Lighthouse's "use efficient cache
+# lifetimes" fire and costs repeat visitors a full re-download of the bundle.
+#
+# Deliberately scoped to the hashed directory. Do NOT widen this to /storage:
+# those filenames are stable across re-uploads, so an immutable year would pin
+# a replaced logo in every visitor's cache.
+<IfModule mod_headers.c>
+    <IfModule mod_setenvif.c>
+        SetEnvIf Request_URI "^/build/assets/" IMMUTABLE_ASSET=1
+        Header set Cache-Control "public, max-age=31536000, immutable" env=IMMUTABLE_ASSET
+    </IfModule>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

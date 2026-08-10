@@ -214,12 +214,16 @@ class RagToolController extends Controller
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
-        $path = $this->ragToolService->getSessionFilePath($session);
-        if (! $path || ! \Illuminate\Support\Facades\Storage::exists($path)) {
+        // Read through the disk the resolver found the file on: uploads live on
+        // the private `local` disk now, while sessions predating that change
+        // still point at the default disk. Assuming the default here 404s every
+        // new upload.
+        $location = $this->ragToolService->getSessionFileLocation($session);
+        if (! $location) {
             abort(404);
         }
 
-        return \Illuminate\Support\Facades\Storage::response($path);
+        return \Illuminate\Support\Facades\Storage::disk($location['disk'])->response($location['path']);
     }
 
     /**

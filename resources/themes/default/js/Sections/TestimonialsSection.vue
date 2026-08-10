@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadGsapNearViewport } from '../composables/useGsapScrollAnimation'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useSectionStyle } from '../composables/useSectionStyle'
@@ -96,11 +97,9 @@ const sectionRef = ref<HTMLElement | null>(null)
 let gsapCtx: any = null
 
 onMounted(async () => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-  const { gsap } = await import('gsap')
-  const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-  gsap.registerPlugin(ScrollTrigger)
+  const gsapLoaded = await loadGsapNearViewport(sectionRef)
+  if (! gsapLoaded) return
+  const { gsap, ScrollTrigger } = gsapLoaded
 
   gsapCtx = gsap.context(() => {
     // Section Header Entrance

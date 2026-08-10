@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadGsapNearViewport } from '../composables/useGsapScrollAnimation'
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useSectionStyle } from '../composables/useSectionStyle'
@@ -168,11 +169,9 @@ const sectionRef = ref<HTMLElement | null>(null)
 let gsapCtx: any = null
 
 onMounted(async () => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-  const { gsap } = await import('gsap')
-  const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-  gsap.registerPlugin(ScrollTrigger)
+  const gsapLoaded = await loadGsapNearViewport(sectionRef)
+  if (! gsapLoaded) return
+  const { gsap, ScrollTrigger } = gsapLoaded
 
   gsapCtx = gsap.context(() => {
     // Section Header Entrance
@@ -285,7 +284,7 @@ onUnmounted(() => gsapCtx?.revert())
                             <span
                                 :class="[
                                     selectedCategoryId === cat.id
-                                        ? 'bg-white/25 text-white'
+                                        ? 'bg-black/20 text-white'
                                         : 'bg-gray-200/80 text-gray-500 dark:bg-surface-800 dark:text-gray-400'
                                 ]"
                                 class="rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-all duration-200"
@@ -353,7 +352,7 @@ onUnmounted(() => gsapCtx?.revert())
                                     <span
                                         :class="[
                                             selectedCategoryId === cat.id
-                                                ? 'bg-white/25 text-white'
+                                                ? 'bg-black/20 text-white'
                                                 : 'bg-gray-200/80 text-gray-500 dark:bg-surface-800 dark:text-gray-400'
                                         ]"
                                         class="text-[10px] px-1.5 py-0.2 rounded-full font-bold"

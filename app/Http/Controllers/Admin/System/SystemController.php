@@ -834,7 +834,15 @@ class SystemController extends Controller
             'package.max' => translate('The update package may not be larger than 300 MB.'),
         ]);
 
-        $stored = $request->file('package')->store('temp');
+        // Pin the upload to the `local` disk explicitly. store() without a disk
+        // writes to filesystems.default, which an install is free to point at
+        // `public` or s3 — the package then lands somewhere other than
+        // storage/app/private/temp while the path below still resolves against
+        // `local`, and the update dies on a copy() of a file that was never there
+        // ("Failed to open stream: No such file or directory"). The package also
+        // has to be on a local driver at all: applyUpdateFromZip() reads it with
+        // File::copy(), which cannot see a remote disk.
+        $stored = $request->file('package')->store('temp', 'local');
         $absolute = Storage::disk('local')->path($stored);
 
         try {
