@@ -27,7 +27,7 @@ keywords: [health check, maintenance mode, rate limits, banned ip, custom style,
 
 ## Reviewing the activity log
 
-**Activity Logs** (Super Admin only) shows the last 29 days of admin actions: who did what, when, from which IP and browser, with a details view for the exact payload changed. Filter by admin, date range, or a free-text search.
+**Activity Logs** (Super Admin only) shows the last 29 days of admin actions: who did what, when, from which IP and browser, with a details view for the exact payload changed. Each entry carries a plain-English action label and a category badge (Settings, Security, Users, Roles, Billing, Affiliate, Content, Appearance, Marketing, AI, System, Mail). Filter by admin, date range, or a free-text search. Only changes are recorded — creating, editing, and deleting — so simply viewing a screen leaves no entry, and the actions captured are those performed by Super Admin accounts. Any submitted value whose field name looks like a password, secret, token, API key, credential, license, signature, or webhook is redacted before the entry is written, so live credentials never land in the audit table. The log can't be edited or cleared from the admin panel, by design.
 
 ## Why a health check keeps failing
 
