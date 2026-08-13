@@ -138,13 +138,29 @@ class HttpErrorContractTest extends TestCase
     {
         // /ref/{code} is public and limited to 30 requests/60s per IP. The 31st is
         // rejected with a JSON 429 carrying the RATE_LIMITED contract + Retry-After.
-        $status = null;
+        //
+        // The counter is primed directly rather than by issuing 31 real requests:
+        // the non-redis limiter is a FIXED 60s window, and on a slow machine a
+        // request takes seconds, so the window rolls over (and resets to zero)
+        // before the loop ever reaches the ceiling. Priming keeps the assertion
+        // about the contract instead of about request latency.
+        $limiter = app(RateLimiterService::class);
         $response = null;
-        for ($i = 0; $i < 40; $i++) {
+
+        // A prime + request pair can still straddle a window boundary; retry from a
+        // clean counter if it does.
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            for ($i = 0; $i < 30; $i++) {
+                $limiter->hit('public', '127.0.0.1', 60);
+            }
+
             $response = $this->get('/ref/SOMECODE');
+
             if ($response->getStatusCode() === 429) {
                 break;
             }
+
+            $this->clearPublicThrottle();
         }
 
         $response->assertStatus(429)

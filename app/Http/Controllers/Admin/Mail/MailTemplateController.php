@@ -78,6 +78,11 @@ class MailTemplateController extends Controller
                 default => $query,
             })
             ->latest()
+            // The system templates are imported in one batch and so share a
+            // created_at second; without a tiebreak their relative order is
+            // whatever the driver returns, which can shuffle rows between pages
+            // from one request to the next.
+            ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
 
