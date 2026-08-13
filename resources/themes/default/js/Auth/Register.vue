@@ -82,7 +82,7 @@ const submit = () => {
                         <div class="auth-art-surface"></div>
                         <div class="auth-side-cta">
                             <p class="text-sm font-medium text-white/80">{{ t('Already joined?') }}</p>
-                            <h2 class="mt-2 font-heading text-2xl font-bold leading-tight text-white">
+                            <h2 class="mt-2 text-2xl font-bold leading-tight !text-white">
                                 {{ t('Sign in and continue with your workspace, saved tools, and account settings.') }}
                             </h2>
                             <p class="mt-3 text-sm leading-6 text-white/80">
@@ -234,9 +234,9 @@ const submit = () => {
 
                             <div v-if="isDemo && demoCredentials?.user" class="mt-8 rounded-xl border border-amber-200 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:text-amber-200">
                                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                    <span>{{ t('Demo') }}:</span>
-                                    <code class="font-mono text-xs">{{ demoCredentials.user.email }}</code>
-                                    <code class="font-mono text-xs">{{ demoCredentials.user.password }}</code>
+                                    <span>{{ t('Demo credentials') }}:</span>
+                                    <code class="font-mono text-xs">Email: {{ demoCredentials.user.email }}</code>
+                                    <code class="font-mono text-xs">Password: {{ demoCredentials.user.password }}</code>
                                 </div>
                             </div>
                         </div>
