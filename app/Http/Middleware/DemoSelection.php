@@ -31,9 +31,13 @@ class DemoSelection
             return $next($request);
         }
 
-        $key = (string) $request->cookie('demo_selection', '');
+        $key = $this->activeKey($request);
 
-        if ($key !== '') {
+        // Stashed for HandleInertiaRequests, so the selector modal ticks the demo actually
+        // being rendered rather than whatever the cookie last said.
+        $request->attributes->set('demo_selection', $key);
+
+        if ($key !== null) {
             $overrides = $this->resolver->overridesFor($key);
 
             if ($overrides !== []) {
@@ -44,6 +48,23 @@ class DemoSelection
         $this->applyBlogLayout($request);
 
         return $next($request);
+    }
+
+    /**
+     * The demo this request renders, or null for the site's real configuration.
+     *
+     * `?demo=<name>` wins over the cookie so a copied URL shows the same demo to someone
+     * who has never opened the selector — and an explicit `?demo=default` shows the real
+     * site even while a cookie is set. Absent the param, the cookie carries the choice
+     * across ordinary navigation.
+     */
+    private function activeKey(Request $request): ?string
+    {
+        $param = $request->query('demo');
+
+        return $this->resolver->resolveKey(
+            $param !== null ? (string) $param : (string) $request->cookie('demo_selection', '')
+        );
     }
 
     /**

@@ -247,7 +247,9 @@ class HandleInertiaRequests extends Middleware
             // which one is currently active.
             'demoBar' => fn () => config('demo.enabled') ? [
                 'selectable' => app(\App\Services\DemoSelectionResolver::class)->catalog(),
-                'active' => (string) ($request->cookie('demo_selection') ?? ''),
+                // Resolved by the DemoSelection middleware, which prefers a ?demo= URL
+                // param over the cookie.
+                'active' => (string) ($request->attributes->get('demo_selection') ?? ''),
             ] : null,
 
             'gdpr' => fn (Request $request) => [

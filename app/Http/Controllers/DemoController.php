@@ -22,16 +22,44 @@ class DemoController extends Controller
     {
         abort_unless(config('demo.enabled'), 404);
 
-        $key = (string) $request->query('demo', '');
-        $redirect = redirect()->back(fallback: '/');
+        // 'default', empty, or anything not on the current menu resolves to null and
+        // clears the selection (falls back to the site's real configuration).
+        $key = $resolver->resolveKey((string) $request->query('demo', ''));
 
-        // 'default', empty, or anything not on the current menu clears the selection
-        // (falls back to the site's real configuration).
-        if ($key === '' || $key === 'default' || ! $resolver->isValid($key)) {
+        $redirect = redirect()->to(
+            $this->targetUrl($key === null ? null : $resolver->shortName($key))
+        );
+
+        if ($key === null) {
             return $redirect->withCookie(cookie()->forget('demo_selection'));
         }
 
         // 30 days — long enough that the choice sticks while a buyer explores the demo.
         return $redirect->withCookie(cookie('demo_selection', $key, 60 * 24 * 30));
+    }
+
+    /**
+     * The page to land back on, with `?demo=<name>` stamped into (or stripped out of) its
+     * query string so the address bar names the demo being viewed and the link can be
+     * copied and shared. The cookie still carries the choice across ordinary navigation
+     * and to the theme-CSS request, which has no query string of its own.
+     *
+     * Only the path and query of the referrer are reused — the host is always rebuilt
+     * from the app URL, so a forged Referer cannot turn this into an open redirect.
+     */
+    private function targetUrl(?string $name): string
+    {
+        $previous = parse_url(url()->previous() ?: '/');
+
+        parse_str($previous['query'] ?? '', $query);
+        unset($query['demo']);
+
+        if ($name !== null) {
+            $query['demo'] = $name;
+        }
+
+        return url($previous['path'] ?? '/')
+            . ($query === [] ? '' : '?' . http_build_query($query))
+            . (isset($previous['fragment']) ? '#' . $previous['fragment'] : '');
     }
 }

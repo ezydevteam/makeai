@@ -53,6 +53,67 @@ class DemoSwitcherTest extends TestCase
         $this->get('/__demo/select?demo=default')->assertCookieExpired('demo_selection');
     }
 
+    /**
+     * The chosen demo is named in the address bar, so a buyer can copy the URL of the
+     * demo they are looking at. The bare name is used, not the `preset:` key, so the
+     * link stays readable.
+     */
+    public function test_select_route_stamps_the_demo_name_into_the_redirect_url(): void
+    {
+        config(['demo.enabled' => true]);
+
+        $this->from('/pricing?plan=pro')
+            ->get('/__demo/select?demo=preset:midnight')
+            ->assertRedirect(url('/pricing') . '?plan=pro&demo=midnight');
+    }
+
+    public function test_select_route_strips_the_demo_name_for_default(): void
+    {
+        config(['demo.enabled' => true]);
+
+        // Switching back to the real site must not leave the old demo in the URL.
+        $this->from(url('/pricing') . '?demo=midnight')
+            ->get('/__demo/select?demo=default')
+            ->assertRedirect(url('/pricing'));
+    }
+
+    // ─── Shareable ?demo= URLs ───
+
+    public function test_demo_query_param_applies_the_demo_without_a_cookie(): void
+    {
+        config(['demo.enabled' => true]);
+
+        // Someone opening a shared link has no cookie — the URL alone has to work.
+        $this->get('/?demo=midnight')->assertInertia(
+            fn (Assert $page) => $page->where('demoBar.active', 'preset:midnight')
+        );
+    }
+
+    public function test_demo_query_param_overrides_the_cookie(): void
+    {
+        config(['demo.enabled' => true]);
+
+        $this->withCookie('demo_selection', 'preset:midnight')
+            ->get('/?demo=default')
+            ->assertInertia(fn (Assert $page) => $page->where('demoBar.active', ''));
+    }
+
+    public function test_cookie_still_applies_when_the_url_carries_no_demo_param(): void
+    {
+        config(['demo.enabled' => true]);
+
+        $this->withCookie('demo_selection', 'preset:midnight')
+            ->get('/')
+            ->assertInertia(fn (Assert $page) => $page->where('demoBar.active', 'preset:midnight'));
+    }
+
+    public function test_demo_query_param_is_ignored_when_demo_disabled(): void
+    {
+        config(['demo.enabled' => false]);
+
+        $this->get('/?demo=midnight')->assertInertia(fn (Assert $page) => $page->where('demoBar', null));
+    }
+
     public function test_select_route_ignores_an_unknown_selection(): void
     {
         config(['demo.enabled' => true]);
@@ -213,6 +274,22 @@ class DemoSwitcherTest extends TestCase
         $method->setAccessible(true);
 
         return $method->invoke($resolver, $name);
+    }
+
+    public function test_resolver_normalises_a_bare_demo_name(): void
+    {
+        $resolver = app(DemoSelectionResolver::class);
+
+        // The URL carries the readable half; the full key still works.
+        $this->assertSame('preset:midnight', $resolver->resolveKey('midnight'));
+        $this->assertSame('preset:midnight', $resolver->resolveKey('preset:midnight'));
+        $this->assertSame('midnight', $resolver->shortName('preset:midnight'));
+
+        // Everything that means "the real site" collapses to null.
+        $this->assertNull($resolver->resolveKey('default'));
+        $this->assertNull($resolver->resolveKey(''));
+        $this->assertNull($resolver->resolveKey(null));
+        $this->assertNull($resolver->resolveKey('does-not-exist'));
     }
 
     public function test_resolver_rejects_unknown_selection(): void

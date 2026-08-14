@@ -117,6 +117,41 @@ class DemoSelectionResolver
     }
 
     /**
+     * Normalise whatever arrived in a `?demo=` param or the cookie into a catalog key,
+     * or null for "no selection" (default / unknown).
+     *
+     * Accepts the bare demo name as well as the full key, so the shareable URL can read
+     * `?demo=midnight` instead of the percent-encoded `?demo=preset%3Amidnight`. Presets
+     * are listed before addon homepages, so a bare name that both offer resolves to the
+     * preset.
+     */
+    public function resolveKey(?string $value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '' || $value === 'default') {
+            return null;
+        }
+
+        foreach ($this->catalog() as $option) {
+            if ($option['key'] === $value || $this->shortName($option['key']) === $value) {
+                return $option['key'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The URL-friendly half of a selection key: `preset:midnight` → `midnight`. This is
+     * what the `?demo=` param carries and what a screenshot file is named after.
+     */
+    public function shortName(string $key): string
+    {
+        return str_contains($key, ':') ? explode(':', $key, 2)[1] : $key;
+    }
+
+    /**
      * The in-memory setting overrides for a selection key. Empty array means "no
      * override" — i.e. fall back to whatever the site is actually configured with.
      *

@@ -25,9 +25,13 @@ const subLabel = (o: Selectable) => (o.type === 'addon' ? t('Premium Extension')
 
 const modalOpen = ref(false)
 
-// Full page load so the (cached) theme CSS re-fetches with the new preset applied.
+// Full page load so the (cached) theme CSS re-fetches with the new preset applied. The
+// route redirects back to the current page with ?demo=<name> in the URL, so the address
+// bar names the demo on screen and can be copied as a link.
 function selectDemo(key: string) {
-    window.location.assign(`/__demo/select?demo=${encodeURIComponent(key)}`)
+    const name = key.includes(':') ? key.split(':')[1] : key
+
+    window.location.assign(`/__demo/select?demo=${encodeURIComponent(name)}`)
 }
 </script>
 
