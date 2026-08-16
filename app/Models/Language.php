@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 class Language extends Model
@@ -125,14 +124,6 @@ class Language extends Model
             // DB/cache not ready (e.g. mid-install) — fall back to config.
             return config('app.locale', 'en');
         }
-    }
-
-    /**
-     * Get translations for this language.
-     */
-    public function translations(): HasMany
-    {
-        return $this->hasMany(Translation::class);
     }
 
     /**

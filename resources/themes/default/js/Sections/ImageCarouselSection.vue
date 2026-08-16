@@ -39,6 +39,27 @@ const showCardCaptions = computed(() => ! asBool(props.section.config.hide_capti
 
 const resolveMediaUrl = (path?: string | null): string => mediaUrl(path)
 
+// A configured image whose file is not actually there — a slide left pointing at an
+// upload that was deleted, or a preset carrying a path from another install — would
+// otherwise render as the browser's broken-image glyph. Recording the failed URL lets
+// the same empty-state placeholder below cover it, so the row still reads as finished.
+const brokenImages = ref(new Set<string>())
+
+const hasImage = (url?: SectionConfigValue): boolean => {
+    const value = typeof url === 'string' ? url : ''
+
+    return value !== '' && ! brokenImages.value.has(value)
+}
+
+const markImageBroken = (url?: SectionConfigValue): void => {
+    const value = typeof url === 'string' ? url : ''
+
+    if (value !== '') {
+        // Reassigned rather than mutated: Set.add() alone does not retrigger the template.
+        brokenImages.value = new Set(brokenImages.value).add(value)
+    }
+}
+
 const items = computed(() => asItems(props.section.config.items))
 
 // Columns and Auto change configuration
@@ -235,10 +256,11 @@ const effectiveCardWrapperClass = computed(() => {
                                         :class="isSingleCol ? 'h-[450px] md:h-[500px]' : 'aspect-video'"
                                     >
                                         <img
-                                            v-if="item.image_url"
+                                            v-if="hasImage(item.image_url)"
                                             :src="resolveMediaUrl(String(item.image_url))"
                                             :alt="String(item.title || '')"
                                             loading="lazy"
+                                            @error="markImageBroken(item.image_url)"
                                             class="w-full transition-transform duration-700 ease-out group-hover:scale-105"
                                             :class="isSingleCol ? 'h-full object-cover' : 'h-full object-cover'"
                                         />
@@ -352,9 +374,10 @@ const effectiveCardWrapperClass = computed(() => {
                         <!-- Media viewport -->
                         <div class="relative flex-1 w-full flex items-center justify-center min-h-0 px-4">
                             <img
-                                v-if="activeItem.image_url"
+                                v-if="hasImage(activeItem.image_url)"
                                 :src="resolveMediaUrl(String(activeItem.image_url))"
                                 :alt="String(activeItem.title || '')"
+                                @error="markImageBroken(activeItem.image_url)"
                                 class="max-h-[55vh] sm:max-h-[65vh] md:max-h-[75vh] max-w-full object-contain rounded-2xl select-none shadow-2xl"
                             />
                             <div v-else class="flex h-full w-full items-center justify-center text-gray-500">

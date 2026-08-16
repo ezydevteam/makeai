@@ -1,0 +1,57 @@
+{
+    "bn": {
+        "Presets": "প্রিসেট",
+        "Header": "হেডার",
+        "Footer": "ফুটার",
+        "Colors": "রং",
+        "General": "সাধারণ",
+        "Home": "হোম",
+        "Page": "পৃষ্ঠা",
+        "Typography": "টাইপোগ্রাফি",
+        "Custom Code": "কাস্টম কোড"
+    },
+    "ar": {
+        "Presets": "الإعدادات المسبقة",
+        "Header": "الرأس",
+        "Footer": "التذييل",
+        "Colors": "الألوان",
+        "General": "عام",
+        "Home": "الرئيسية",
+        "Page": "الصفحة",
+        "Typography": "الطباعة",
+        "Custom Code": "شفرة مخصصة"
+    },
+    "es": {
+        "Presets": "Ajustes preestablecidos",
+        "Header": "Encabezado",
+        "Footer": "Pie de página",
+        "Colors": "Colores",
+        "General": "General",
+        "Home": "Inicio",
+        "Page": "Página",
+        "Typography": "Tipografía",
+        "Custom Code": "Código personalizado"
+    },
+    "fr": {
+        "Presets": "Préréglages",
+        "Header": "En-tête",
+        "Footer": "Pied de page",
+        "Colors": "Couleurs",
+        "General": "Général",
+        "Home": "Accueil",
+        "Page": "Page",
+        "Typography": "Typographie",
+        "Custom Code": "Code personnalisé"
+    },
+    "hi": {
+        "Presets": "प्रीसेट",
+        "Header": "हेडर",
+        "Footer": "फ़ूटर",
+        "Colors": "रंग",
+        "General": "सामान्य",
+        "Home": "होम",
+        "Page": "पेज",
+        "Typography": "टाइपोग्राफी",
+        "Custom Code": "कस्टम कोड"
+    }
+}

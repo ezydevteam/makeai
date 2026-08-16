@@ -154,7 +154,7 @@ onUnmounted(() => gsapCtx?.revert())
                     <div class="w-full">
                         <span v-if="asString(section.config.badge_text)" :class="badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </span>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
@@ -164,9 +164,9 @@ onUnmounted(() => gsapCtx?.revert())
                             ]">
                                 <i :class="asString(section.config.icon)"></i>
                             </div>
-                            <h2 :class="['font-black features-heading', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ section.config.title || t('Supercharge your workflow') }}</h2>
+                            <h2 :class="['font-black features-heading', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ t(asString(section.config.title, t('Supercharge your workflow'))) }}</h2>
                         </div>
-                        <p v-if="asString(section.config.subtitle)" :class="['font-medium max-w-2xl mt-4', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ asString(section.config.subtitle) }}</p>
+                        <p v-if="asString(section.config.subtitle)" :class="['font-medium max-w-2xl mt-4', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ t(asString(section.config.subtitle)) }}</p>
                     </div>
                 </div>
                 <div :class="[!cardStyleEnabled ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-10' : `${featureGridClass(asString(section.config.layout, '3-column'))} grid grid-cols-1 gap-8 md:grid-cols-2`]">
@@ -190,10 +190,10 @@ onUnmounted(() => gsapCtx?.revert())
                                     <i :class="String(item.icon || 'ti ti-sparkles')" class="block shrink-0 text-2xl leading-none"></i>
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <h3 class="mb-2 text-[1.15rem] font-black tracking-tight !text-gray-900 dark:!text-white transition-colors duration-300 group-hover:!text-primary-600 dark:group-hover:!text-primary-400">{{ item.title }}</h3>
-                                    <p class="text-sm font-medium leading-7 text-gray-500 dark:text-gray-400">{{ item.description }}</p>
+                                    <h3 class="mb-2 text-[1.15rem] font-black tracking-tight !text-gray-900 dark:!text-white transition-colors duration-300 group-hover:!text-primary-600 dark:group-hover:!text-primary-400">{{ t(item.title) }}</h3>
+                                    <p class="text-sm font-medium leading-7 text-gray-500 dark:text-gray-400">{{ t(item.description) }}</p>
                                     <div v-if="String(item.link_url) && asString(section.config.learn_more_text)" class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary-600 transition group-hover:gap-3 dark:text-primary-400">
-                                        {{ asString(section.config.learn_more_text) }}
+                                        {{ t(asString(section.config.learn_more_text)) }}
                                         <i class="ti ti-arrow-right text-base leading-none"></i>
                                     </div>
                                 </div>
@@ -208,10 +208,10 @@ onUnmounted(() => gsapCtx?.revert())
                                 <div v-if="!item.image_url" :class="[featureCardMediaClass(asString(section.config.card_style, 'bordered')), 'mx-0 mb-6 transition-transform duration-300 group-hover:scale-105']">
                                     <i :class="String(item.icon || 'ti ti-sparkles')" class="block shrink-0 text-2xl leading-none"></i>
                                 </div>
-                                <h3 class="mb-3 text-[1.15rem] font-black tracking-tight !text-gray-900 dark:!text-white transition-colors duration-300 group-hover:!text-primary-600 dark:group-hover:!text-primary-400">{{ item.title }}</h3>
-                                <p class="text-sm font-medium leading-7 text-gray-500 dark:text-gray-400">{{ item.description }}</p>
+                                <h3 class="mb-3 text-[1.15rem] font-black tracking-tight !text-gray-900 dark:!text-white transition-colors duration-300 group-hover:!text-primary-600 dark:group-hover:!text-primary-400">{{ t(item.title) }}</h3>
+                                <p class="text-sm font-medium leading-7 text-gray-500 dark:text-gray-400">{{ t(item.description) }}</p>
                                 <div v-if="String(item.link_url) && asString(section.config.learn_more_text)" class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary-600 transition group-hover:gap-3 dark:text-primary-400">
-                                    {{ asString(section.config.learn_more_text) }}
+                                    {{ t(asString(section.config.learn_more_text)) }}
                                     <i class="ti ti-arrow-right text-base leading-none"></i>
                                 </div>
                             </div>
@@ -221,7 +221,7 @@ onUnmounted(() => gsapCtx?.revert())
                 <div v-if="asString(section.config.button_text) && asString(section.config.button_link)" class="mt-12 text-center">
                     <Link :href="asString(section.config.button_link)" :class="heroButtonClass(asString(section.config.button_style, 'primary_filled'))" class="inline-flex items-center justify-center gap-3 rounded-2xl px-8 py-4 font-black transition-colors">
                         <i v-if="asString(section.config.button_icon)" :class="[asString(section.config.button_icon), 'block shrink-0 text-lg leading-none']"></i>
-                        {{ asString(section.config.button_text) }}
+                        {{ t(asString(section.config.button_text)) }}
                     </Link>
                 </div>
             </div>

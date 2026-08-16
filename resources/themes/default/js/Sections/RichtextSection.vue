@@ -38,7 +38,7 @@ const asString = (v: SectionConfigValue | undefined, fallback = ''): string => t
                     <div class="w-full">
                         <div v-if="asString(section.config.badge_text)" :class="[badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))]">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </div>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
@@ -48,9 +48,9 @@ const asString = (v: SectionConfigValue | undefined, fallback = ''): string => t
                             ]">
                                 <i :class="asString(section.config.icon)"></i>
                             </div>
-                            <h2 v-if="asString(section.config.title)" :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ asString(section.config.title) }}</h2>
+                            <h2 v-if="asString(section.config.title)" :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ t(asString(section.config.title)) }}</h2>
                         </div>
-                        <p v-if="asString(section.config.subtitle)" :class="['font-medium max-w-2xl mt-4', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ asString(section.config.subtitle) }}</p>
+                        <p v-if="asString(section.config.subtitle)" :class="['font-medium max-w-2xl mt-4', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ t(asString(section.config.subtitle)) }}</p>
                     </div>
                 </div>
                 <article class="max-w-none prose dark:prose-invert !text-gray-800 dark:!text-gray-200 prose-p:!text-gray-700 dark:prose-p:!text-gray-300 prose-headings:!text-gray-900 dark:prose-headings:!text-white" v-html="asString(section.config.content)"></article>

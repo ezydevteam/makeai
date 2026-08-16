@@ -125,21 +125,31 @@ class Category extends Model
         return $this->is_system;
     }
 
-    public function getEffectiveAccessLevel(): string
+    /**
+     * The level this category and its ancestors define, or 'inherit' when none of them do.
+     *
+     * Split out from getEffectiveAccessLevel() because this half is pure database state and
+     * so is safe to cache, while the settings fallback below it is not: the tool catalog
+     * caches its serialized list for an hour, and baking a settings-derived value into that
+     * left listing badges an hour behind the detail page after an admin changed the default.
+     */
+    public function resolvedAccessLevel(): string
     {
         $level = $this->access_level ?? 'inherit';
 
-        if ($level === 'inherit') {
-            if ($this->parent) {
-                $parentLevel = $this->parent->getEffectiveAccessLevel();
-                if ($parentLevel !== 'inherit') {
-                    return $parentLevel;
-                }
-            }
-
-            return settings('default_tool_access_level', 'login');
+        if ($level === 'inherit' && $this->parent) {
+            return $this->parent->resolvedAccessLevel();
         }
 
         return $level;
+    }
+
+    public function getEffectiveAccessLevel(): string
+    {
+        $level = $this->resolvedAccessLevel();
+
+        return $level === 'inherit'
+            ? settings('default_tool_access_level', 'login')
+            : $level;
     }
 }

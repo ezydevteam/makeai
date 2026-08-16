@@ -245,7 +245,7 @@ onUnmounted(() => gsapCtx?.revert())
                     <div class="w-full">
                         <span v-if="asString(section.config.badge_text)" :class="badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </span>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
@@ -256,11 +256,11 @@ onUnmounted(() => gsapCtx?.revert())
                                 <i :class="section.config.icon !== undefined ? asString(section.config.icon) : 'ti ti-help-circle'"></i>
                             </div>
                             <h2 :class="['font-bold', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">
-                                {{ asString(section.config.heading ?? section.config.title, t('Frequently Asked Questions')) }}
+                                {{ t(asString(section.config.heading ?? section.config.title, t('Frequently Asked Questions'))) }}
                             </h2>
                         </div>
                         <p v-if="asString(section.config.subheading ?? section.config.subtitle)" :class="['font-medium mt-4 max-w-2xl', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">
-                            {{ asString(section.config.subheading ?? section.config.subtitle) }}
+                            {{ t(asString(section.config.subheading ?? section.config.subtitle)) }}
                         </p>
                     </div>
                 </div>
@@ -395,7 +395,7 @@ onUnmounted(() => gsapCtx?.revert())
                                                 ]"
                                                 class="text-sm font-semibold md:text-base leading-snug transition-colors duration-200"
                                             >
-                                                {{ faq.question }}
+                                                {{ t(faq.question) }}
                                             </span>
                                             <!-- Category tag badge (only in 'All' category view to distinguish different groups) -->
                                             <span

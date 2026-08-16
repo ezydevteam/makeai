@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\AdminRole;
 use App\Services\LicenseService;
+use App\Support\RedisProbe;
 use Installer\Services\EnvFileService;
 use Installer\Services\SystemCheckService;
 use Illuminate\Http\Request;
@@ -68,6 +69,17 @@ class InstallController extends Controller
             // chance to show it, with the real absolute path already filled in.
             $props['cronCommand'] = sprintf(
                 '* * * * * cd %s && php artisan schedule:run >> /dev/null 2>&1',
+                base_path()
+            );
+
+            // The second cron, and the reason the review step asks about it: the queue
+            // driver this install ends up on depends on whether this one exists. The
+            // --queue list is the priority order and is NOT optional — `queue:work`
+            // without it serves only "default" and would strand otp and emails. Kept
+            // identical to deploy/cron.txt.
+            $props['queueCommand'] = sprintf(
+                '* * * * * cd %s && php artisan queue:work --queue=otp,emails,mail,default,'
+                . 'webhooks,ai,media,embeddings,social,low --stop-when-empty --max-time=55 >> /dev/null 2>&1',
                 base_path()
             );
         }
@@ -186,6 +198,10 @@ class InstallController extends Controller
         $envPath = base_path('.env');
         $errors = [];
         $dbReady = false;
+        // Tracked separately from $errors: every other phase here is genuinely
+        // non-critical, but an install with no admin account cannot be used at all and
+        // must not be reported as "complete" alongside cosmetic warnings.
+        $adminProvisioned = false;
 
         // ─── Phase 0: Bootstrap .env file ───
         if (! file_exists($envPath)) {
@@ -358,12 +374,35 @@ class InstallController extends Controller
             // Sessions are deliberately NOT switched to Redis: the "active sessions
             // / sign out other devices" feature reads the sessions table, which
             // Redis sessions never populate, so that stays on the database driver.
-            if ($this->redisIsReachable()) {
+            $redis = RedisProbe::detect();
+
+            if ($redis['reachable']) {
                 $replacements['CACHE_STORE'] = 'redis';
                 // predis is bundled, so Redis works even without the phpredis
                 // extension; only prefer phpredis when it is actually installed.
-                $replacements['REDIS_CLIENT'] = extension_loaded('redis') ? 'phpredis' : 'predis';
+                $replacements['REDIS_CLIENT'] = RedisProbe::preferredClient();
+
+                // The probe looks beyond REDIS_HOST — a per-user unix socket is how
+                // most shared hosts expose Redis, and the wizard never asks for one.
+                // When it answered somewhere other than the configured address, write
+                // that address down, or the app would go on dialling the wrong one.
+                foreach ($redis['env'] as $key => $value) {
+                    $replacements[$key] = $value;
+                }
             }
+
+            // The queue. index.php boots a fresh install on `sync` because no database
+            // exists yet, and nothing used to move it off again — so every install ran
+            // jobs inline forever, whatever .env.example said.
+            //
+            // Restored here, but only as far as it is safe to go: on `database` or
+            // `redis` a job is stored and never runs until a worker picks it up, and on
+            // shared hosting there usually is no worker. That failure is silent and
+            // lands on sign-in codes and password resets. So the buyer's own answer on
+            // the review step decides it, and the default stays `sync`.
+            $replacements['QUEUE_CONNECTION'] = $request->boolean('queue_worker_ready')
+                ? ($redis['reachable'] ? 'redis' : 'database')
+                : 'sync';
 
             foreach ($replacements as $key => $value) {
                 $pattern = '/^' . preg_quote($key, '/') . '=.*$/m';
@@ -441,7 +480,18 @@ class InstallController extends Controller
                 } else {
                     throw new \RuntimeException('No data source available: database/data/data.sql is missing and the database seeders are not present.');
                 }
+            } catch (\Throwable $e) {
+                $errors[] = 'Data bootstrap: ' . $e->getMessage();
+            }
 
+            // ─── Phase 4b: Admin account ───
+            // Deliberately its OWN try block. It used to share one with the import
+            // above, so any failure there — a dump too large for max_allowed_packet, a
+            // host that forbids SET FOREIGN_KEY_CHECKS, a timeout — skipped this step
+            // silently. The import is not transactional and the admins row lands in the
+            // first 10% of the dump, so the usual result was a seeded placeholder admin
+            // left in place while the wizard still reported a successful install.
+            try {
                 // Update or create admin account
                 $admin = Admin::where('email', 'admin@makeai.com')->first();
 
@@ -462,8 +512,10 @@ class InstallController extends Controller
                         'is_active' => true,
                     ]);
                 }
+
+                $adminProvisioned = true;
             } catch (\Throwable $e) {
-                $errors[] = 'Data bootstrap: ' . $e->getMessage();
+                $errors[] = 'Admin account: ' . $e->getMessage();
             }
 
             // ─── Phase 5: Store site settings + license ───
@@ -519,6 +571,21 @@ class InstallController extends Controller
 
         // Migration failure is handled earlier (Phase 2) by bailing out before the
         // app is ever marked installed, so reaching here means the database is ready.
+
+        // No admin account means there is no way into the site, so this is reported as a
+        // failure even though the database is migrated and INSTALLED=true is persisted.
+        // Saying "complete" here is how an install that never provisioned an admin used
+        // to reach production still holding the seeded placeholder account.
+        if (! $adminProvisioned) {
+            $failureMessage = 'Installation finished, but the administrator account could not be created, '
+                . 'so there is no way to sign in yet. Details: ' . implode(' | ', $errors);
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $failureMessage], 500);
+            }
+
+            return back()->with('error', $failureMessage);
+        }
 
         $successMessage = 'Installation complete! You may now log in as the admin user.';
         if (! empty($errors)) {
@@ -774,50 +841,6 @@ class InstallController extends Controller
      * `php artisan installer:export-data`. Runs the whole dump in one shot, wrapped
      * in an FK-checks guard so parent/child insert order can never fail the import.
      */
-    /**
-     * Is a Redis server actually reachable with the default connection details?
-     *
-     * A raw socket PING rather than the Redis facade: no extension is assumed, no
-     * package needs booting, and a wrong host simply fails fast (1s timeout)
-     * instead of throwing deep in a driver. Handles a password if REDIS_PASSWORD
-     * is set; without one it tests the common localhost, no-auth setup.
-     */
-    private function redisIsReachable(): bool
-    {
-        $host = env('REDIS_HOST', '127.0.0.1');
-        $port = (int) env('REDIS_PORT', 6379);
-        $password = env('REDIS_PASSWORD');
-
-        $errno = 0;
-        $errstr = '';
-        $fp = @fsockopen($host, $port, $errno, $errstr, 1.0);
-
-        if (! $fp) {
-            return false;
-        }
-
-        try {
-            stream_set_timeout($fp, 1);
-
-            if (filled($password)) {
-                fwrite($fp, "AUTH {$password}\r\n");
-                $auth = fgets($fp, 64);
-                if (! is_string($auth) || $auth === '' || $auth[0] !== '+') {
-                    return false;
-                }
-            }
-
-            fwrite($fp, "PING\r\n");
-            $pong = fgets($fp, 64);
-
-            return is_string($pong) && str_starts_with($pong, '+PONG');
-        } catch (\Throwable) {
-            return false;
-        } finally {
-            fclose($fp);
-        }
-    }
-
     private function importDataBootstrap(string $path): void
     {
         $sql = file_get_contents($path);

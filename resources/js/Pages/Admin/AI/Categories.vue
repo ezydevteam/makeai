@@ -183,11 +183,11 @@ const parentOptions = computed(() => {
 })
 
 const accessLevels = computed<SelectOption[]>(() => props.accessLevels ?? [
+    // Mirrors config/access-levels.php — see the same note in Admin/AI/Access.vue.
     { value: 'inherit', label: t('Inherit (Default)') },
-    { value: 'public', label: t('Public (No Login)') },
-    { value: 'login_required', label: t('Login Required') },
-    { value: 'free_plan', label: t('Free Plan') },
-    { value: 'pro_plan', label: t('Pro Plan') },
+    { value: 'guest', label: t('Guest (Free)') },
+    { value: 'login', label: t('Login Required') },
+    { value: 'premium', label: t('Premium (Any Plan)') },
 ])
 
 const statusFilterOptions: SelectOption[] = [

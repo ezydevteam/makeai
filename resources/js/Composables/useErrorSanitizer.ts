@@ -13,6 +13,28 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
 
     const lower = message.toLowerCase()
 
+    // ── Our own access messages (must stay first) ────────────
+    // Already translated and written for the reader — not signed in, unverified address,
+    // suspended account. The API-key bucket below matches bare words like 'authentication'
+    // and 'unauthorized', so without this it claimed CheckCredits' 401
+    // ("Authentication required to use this tool.") and rendered it as
+    // "This AI provider is not configured. Please contact support." — telling a visitor the
+    // site is broken, and a buyer to go and check API keys that were never the problem.
+    // Mirrors the same guard in App\Services\AI\AiErrors::sanitize().
+    if (
+        lower.includes('authentication required') ||
+        lower.includes('please log in') ||
+        lower.includes('please sign in') ||
+        lower.includes('session expired') ||
+        lower.includes('session has expired') ||
+        lower.includes('unauthenticated') ||
+        lower.includes('verify your email') ||
+        lower.includes('account has been suspended') ||
+        lower.includes('upgrade to pro')
+    ) {
+        return message
+    }
+
     // ── Rate limit / Quota ───────────────────────────────────
     if (
         lower.includes('rate limited by ai provider') ||

@@ -28,6 +28,8 @@ interface ToolData {
     color?: string
     output_type?: string
     access_level: string
+    /** Server-resolved level (tool → category → default_tool_access_level). Prefer this. */
+    effective_access_level?: string
     supports_brand_voice?: boolean
     fields: ToolField[] | string | Record<string, ToolField>
     about_content?: string
@@ -363,13 +365,16 @@ const canSubmit = computed(() => {
     })
 })
 
-// Single source of truth for the tool's resolved access level. Mirrors the backend
-// AiTool::getEffectiveAccessLevel() ('inherit' falls through to the category level).
-// Valid values: guest | login | premium | plan:* — there is no 'public'.
-const effectiveAccessLevel = computed(() => {
-    const level = props.tool.access_level || 'inherit'
-    return level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
-})
+// The tool's resolved access level, decided by the server (AiTool::getEffectiveAccessLevel)
+// and passed down. Valid values: guest | login | premium | plan:* — there is no 'public'.
+//
+// Resolving it here instead meant re-implementing the last step of that chain, and getting
+// it wrong: this fell back to 'guest' when tool and category are both 'inherit', while the
+// server falls back to settings('default_tool_access_level', 'login'). Every inherit-level
+// tool then offered a signed-out visitor an enabled Generate button with no sign-in CTA,
+// and the POST came back 401 from CheckCredits. Fails closed if the prop is ever absent:
+// an unnecessary sign-in prompt is recoverable, an unusable Generate button is not.
+const effectiveAccessLevel = computed(() => props.tool.effective_access_level || 'login')
 
 const needsLogin = computed(() => {
     const level = effectiveAccessLevel.value
@@ -466,16 +471,14 @@ const hasHowItWorks = computed(() => props.tool.show_how_it_works && howItWorks.
 const hasUsageExamples = computed(() => props.tool.show_usage_examples && usageExamples.value.some(e => String(e.title || '').trim() !== '' || Object.keys(e.input || {}).length > 0 || exampleOutput(e.output).trim() !== ''))
 const hasFaqs = computed(() => props.tool.show_faqs && faqItems.value.some(f => String(f.question || '').trim() !== '' || String(f.answer || '').trim() !== ''))
 const accessBadgeLabel = computed(() => {
-    const level = props.tool.access_level || 'inherit'
-    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    const effectiveLevel = effectiveAccessLevel.value
     if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) return t('Pro')
     if (effectiveLevel === 'login') return t('Login')
     return t('Free')
 })
 
 const accessBadgeClass = computed(() => {
-    const level = props.tool.access_level || 'inherit'
-    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    const effectiveLevel = effectiveAccessLevel.value
     if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) {
         return 'border-accent-500/20 bg-gradient-to-r from-accent-500 to-primary-500 text-white shadow-sm'
     }

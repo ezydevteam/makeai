@@ -1,18 +1,69 @@
-MIT License
+MakeAI — Licence
+================
 
-Copyright (c) 2026 MakeAI
+Copyright (c) 2026 MakeAI. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software is a commercial product sold through Envato Market
+(CodeCanyon). It is NOT open-source software and is not placed in the public
+domain.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+YOUR LICENCE
+------------
+
+Your use of MakeAI is governed by the Envato licence you purchased with it,
+and by that licence alone. Two are available, and the one that applies to you
+is the one named on your Envato purchase receipt:
+
+  Regular Licence
+      Use in a single end product that is free for end users. End users may
+      not be charged for access to the product itself.
+      https://codecanyon.net/licenses/standard#regular
+
+  Extended Licence
+      Use in a single end product that end users may be charged for.
+      https://codecanyon.net/licenses/standard#extended
+
+The full and authoritative text of both is published by Envato at:
+
+      https://codecanyon.net/licenses/standard
+
+Where anything in this file conflicts with Envato's published licence terms,
+Envato's terms govern.
+
+
+IN SHORT
+--------
+
+One purchase licenses ONE end product (one installation / one domain). Each
+additional site needs its own purchase.
+
+You MAY:
+  • install and run it, and modify the source for your own end product
+  • use it commercially, subject to the licence tier you purchased
+
+You MAY NOT:
+  • redistribute, resell, sublicense, lease or give away the source code,
+    whether modified or not
+  • offer it (or a derivative of it) as a template, theme, script, plugin or
+    starter kit for others to use or build on
+  • remove, disable or circumvent the licensing and activation mechanisms
+
+
+THIRD-PARTY COMPONENTS
+----------------------
+
+MakeAI bundles open-source libraries — including the Laravel framework and the
+packages listed in composer.json / package.json — which remain the property of
+their respective authors and are used under their own licences (MIT and
+similar). Those licences apply to those components only, and NOT to MakeAI
+itself. Each package's own licence text ships alongside it under core/vendor/.
+
+
+NO WARRANTY
+-----------
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER

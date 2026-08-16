@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\LanguageStoreRequest;
 use App\Http\Requests\Admin\LanguageUpdateRequest;
 use App\Models\Language;
-use App\Models\Translation;
 use App\Services\TranslationService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -70,16 +69,10 @@ class LanguageController extends Controller
 
         $lang = Language::create($data);
 
-        // Sync existing keys to this new language
-        $keys = Translation::distinct()->pluck('key');
-        foreach ($keys as $key) {
-            Translation::create([
-                'language_id' => $lang->id,
-                'key' => $key,
-                'value' => $key,
-            ]);
-        }
-
+        // No key backfill: the translation screen derives its key list from the source
+        // scan and lang/{code}.json, so a new language starts with everything on offer
+        // and an empty catalogue. This used to insert one row per key per language —
+        // ~6,000 of them, every one a copy of its own key.
         TranslationService::clearCache($lang->code);
 
         return back()->with('success', translate('Language created successfully.'));

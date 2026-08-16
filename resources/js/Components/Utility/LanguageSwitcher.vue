@@ -4,6 +4,7 @@ import type { CSSProperties } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import FlagIcon from '@/Components/Utility/FlagIcon.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 
 interface LocaleProp {
     code: string
@@ -35,6 +36,7 @@ const props = withDefaults(defineProps<{
 
 const page = usePage()
 const { t } = useTranslate()
+const toast = useToastr()
 const open = ref(false)
 const switching = ref(false)
 const languages = computed(() => (page.props.languages as LanguageOption[]) ?? [])
@@ -44,6 +46,12 @@ const currentLanguage = computed(() => languages.value.find((language) => langua
     name: locale.value?.name ?? 'English',
     flag: locale.value?.flag,
 })
+// The switcher stays visible in demo mode — it is a feature worth showing off — but the
+// switch itself is refused: it writes the chosen locale to the session and, for a signed-in
+// visitor, onto the user row, and the demo's accounts are shared, so one visitor's pick
+// would greet the next in a language they never chose.
+const isDemo = computed(() => Boolean((page.props.app as { demo?: boolean } | undefined)?.demo))
+
 const shouldRender = computed(() => Boolean(currentLanguage.value?.code || currentLanguage.value?.name))
 const isBottomDisplay = computed(() => props.display === 'bottom')
 const opensUpward = computed(() => isBottomDisplay.value || props.placement === 'up')
@@ -78,6 +86,16 @@ const isRtlValue = (value?: boolean | number | string | null) => value === true 
 const switchLanguage = (code: string) => {
     if (switching.value || code === locale.value?.code) {
         open.value = false
+        return
+    }
+
+    // Refused client-side so the visitor gets an immediate answer instead of a redirect
+    // that silently lands back on the same language. DemoMode blocks the POST too — that
+    // is the real guard; this is the explanation.
+    if (isDemo.value) {
+        open.value = false
+        toast.info(t('This action is disabled in demo mode.'))
+
         return
     }
 

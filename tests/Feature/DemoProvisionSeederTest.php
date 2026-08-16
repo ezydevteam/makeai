@@ -424,14 +424,43 @@ class DemoProvisionSeederTest extends TestCase
         ]]);
 
         // The setting stores the COPY's key, not the source path — media_url() resolves
-        // stored keys against the public disk, so 'demo-assets/…' would 404.
-        $this->assertSame('branding/'.basename($logo), settings('site_logo_light'));
-        $this->assertSame('branding/'.basename($icon), settings('site_favicon_png'));
-        Storage::disk('public')->assertExists('branding/'.basename($logo));
-        $this->assertSame('<svg/>', Storage::disk('public')->get('branding/'.basename($logo)));
+        // stored keys against the public disk, so 'demo-assets/…' would 404. The key also
+        // carries a hash of the bytes, so refreshed art is a new url (see the cache test
+        // below) rather than the same one with different contents.
+        $logoKey = 'branding/'.pathinfo($logo, PATHINFO_FILENAME).'-'.substr(md5('<svg/>'), 0, 8).'.svg';
+        $iconKey = 'branding/'.pathinfo($icon, PATHINFO_FILENAME).'-'.substr(md5('PNG'), 0, 8).'.png';
+
+        $this->assertSame($logoKey, settings('site_logo_light'));
+        $this->assertSame($iconKey, settings('site_favicon_png'));
+        Storage::disk('public')->assertExists($logoKey);
+        $this->assertSame('<svg/>', Storage::disk('public')->get($logoKey));
 
         // Untouched slots stay empty rather than pointing at a file that is not there.
         $this->assertBlank(settings('site_logo_dark'));
+    }
+
+    /**
+     * The bug this guards: the copy used to keep the source filename, so shipping new
+     * brand art rewrote the bytes behind an unchanged '/storage/branding/logo-light.png'.
+     * Browsers kept serving the cached previous image and the refresh looked like it had
+     * never been built. A different image has to mean a different url.
+     */
+    public function test_replacing_the_source_art_changes_the_stored_url(): void
+    {
+        Storage::fake('public');
+        $name = 'logo-swap-'.getmypid().'.svg';
+
+        $this->writeDemoAsset($name, '<svg>old</svg>');
+        $this->provision(['branding' => ['logo_light' => $name]]);
+        $before = settings('site_logo_light');
+
+        // Same filename on disk, new contents — exactly what a brand refresh ships.
+        $this->writeDemoAsset($name, '<svg>new</svg>');
+        $this->provision(['branding' => ['logo_light' => $name]]);
+        $after = settings('site_logo_light');
+
+        $this->assertNotSame($before, $after, 'new art must produce a new url');
+        $this->assertSame('<svg>new</svg>', Storage::disk('public')->get($after));
     }
 
     public function test_a_branding_filename_with_no_file_behind_it_is_skipped(): void

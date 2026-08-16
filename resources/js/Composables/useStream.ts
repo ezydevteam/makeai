@@ -119,7 +119,14 @@ export function useStream() {
                     const data = await response.json().catch(() => ({}))
                     const errMsg = data.message || data.error || t('Generation failed (:status).', { status: response.status })
 
-                    if (isRetryable(errMsg) && attempt < maxRetries) {
+                    // A 429 is OUR rate limiter, never the provider's — a provider that
+                    // rate-limits us answers 200 and reports it inside the SSE stream. So it
+                    // is a definite refusal for a known period, and retrying cannot help:
+                    // the window does not clear in 120 seconds. Retrying anyway held the
+                    // output panel in its generating state for up to three back-offs with no
+                    // countdown rendered (ToolPage never binds retryCountdown), which read as
+                    // a silent hang. The message already says how long to wait, so say it.
+                    if (response.status !== 429 && isRetryable(errMsg) && attempt < maxRetries) {
                         const retrySecs = parseRetryAfter(response.headers) ?? backoffs[attempt]
                         try {
                             await delay(retrySecs)
@@ -131,7 +138,20 @@ export function useStream() {
                         }
                     }
 
-                    throw new Error(errMsg)
+                    // Surfaced as-is, NOT through sanitizeErrorMessage(). Everything that
+                    // reaches here is already safe: CheckCredits returns translated,
+                    // app-authored text, and GenerateController runs AiErrors::sanitize()
+                    // over anything originating from a provider. Throwing instead sent it
+                    // through the catch below for a second scrub, whose keyword list read
+                    // "Authentication required to use this tool." as a provider-key failure
+                    // and displayed "This AI provider is not configured." Keyword guards
+                    // alone cannot fix that — these messages are translated, so on a
+                    // non-English install no English keyword would match. Not re-sanitizing
+                    // is the only fix that holds in all 6 shipped languages.
+                    error.value = errMsg
+                    isStreaming.value = false
+
+                    return
                 }
 
                 const reader = response.body?.getReader()

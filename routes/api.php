@@ -43,7 +43,12 @@ Route::prefix('v1')->group(function () {
         Route::post('stream', [GenerateController::class, 'stream']);    // SSE streaming
         Route::post('text', [GenerateController::class, 'text']);       // Sync JSON
     });
-    Route::middleware(['web', 'throttle:text_gen'])->prefix('generate')->group(function () {
+    // Deliberately NOT throttle:text_gen. This is a read-only cost calculation — no
+    // provider call, nothing spent — but it fires on page load and again on every model or
+    // length change, so sharing the generation counter meant browsing tool pages spent the
+    // generation allowance. The seeded guest rule is 5 per HOUR, so a signed-out visitor
+    // could exhaust it without generating anything once, and then watch Generate fail.
+    Route::middleware(['web', 'throttle:public,60,60'])->prefix('generate')->group(function () {
         Route::get('estimate', [GenerateController::class, 'estimate']); // Cost estimate
     });
 

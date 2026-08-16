@@ -147,7 +147,7 @@ onUnmounted(() => gsapCtx?.revert())
                              this section paints its own gradient/solid panel behind the text. -->
                         <span v-if="asString(section.config.badge_text)" :class="badgeClass(activeBgStyle, asString(section.config.title_color, 'dark'))">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </span>
                         <!-- Top Position Icon -->
                         <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'top'" :class="[
@@ -165,10 +165,10 @@ onUnmounted(() => gsapCtx?.revert())
                                 ]">
                                     <i :class="asString(section.config.icon)"></i>
                                 </div>
-                                <h2 :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), isDark ? '!text-white' : (titleColorClass(asString(section.config.title_color, 'dark')) === 'text-gray-900 dark:text-white' ? '' : titleColorClass(asString(section.config.title_color, 'dark')))]">{{ asString(section.config.headline ?? section.config.title, t('Ready to create with AI?')) }}</h2>
+                                <h2 :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), isDark ? '!text-white' : (titleColorClass(asString(section.config.title_color, 'dark')) === 'text-gray-900 dark:text-white' ? '' : titleColorClass(asString(section.config.title_color, 'dark')))]">{{ t(asString(section.config.headline ?? section.config.title, t('Ready to create with AI?'))) }}</h2>
                             </div>
                             <p v-if="asString(section.config.subheadline ?? section.config.subtitle)" :class="['max-w-2xl mb-8 font-medium', isDark ? '!text-gray-300' : (titleColorClass(asString(section.config.title_color, 'dark')) === 'text-gray-900 dark:text-white' ? (ctaBannerIsLightSurface(activeBgStyle) ? 'text-gray-700 dark:text-gray-200' : 'text-white/80') : subtitleColorClass(asString(section.config.title_color, 'dark'), activeBgStyle)), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">
-                                {{ asString(section.config.subheadline ?? section.config.subtitle) }}
+                                {{ t(asString(section.config.subheadline ?? section.config.subtitle)) }}
                             </p>
                         </div>
                     </div>
@@ -176,13 +176,13 @@ onUnmounted(() => gsapCtx?.revert())
                         <Link v-if="asString(section.config.primary_text ?? section.config.primary_cta_text) && checkAccessLevel(asString(section.config.primary_access_level ?? section.config.primary_cta_access_level, 'all'))" :href="asString(section.config.primary_link ?? section.config.primary_cta_link, '/register')" :class="[heroButtonClass(asString(section.config.primary_style ?? section.config.primary_cta_style, 'primary_filled')), heroButtonShapeClass(asString(section.config.primary_shape ?? section.config.primary_cta_shape, 'rounded_xl'))]" class="w-full px-8 py-4 font-black transition-colors sm:w-auto text-center">
                             <span class="inline-flex items-center justify-center gap-3">
                                 <i v-if="asString(section.config.primary_icon ?? section.config.primary_cta_icon)" :class="[asString(section.config.primary_icon ?? section.config.primary_cta_icon), 'block shrink-0 text-lg leading-none']"></i>
-                                {{ asString(section.config.primary_text ?? section.config.primary_cta_text) }}
+                                {{ t(asString(section.config.primary_text ?? section.config.primary_cta_text)) }}
                             </span>
                         </Link>
                         <Link v-if="asString(section.config.secondary_text ?? section.config.secondary_cta_text) && checkAccessLevel(asString(section.config.secondary_access_level ?? section.config.secondary_cta_access_level, 'all'))" :href="asString(section.config.secondary_link ?? section.config.secondary_cta_link, '/pricing')" :class="[heroButtonClass(asString(section.config.secondary_style ?? section.config.secondary_cta_style, 'outline')), heroButtonShapeClass(asString(section.config.secondary_shape ?? section.config.secondary_cta_shape, 'rounded_xl'))]" class="w-full px-8 py-4 font-black transition-colors sm:w-auto text-center">
                             <span class="inline-flex items-center justify-center gap-3">
                                 <i v-if="asString(section.config.secondary_icon ?? section.config.secondary_cta_icon)" :class="[asString(section.config.secondary_icon ?? section.config.secondary_cta_icon), 'block shrink-0 text-lg leading-none']"></i>
-                                {{ asString(section.config.secondary_text ?? section.config.secondary_cta_text) }}
+                                {{ t(asString(section.config.secondary_text ?? section.config.secondary_cta_text)) }}
                             </span>
                         </Link>
                     </div>

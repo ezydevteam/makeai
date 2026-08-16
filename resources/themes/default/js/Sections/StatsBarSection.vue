@@ -23,6 +23,26 @@ const asItems = (v: SectionConfigValue | undefined): Record<string, string | num
 
 const resolveMediaUrl = (path?: string | null): string => mediaUrl(path)
 
+// A logo whose file is missing would render as the browser's broken-image glyph in the
+// middle of the marquee. Recording the failed URL routes it to the `v-else` below, which
+// already shows the brand's name as text — the same thing a brand with no logo gets.
+const brokenLogos = ref(new Set<string>())
+
+const hasLogo = (url?: SectionConfigValue): boolean => {
+    const value = typeof url === 'string' ? url : ''
+
+    return value !== '' && ! brokenLogos.value.has(value)
+}
+
+const markLogoBroken = (url?: SectionConfigValue): void => {
+    const value = typeof url === 'string' ? url : ''
+
+    if (value !== '') {
+        // Reassigned rather than mutated: Set.add() alone does not retrigger the template.
+        brokenLogos.value = new Set(brokenLogos.value).add(value)
+    }
+}
+
 const sectionRef = ref<HTMLElement | null>(null)
 let gsapCtx: any = null
 
@@ -149,7 +169,7 @@ const marqueeMaskClass = computed(() => {
                     <div class="w-full">
                         <div v-if="asString(section.config.badge_text)" :class="[badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))]">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </div>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
@@ -159,9 +179,9 @@ const marqueeMaskClass = computed(() => {
                             ]">
                                 <i :class="asString(section.config.icon)"></i>
                             </div>
-                            <h2 :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ asString(section.config.heading ?? section.config.title, t('Social Proof')) }}</h2>
+                            <h2 :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ t(asString(section.config.heading ?? section.config.title, t('Social Proof'))) }}</h2>
                         </div>
-                        <p v-if="asString(section.config.subheading ?? section.config.subtitle)" :class="['font-medium mt-4 max-w-2xl', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ asString(section.config.subheading ?? section.config.subtitle) }}</p>
+                        <p v-if="asString(section.config.subheading ?? section.config.subtitle)" :class="['font-medium mt-4 max-w-2xl', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ t(asString(section.config.subheading ?? section.config.subtitle)) }}</p>
                     </div>
                 </div>
 
@@ -171,7 +191,7 @@ const marqueeMaskClass = computed(() => {
                  class="grid grid-cols-2 gap-8 text-center md:grid-cols-4">
                 <div v-for="stat in asItems(section.config.stats)" :key="`${stat.number}_${stat.label}`">
                     <p :class="[titleColorClass(statsStyle)]" class="text-4xl font-black"><span class="stat-counter" :data-target-raw="stat.number">{{ stat.number }}</span></p>
-                    <p :class="[subtitleColorClass(statsStyle, asString(section.config.section_bg, 'default'))]" class="mt-2 text-xs font-black uppercase tracking-widest">{{ stat.label }}</p>
+                    <p :class="[subtitleColorClass(statsStyle, asString(section.config.section_bg, 'default'))]" class="mt-2 text-xs font-black uppercase tracking-widest">{{ t(stat.label) }}</p>
                 </div>
             </div>
 
@@ -188,14 +208,14 @@ const marqueeMaskClass = computed(() => {
                     <!-- First track -->
                     <div class="marquee-track flex items-center justify-around gap-12 min-w-full shrink-0">
                         <div v-for="(brand, idx) in asItems(section.config.brands)" :key="`brand1_${idx}`" class="flex items-center justify-center h-12 rounded-xl px-4 transition-colors dark:bg-white/90 dark:px-5 dark:py-2 dark:shadow-sm">
-                            <img v-if="brand.image" :src="resolveMediaUrl(brand.image ? String(brand.image) : null)" :alt="String(brand.name || '')" :title="String(brand.name || '')" class="max-h-8 w-auto object-contain hover:scale-105 transition-transform duration-300" />
+                            <img v-if="hasLogo(brand.image)" :src="resolveMediaUrl(brand.image ? String(brand.image) : null)" :alt="String(brand.name || '')" :title="String(brand.name || '')" class="max-h-8 w-auto object-contain hover:scale-105 transition-transform duration-300" @error="markLogoBroken(brand.image)" />
                             <span v-else :title="String(brand.name || '')" class="text-lg font-bold text-gray-600 dark:text-gray-800">{{ brand.name }}</span>
                         </div>
                     </div>
                     <!-- Second track (cloned for seamless looping) -->
                     <div class="marquee-track flex items-center justify-around gap-12 min-w-full shrink-0" aria-hidden="true">
                         <div v-for="(brand, idx) in asItems(section.config.brands)" :key="`brand2_${idx}`" class="flex items-center justify-center h-12 rounded-xl px-4 transition-colors dark:bg-white/90 dark:px-5 dark:py-2 dark:shadow-sm">
-                            <img v-if="brand.image" :src="resolveMediaUrl(brand.image ? String(brand.image) : null)" :alt="String(brand.name || '')" :title="String(brand.name || '')" class="max-h-8 w-auto object-contain hover:scale-105 transition-transform duration-300" />
+                            <img v-if="hasLogo(brand.image)" :src="resolveMediaUrl(brand.image ? String(brand.image) : null)" :alt="String(brand.name || '')" :title="String(brand.name || '')" class="max-h-8 w-auto object-contain hover:scale-105 transition-transform duration-300" @error="markLogoBroken(brand.image)" />
                             <span v-else :title="String(brand.name || '')" class="text-lg font-bold text-gray-600 dark:text-gray-800">{{ brand.name }}</span>
                         </div>
                     </div>

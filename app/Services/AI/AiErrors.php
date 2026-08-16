@@ -50,6 +50,17 @@ class AiErrors
     {
         $lower = mb_strtolower($message);
 
+        // Our own access messages, checked before anything below can claim them.
+        // These are already translated and written for the person reading them — a visitor
+        // who is not signed in, an unverified address, a suspended account. The provider-key
+        // bucket further down matches on bare words like "authentication" and "unauthorized",
+        // so without this it swallowed "Authentication required to use this tool." and told
+        // the visitor the AI provider was misconfigured: alarming, wrong, and it sends a
+        // buyer chasing their API keys over a working install.
+        if (preg_match('/authentication required|please (log|sign) in|session (has )?expired|unauthenticated|verify your email|account has been suspended|upgrade to pro/i', $lower)) {
+            return $message;
+        }
+
         if (preg_match('/rate.?limit|too many requests|quota exceeded|insufficient_?quota|credits? exhausted|429/i', $lower)) {
             return (string) translate('Rate limit reached. Please try again in a moment.');
         }

@@ -138,6 +138,10 @@ class SystemCheckService
             'storage/framework/sessions'=> storage_path('framework/sessions'),
             'bootstrap/cache'          => base_path('bootstrap/cache'),
             '.env'                      => base_path('.env'),
+            // Translations are stored as lang/{code}.json, so the admin translation
+            // screen cannot save a thing if this is read-only. Caught here rather than
+            // as a failed save weeks later, when the buyer is mid-translation.
+            'lang'                      => lang_path(),
         ];
 
         $results = [];

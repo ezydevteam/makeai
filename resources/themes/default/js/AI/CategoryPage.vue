@@ -27,6 +27,8 @@ interface Template {
     color: string
     is_featured: boolean
     access_level: string
+    /** Server-resolved level (tool → category → default_tool_access_level). Prefer this. */
+    effective_access_level?: string
     views_count?: number
 }
 
@@ -151,15 +153,19 @@ function formatViews(views: number): string {
     return views.toString()
 }
 
+// Resolved by the server (ToolCatalogCacheService::applyGlobalOverrides), which walks
+// tool → category → the default_tool_access_level setting. Deriving it here read the
+// tool's own access_level and stopped at the category, so an `inherit` tool showed no
+// badge at all while CheckCredits was gating it behind a login.
+const effectiveLevel = (tool: Template) => tool.effective_access_level || 'login'
+
 const isProTool = (tool: Template) => {
-    const level = tool.access_level || 'inherit'
-    if (level === 'premium' || level.startsWith('plan:')) return true
-    if (level === 'inherit' && props.category.access_level) {
-        const catLevel = props.category.access_level
-        return catLevel === 'premium' || catLevel.startsWith('plan:')
-    }
-    return false
+    const level = effectiveLevel(tool)
+
+    return level === 'premium' || level.startsWith('plan:')
 }
+
+const needsLoginTool = (tool: Template) => effectiveLevel(tool) === 'login'
 </script>
 
 <template>
@@ -259,7 +265,7 @@ const isProTool = (tool: Template) => {
                     class="group card relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:!border-primary-200 hover:shadow-lg dark:border-white/5 dark:hover:!border-primary-500/30 dark:bg-white/[0.03] flex flex-col justify-between"
                 >
                     <div v-if="isProTool(tool)" class="badge badge-pro absolute right-4 top-4 transition-opacity group-hover:opacity-0">{{ t('PRO') }}</div>
-                    <div v-else-if="tool.access_level === 'login'" class="absolute top-4 right-4 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20 transition-opacity group-hover:opacity-0">{{ t('LOGIN') }}</div>
+                    <div v-else-if="needsLoginTool(tool)" class="absolute top-4 right-4 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20 transition-opacity group-hover:opacity-0">{{ t('LOGIN') }}</div>
 
                     <!-- Hover Arrow in Top Right Corner -->
                     <i class="ti ti-arrow-up-right absolute right-5 top-5 text-primary-400 text-lg opacity-0 -translate-x-1.5 translate-y-1.5 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0"></i>

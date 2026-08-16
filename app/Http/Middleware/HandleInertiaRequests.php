@@ -69,7 +69,7 @@ class HandleInertiaRequests extends Middleware
                 'locale' => ['code' => 'en', 'name' => 'English', 'flag' => null, 'is_rtl' => false],
                 'translations' => [],
                 'languages' => [],
-                'licenseTestMode' => config('app.license_test_mode', false),
+                'licenseTestMode' => \App\Support\PurchaseCode::testModeActive(),
                 'purchaseCodeFormat' => \App\Support\PurchaseCode::frontendConfig(),
                 'flash' => [
                     'success' => fn () => $request->session()->get('success'),
@@ -86,7 +86,6 @@ class HandleInertiaRequests extends Middleware
             : $defaultLocale;
         $requestedLocale = $request->user()?->locale ?: $requestedLocale;
         $hasLanguagesTable = Schema::hasTable('languages');
-        $hasTranslationsTable = Schema::hasTable('translations');
         $language = $hasLanguagesTable
             ? (Language::query()
                 ->where('code', $requestedLocale)
@@ -130,7 +129,13 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
 
             'appName' => $siteName,
-            'licenseTestMode' => config('app.license_test_mode', false),
+
+            // PurchaseCode::testModeActive(), not the raw config value: a released package
+            // has test mode compiled out (build-release.php forces that method to false), so
+            // reading LICENSE_TEST_MODE directly would raise the admin "test mode is active"
+            // banner for a buyer who set the flag while the flag in fact does nothing. The
+            // banner has to describe whether test codes WORK, which is what this method says.
+            'licenseTestMode' => \App\Support\PurchaseCode::testModeActive(),
             'purchaseCodeFormat' => \App\Support\PurchaseCode::frontendConfig(),
 
             // Base URL the client prepends to a stored media key (see resources/js/lib/media.ts).
@@ -178,9 +183,8 @@ class HandleInertiaRequests extends Middleware
                 // is what the frontend reads — no duplicate under `locale`.
             ],
             'isRtl' => (bool) ($language?->is_rtl ?? false),
-            'translations' => fn () => $hasTranslationsTable && $hasLanguagesTable
-                ? TranslationService::getForLocale($locale)
-                : [],
+            // Catalogues live in lang/{code}.json, so this reads no database rows at all.
+            'translations' => fn () => TranslationService::getForLocale($locale),
             'languages' => fn () => $hasLanguagesTable
                 ? Language::query()
                     ->where('is_active', true)

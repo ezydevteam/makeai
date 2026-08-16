@@ -68,15 +68,16 @@ const asItems = (value: SectionConfigValue | undefined): Record<string, string |
 const resolveMediaUrl = (path?: string | null): string => mediaUrl(path)
 
 const headingParts = (headline: string): [string, string] => {
-    const parts = headline.split('. ')
-    return parts.length > 1 ? [`${parts[0]}.`, parts.slice(1).join('. ')] : [headline, '']
+    const translated = t(headline)
+    const parts = translated.split('. ')
+    return parts.length > 1 ? [`${parts[0]}.`, parts.slice(1).join('. ')] : [translated, '']
 }
 
 const headlineLines = (headline: string): string[] => headline.split('/').map(s => s.trim()).filter(Boolean)
 
 const headlineSplitLines = computed(() => {
     const text = asString(props.section.config.headline, '')
-    if (text.includes('/')) return headlineLines(text)
+    if (text.includes('/')) return headlineLines(text).map(s => t(s))
     return []
 })
 
@@ -327,7 +328,8 @@ const typewriterPaused = ref(false)
 const headlineParts = computed(() => {
     const text = asString(props.section.config.headline, '')
     const parts = text.split('|').map(s => s.trim()).filter(Boolean)
-    return { prefix: parts[0] ?? '', phrases: parts.slice(1) }
+    const translatedParts = parts.map(s => t(s))
+    return { prefix: translatedParts[0] ?? '', phrases: translatedParts.slice(1) }
 })
 
 // CLS: the phrase span reserves room for the longest phrase — do not "simplify" it
@@ -641,7 +643,7 @@ onUnmounted(() => {
                         ]"
                     >
                         <span class="h-2 w-2 animate-pulse rounded-full bg-primary-500"></span>
-                        {{ asString(props.section.config.trust_badge_text) }}
+                        {{ t(asString(props.section.config.trust_badge_text)) }}
                     </div>
                     <div class="max-w-3xl">
                         <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]" class="mb-8 font-black leading-[1.25] tracking-tight gsap-heading">
@@ -658,10 +660,10 @@ onUnmounted(() => {
                             </template>
                         </h1>
                         <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mx-auto mb-12 text-lg font-medium leading-relaxed md:text-xl gsap-subtext']">
-                            {{ asString(props.section.config.subheadline) }}
+                            {{ t(asString(props.section.config.subheadline)) }}
                         </p>
                         <p v-else :class="isBackgroundDark ? 'mx-auto mb-12 text-lg font-medium leading-relaxed text-white/70 md:text-xl gsap-subtext' : 'mx-auto mb-12 text-lg font-medium leading-relaxed text-gray-600 md:text-xl dark:text-gray-400 gsap-subtext'">
-                            {{ asString(props.section.config.subheadline) }}
+                            {{ t(asString(props.section.config.subheadline)) }}
                         </p>
                     </div>
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mx-auto mb-8 w-full max-w-lg">
@@ -689,7 +691,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.primary_cta_icon)"
                                 :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.primary_cta_text) }}
+                            {{ t(asString(props.section.config.primary_cta_text)) }}
                         </button>
                         <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                             :href="secondaryCtaHref"
@@ -700,7 +702,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.secondary_cta_icon)"
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.secondary_cta_text) }}
+                            {{ t(asString(props.section.config.secondary_cta_text)) }}
                         </component>
                     </div>
                     <div v-if="asBoolean(props.section.config.show_stats, true) && asItems(props.section.config.stats).length > 0"
@@ -709,8 +711,8 @@ onUnmounted(() => {
                         <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                             <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                             <p v-else :class="isBackgroundDark ? 'text-2xl font-black sm:text-3xl text-white' : 'text-2xl font-black sm:text-3xl text-gray-900 dark:text-white'">{{ stat.number }}</p>
-                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ stat.label }}</p>
+                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ t(stat.label) }}</p>
                         </div>
                     </div>
                 </div>
@@ -737,7 +739,7 @@ onUnmounted(() => {
                         :class="isDarkGradientSelected ? 'border-white/30 bg-transparent text-white' : (isBackgroundDark ? 'border-white/30 bg-white/10 text-white' : 'border-white/30 bg-white/60 text-gray-900 dark:border-surface-700 dark:bg-surface-800/85 dark:text-gray-300')"
                     >
                         <span class="h-2 w-2 rounded-full bg-primary-500"></span>
-                        {{ asString(props.section.config.trust_badge_text) }}
+                        {{ t(asString(props.section.config.trust_badge_text)) }}
                     </div>
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
@@ -753,7 +755,7 @@ onUnmounted(() => {
                         </template>
                     </h1>
                     <p :class="['mb-10 max-w-xl text-lg leading-relaxed gsap-subtext', gradientEnabled ? heroGradientTextDarkClass : (isBackgroundDark ? 'text-white/80' : 'text-gray-600 dark:text-gray-400')]">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mb-8 w-full max-w-lg">
                         <button type="button" @click="openCommandPalette()"
@@ -780,7 +782,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.primary_cta_icon)"
                                 :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.primary_cta_text) }}
+                            {{ t(asString(props.section.config.primary_cta_text)) }}
                         </button>
                         <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                             :href="secondaryCtaHref"
@@ -791,7 +793,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.secondary_cta_icon)"
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.secondary_cta_text) }}
+                            {{ t(asString(props.section.config.secondary_cta_text)) }}
                         </component>
                     </div>
                 </div>
@@ -840,7 +842,7 @@ onUnmounted(() => {
                         :class="isDarkGradientSelected ? 'border-white/30 bg-transparent text-white' : (isBackgroundDark ? 'border-white/30 bg-white/10 text-white' : 'border-white/30 bg-white/60 text-gray-900 dark:border-surface-700 dark:bg-surface-800/85 dark:text-gray-300')"
                     >
                         <span class="h-2 w-2 rounded-full bg-primary-500"></span>
-                        {{ asString(props.section.config.trust_badge_text) }}
+                        {{ t(asString(props.section.config.trust_badge_text)) }}
                     </div>
                     <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
@@ -856,10 +858,10 @@ onUnmounted(() => {
                         </template>
                     </h1>
                     <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mb-10 max-w-xl text-lg leading-relaxed gsap-subtext']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <p v-else :class="['mb-10 max-w-xl text-lg leading-relaxed gsap-subtext', isBackgroundDark ? 'text-white/80' : 'text-gray-600 dark:text-gray-400']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mb-8 w-full max-w-lg">
                         <button type="button" @click="openCommandPalette()"
@@ -886,7 +888,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.primary_cta_icon)"
                                 :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.primary_cta_text) }}
+                            {{ t(asString(props.section.config.primary_cta_text)) }}
                         </button>
                         <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                             :href="secondaryCtaHref"
@@ -897,7 +899,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.secondary_cta_icon)"
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.secondary_cta_text) }}
+                            {{ t(asString(props.section.config.secondary_cta_text)) }}
                         </component>
                     </div>
                 </div>
@@ -909,8 +911,8 @@ onUnmounted(() => {
                         <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                             <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                             <p v-else :class="isBackgroundDark ? 'text-2xl font-black sm:text-3xl text-white' : 'text-2xl font-black sm:text-3xl text-gray-900 dark:text-white'">{{ stat.number }}</p>
-                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ stat.label }}</p>
+                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ t(stat.label) }}</p>
                         </div>
                     </div>
                 </div>
@@ -925,8 +927,8 @@ onUnmounted(() => {
                         <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                             <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                             <p v-else :class="isBackgroundDark ? 'text-2xl font-black sm:text-3xl text-white' : 'text-2xl font-black sm:text-3xl text-gray-900 dark:text-white'">{{ stat.number }}</p>
-                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ stat.label }}</p>
+                            <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                            <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ t(stat.label) }}</p>
                         </div>
                     </div>
                 </div>
@@ -960,7 +962,7 @@ onUnmounted(() => {
                         :class="isDarkGradientSelected ? 'border-white/30 bg-transparent text-white' : (isBackgroundDark ? 'border-white/30 bg-white/10 text-white' : 'border-white/30 bg-white/60 text-gray-900 dark:border-surface-700 dark:bg-surface-800/60 dark:text-white')"
                     >
                         <span class="h-2 w-2 animate-pulse rounded-full bg-primary-500"></span>
-                        {{ asString(props.section.config.trust_badge_text) }}
+                        {{ t(asString(props.section.config.trust_badge_text)) }}
                     </div>
                     <h1 :class="[heroHeadingSizeClass(asString(props.section.config.hero_heading_size, 'lg')), 'font-black leading-[1.15] tracking-tight mb-6 gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
@@ -976,10 +978,10 @@ onUnmounted(() => {
                         </template>
                     </h1>
                     <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mx-auto mb-10 max-w-2xl text-lg font-medium leading-relaxed md:text-xl gsap-subtext']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <p v-else :class="isBackgroundDark ? 'mx-auto mb-10 max-w-2xl text-lg font-medium leading-relaxed text-white/70 md:text-xl gsap-subtext' : 'mx-auto mb-10 max-w-2xl text-lg font-medium leading-relaxed text-gray-600 md:text-xl dark:text-gray-400 gsap-subtext'">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mx-auto mb-8 w-full max-w-lg">
                         <button type="button" @click="openCommandPalette()"
@@ -1006,7 +1008,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.primary_cta_icon)"
                                 :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.primary_cta_text) }}
+                            {{ t(asString(props.section.config.primary_cta_text)) }}
                         </button>
                         <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                             :href="secondaryCtaHref"
@@ -1017,7 +1019,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.secondary_cta_icon)"
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.secondary_cta_text) }}
+                            {{ t(asString(props.section.config.secondary_cta_text)) }}
                         </component>
                     </div>
                 </div>
@@ -1029,8 +1031,8 @@ onUnmounted(() => {
                     <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                         <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                         <p v-else :class="isBackgroundDark ? 'text-2xl font-black sm:text-3xl text-white' : 'text-2xl font-black sm:text-3xl text-gray-900 dark:text-white'">{{ stat.number }}</p>
-                        <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                        <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ stat.label }}</p>
+                        <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                        <p v-else :class="isBackgroundDark ? 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-white/60' : 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest text-gray-500 dark:text-gray-400'">{{ t(stat.label) }}</p>
                     </div>
                 </div>
 
@@ -1125,7 +1127,7 @@ onUnmounted(() => {
                             : (isBackgroundDark ? 'border-white/30 bg-white/10 text-white' : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-surface-700 dark:bg-surface-800/85 dark:text-gray-300')
                     ]"
                 >
-                    {{ asString(props.section.config.trust_badge_text) }}
+                    {{ t(asString(props.section.config.trust_badge_text)) }}
                 </div>
                 <h1 :class="['mb-6 text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                     <template v-if="showTypewriter">
@@ -1142,10 +1144,10 @@ onUnmounted(() => {
                 </h1>
                 <div class="mx-auto !max-w-3xl">
                     <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mb-12 text-lg leading-relaxed gsap-subtext']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <p v-else :class="['mb-12 text-lg leading-relaxed gsap-subtext', isBackgroundDark ? 'text-white/60' : 'text-gray-600 dark:text-gray-400']" >
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
 
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mb-8 w-full">
@@ -1174,7 +1176,7 @@ onUnmounted(() => {
                         <i v-if="asString(props.section.config.primary_cta_icon)"
                             :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                         ></i>
-                        {{ asString(props.section.config.primary_cta_text) }}
+                        {{ t(asString(props.section.config.primary_cta_text)) }}
                     </button>
                     <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                         :href="secondaryCtaHref"
@@ -1185,7 +1187,7 @@ onUnmounted(() => {
                         <i v-if="asString(props.section.config.secondary_cta_icon)"
                             :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                         ></i>
-                        {{ asString(props.section.config.secondary_cta_text) }}
+                        {{ t(asString(props.section.config.secondary_cta_text)) }}
                     </component>
                 </div>
             </div>
@@ -1194,8 +1196,8 @@ onUnmounted(() => {
                 <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                     <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                     <p v-else :class="['text-2xl font-black sm:text-3xl', isBackgroundDark ? 'text-white' : 'text-gray-900 dark:text-white']">{{ stat.number }}</p>
-                    <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                    <p v-else :class="['mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest', isBackgroundDark ? 'text-white/40' : 'text-gray-500 dark:text-gray-400']">{{ stat.label }}</p>
+                    <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                    <p v-else :class="['mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest', isBackgroundDark ? 'text-white/40' : 'text-gray-500 dark:text-gray-400']">{{ t(stat.label) }}</p>
                 </div>
             </div>
         </div>
@@ -1239,7 +1241,7 @@ onUnmounted(() => {
                         :class="isDarkGradientSelected ? 'border-white/30 bg-transparent text-white' : (isBackgroundDark ? 'border-white/30 bg-white/10 text-white' : 'border-white/30 bg-white/60 text-gray-900 dark:border-surface-700 dark:bg-surface-800/60 dark:text-white')"
                     >
                         <span class="h-2 w-2 animate-pulse rounded-full bg-primary-500"></span>
-                        {{ asString(props.section.config.trust_badge_text) }}
+                        {{ t(asString(props.section.config.trust_badge_text)) }}
                     </div>
                     <h1 :class="['mb-5 text-4xl font-black leading-[1.25] tracking-tight md:text-5xl lg:text-6xl gsap-heading', gradientEnabled ? heroGradientTextClass : heroColorClass(effectiveHeadingColor)]">
                         <template v-if="showTypewriter">
@@ -1255,10 +1257,10 @@ onUnmounted(() => {
                         </template>
                     </h1>
                     <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mb-8 max-w-xl text-lg leading-relaxed gsap-subtext']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <p v-else :class="['mb-8 max-w-xl text-lg leading-relaxed gsap-subtext', isBackgroundDark ? 'text-white/70' : 'text-gray-600 dark:text-gray-400']">
-                        {{ asString(props.section.config.subheadline) }}
+                        {{ t(asString(props.section.config.subheadline)) }}
                     </p>
                     <div v-if="asBoolean(props.section.config.show_search_box, true)" class="mb-8 w-full max-w-lg">
                         <button type="button" @click="openCommandPalette()"
@@ -1285,7 +1287,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.primary_cta_icon)"
                                 :class="[asString(props.section.config.primary_cta_icon), asString(props.section.config.primary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.primary_cta_text) }}
+                            {{ t(asString(props.section.config.primary_cta_text)) }}
                         </button>
                         <component :is="secondaryCtaComponent" v-if="asBoolean(props.section.config.show_secondary_cta, true) && asString(props.section.config.secondary_cta_text) && checkAccessLevel(asString(props.section.config.secondary_cta_access_level, 'all'))"
                             :href="secondaryCtaHref"
@@ -1296,7 +1298,7 @@ onUnmounted(() => {
                             <i v-if="asString(props.section.config.secondary_cta_icon)"
                                 :class="[asString(props.section.config.secondary_cta_icon), asString(props.section.config.secondary_cta_icon_position, 'left') === 'right' ? 'order-1' : '']"
                             ></i>
-                            {{ asString(props.section.config.secondary_cta_text) }}
+                            {{ t(asString(props.section.config.secondary_cta_text)) }}
                         </component>
                     </div>
                 </div>
@@ -1348,8 +1350,8 @@ onUnmounted(() => {
                 <div v-for="stat in asItems(props.section.config.stats)" :key="`${stat.number}_${stat.label}`" class="text-center">
                     <p v-if="gradientEnabled" :class="[heroGradientTextClass, 'text-2xl font-black sm:text-3xl']">{{ stat.number }}</p>
                     <p v-else :class="['text-2xl font-black sm:text-3xl', isBackgroundDark ? 'text-white' : 'text-gray-900 dark:text-white']">{{ stat.number }}</p>
-                    <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ stat.label }}</p>
-                    <p v-else :class="['mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest', isBackgroundDark ? 'text-white/50' : 'text-gray-500 dark:text-gray-400']">{{ stat.label }}</p>
+                    <p v-if="gradientEnabled" :class="[heroGradientTextDarkClass, 'mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest']">{{ t(stat.label) }}</p>
+                    <p v-else :class="['mt-1 text-[10px] font-black uppercase tracking-wider sm:text-xs sm:tracking-widest', isBackgroundDark ? 'text-white/50' : 'text-gray-500 dark:text-gray-400']">{{ t(stat.label) }}</p>
                 </div>
             </div>
         </div>

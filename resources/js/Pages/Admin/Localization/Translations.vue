@@ -15,9 +15,11 @@ interface Language {
 }
 
 interface TranslationItem {
-    id: number
+    // The source string. It is the key in lang/{code}.json and the row's identity —
+    // there is no database row, and so no id, behind an entry any more.
     key: string
     value: string
+    translated?: boolean
 }
 
 interface PaginationLink {
@@ -46,7 +48,7 @@ interface PaginatedTranslations {
 
 type PendingAction =
     | { type: 'search'; value: string }
-    | { type: 'ai-one'; id: number }
+    | { type: 'ai-one'; key: string }
     | { type: 'ai-all' }
     | { type: 'navigate' }
     | null
@@ -65,9 +67,9 @@ const search = ref(props.filters.search || '')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
 const rows = ref<TranslationItem[]>([])
-const originalValues = ref<Record<number, string>>({})
+const originalValues = ref<Record<string, string>>({})
 const savingAll = ref(false)
-const translatingAi = ref<number | null>(null)
+const translatingAi = ref<string | null>(null)
 const translatingAiAll = ref(false)
 const syncedSearch = ref(props.filters.search || '')
 const allowNavigation = ref(false)
@@ -174,10 +176,10 @@ const paginationDisplayLinks = computed<DisplayPaginationLink[]>(() => {
 
 const resetRows = () => {
     rows.value = props.translations.data.map((translation) => ({ ...translation }))
-    originalValues.value = Object.fromEntries(rows.value.map((translation) => [translation.id, translation.value ?? '']))
+    originalValues.value = Object.fromEntries(rows.value.map((translation) => [translation.key, translation.value ?? '']))
 }
 
-const isDirty = (translation: TranslationItem) => (translation.value ?? '') !== (originalValues.value[translation.id] ?? '')
+const isDirty = (translation: TranslationItem) => (translation.value ?? '') !== (originalValues.value[translation.key] ?? '')
 
 const closeConfirmModal = () => {
     confirmModalOpen.value = false
@@ -217,16 +219,19 @@ const clearSearch = () => {
 
 const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || ''
 
-const runAiTranslate = async (id: number) => {
-    translatingAi.value = id
+const runAiTranslate = async (key: string) => {
+    translatingAi.value = key
     try {
-        const res = await fetch(route('admin.translations.ai', id), {
+        const res = await fetch(route('admin.translations.ai', props.language.id), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+            // The entry is addressed by its source string, which travels in the body:
+            // keys contain spaces, slashes and non-ASCII text.
+            body: JSON.stringify({ key }),
         })
         const json = await res.json()
         if (!json.success) throw new Error(json.message)
-        const row = rows.value.find((r) => r.id === id)
+        const row = rows.value.find((r) => r.key === key)
         if (row) row.value = json.value
         toast.success(t('AI translation applied.'))
     } catch (e: any) {
@@ -250,7 +255,7 @@ const runAiTranslateAll = async () => {
             return
         }
         for (const item of json.items) {
-            const row = rows.value.find((r) => r.id === item.id)
+            const row = rows.value.find((r) => r.key === item.key)
             if (row) row.value = item.value
         }
         toast.success(t('AI translation applied.'))
@@ -276,7 +281,7 @@ const handlePendingAction = () => {
     }
 
     if (action.type === 'ai-one') {
-        runAiTranslate(action.id)
+        runAiTranslate(action.key)
         return
     }
 
@@ -321,7 +326,7 @@ const saveAllChanges = () => {
     }
 
     const changedTranslations = dirtyRows.value.map((translation) => ({
-        id: translation.id,
+        key: translation.key,
         value: translation.value,
     }))
 
@@ -334,7 +339,7 @@ const saveAllChanges = () => {
         onSuccess: () => {
             originalValues.value = {
                 ...originalValues.value,
-                ...Object.fromEntries(changedTranslations.map((translation) => [translation.id, translation.value ?? ''])),
+                ...Object.fromEntries(changedTranslations.map((translation) => [translation.key, translation.value ?? ''])),
             }
         },
         onError: () => {
@@ -348,8 +353,8 @@ const saveAllChanges = () => {
     })
 }
 
-const aiTranslate = (id: number) => {
-    runAiTranslate(id)
+const aiTranslate = (key: string) => {
+    runAiTranslate(key)
 }
 
 const aiTranslateAll = () => {
@@ -547,7 +552,7 @@ function handleKeydown(event: KeyboardEvent) {
             <div v-if="rows.length" class="divide-y divide-gray-100 dark:divide-surface-800">
                 <div
                     v-for="translation in rows"
-                    :key="translation.id"
+                    :key="translation.key"
                     class="grid grid-cols-12 gap-4 px-6 py-5 transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-900/10"
                 >
                     <div class="col-span-12 lg:col-span-4">
@@ -574,9 +579,9 @@ function handleKeydown(event: KeyboardEvent) {
                                         type="button"
                                         class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 dark:!border-violet-900/80 dark:!bg-violet-900/40 dark:text-violet-300"
                                         :disabled="translatingAi !== null"
-                                        @click="aiTranslate(translation.id)"
+                                        @click="aiTranslate(translation.key)"
                                     >
-                                        <svg v-if="translatingAi === translation.id" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                        <svg v-if="translatingAi === translation.key" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                         <i v-else class="ti ti-sparkles text-sm"></i>
                                     </button>
                                 </Tooltip>

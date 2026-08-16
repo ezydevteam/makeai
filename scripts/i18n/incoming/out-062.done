@@ -1,0 +1,72 @@
+{
+    "bn": {
+        "Use AI Image Pro": "AI Image Pro ব্যবহার করুন",
+        "Use Cases Heading": "ব্যবহারের ক্ষেত্রের শিরোনাম",
+        "Use Cases Sub-heading": "ব্যবহারের ক্ষেত্রের সাব-শিরোনাম",
+        "View AI Image Pro Analytics": "AI Image Pro অ্যানালিটিক্স দেখুন",
+        "Watermark Opacity (%)": "জলছাপের অস্বচ্ছতা (%)",
+        "Watermark Position": "জলছাপের অবস্থান",
+        "Website Link": "ওয়েবসাইটের লিঙ্ক",
+        "WhatsApp Link": "হোয়াটসঅ্যাপ লিঙ্ক",
+        "Who Can Use the Assistant": "কে সহকারী ব্যবহার করতে পারে",
+        "Widget accent color": "উইজেট অ্যাকসেন্ট রঙ",
+        "Widget Position": "উইজেটের অবস্থান",
+        "X (Twitter) Link": "X (Twitter) লিঙ্ক"
+    },
+    "ar": {
+        "Use AI Image Pro": "استخدام AI Image Pro",
+        "Use Cases Heading": "عنوان حالات الاستخدام",
+        "Use Cases Sub-heading": "العنوان الفرعي لحالات الاستخدام",
+        "View AI Image Pro Analytics": "عرض تحليلات AI Image Pro",
+        "Watermark Opacity (%)": "تعتيم العلامة المائية (%)",
+        "Watermark Position": "موضع العلامة المائية",
+        "Website Link": "رابط الموقع الإلكتروني",
+        "WhatsApp Link": "رابط واتساب",
+        "Who Can Use the Assistant": "من يمكنه استخدام المساعد",
+        "Widget accent color": "لون تمييز عنصر الواجهة",
+        "Widget Position": "موضع عنصر الواجهة",
+        "X (Twitter) Link": "رابط X (تويتر)"
+    },
+    "es": {
+        "Use AI Image Pro": "Usar AI Image Pro",
+        "Use Cases Heading": "Encabezado de casos de uso",
+        "Use Cases Sub-heading": "Subencabezado de casos de uso",
+        "View AI Image Pro Analytics": "Ver analíticas de AI Image Pro",
+        "Watermark Opacity (%)": "Opacidad de la marca de agua (%)",
+        "Watermark Position": "Posición de la marca de agua",
+        "Website Link": "Enlace del sitio web",
+        "WhatsApp Link": "Enlace de WhatsApp",
+        "Who Can Use the Assistant": "Quién puede usar el asistente",
+        "Widget accent color": "Color de acento del widget",
+        "Widget Position": "Posición del widget",
+        "X (Twitter) Link": "Enlace de X (Twitter)"
+    },
+    "fr": {
+        "Use AI Image Pro": "Utiliser AI Image Pro",
+        "Use Cases Heading": "En-tête des cas d'utilisation",
+        "Use Cases Sub-heading": "Sous-titre des cas d'utilisation",
+        "View AI Image Pro Analytics": "Voir les analyses d'AI Image Pro",
+        "Watermark Opacity (%)": "Opacité du filigrane (%)",
+        "Watermark Position": "Position du filigrane",
+        "Website Link": "Lien du site web",
+        "WhatsApp Link": "Lien WhatsApp",
+        "Who Can Use the Assistant": "Qui peut utiliser l'assistant",
+        "Widget accent color": "Couleur d'accentuation du widget",
+        "Widget Position": "Position du widget",
+        "X (Twitter) Link": "Lien X (Twitter)"
+    },
+    "hi": {
+        "Use AI Image Pro": "AI Image Pro का उपयोग करें",
+        "Use Cases Heading": "उपयोग के मामले शीर्षक",
+        "Use Cases Sub-heading": "उपयोग के मामले उप-शीर्षक",
+        "View AI Image Pro Analytics": "AI Image Pro एनालिटिक्स देखें",
+        "Watermark Opacity (%)": "वॉटरमार्क अपारदर्शिता (%)",
+        "Watermark Position": "वॉटरमार्क स्थिति",
+        "Website Link": "वेबसाइट लिंक",
+        "WhatsApp Link": "व्हाट्सएप लिंक",
+        "Who Can Use the Assistant": "सहायक का उपयोग कौन कर सकता है",
+        "Widget accent color": "विजेट एक्सेंट रंग",
+        "Widget Position": "विजेट स्थिति",
+        "X (Twitter) Link": "X (Twitter) लिंक"
+    }
+}

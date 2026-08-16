@@ -308,25 +308,25 @@ const { t } = useTranslate()
 const page = usePage()
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
-const tabs = [
-    { id: 'presets', label: 'Presets', icon: 'ti ti-layout-collage' },
-    { id: 'general', label: 'General', icon: 'ti ti-settings' },
-    { id: 'header', label: 'Header', icon: 'ti ti-layout-navbar' },
-    { id: 'footer', label: 'Footer', icon: 'ti ti-layout-bottombar' },
-    { id: 'homepage', label: 'Home', icon: 'ti ti-home' },
-    { id: 'page', label: 'Page', icon: 'ti ti-layout-grid' },
-    { id: 'colors', label: 'Colors', icon: 'ti ti-palette' },
-    { id: 'typography', label: 'Typography', icon: 'ti ti-typography' },
-    { id: 'custom_code', label: 'Custom Code', icon: 'ti ti-code' },
-] as const
+const VALID_TABS = ['presets', 'general', 'header', 'footer', 'homepage', 'page', 'colors', 'typography', 'custom_code'] as const
+type TabId = typeof VALID_TABS[number]
 
-type TabId = typeof tabs[number]['id']
+const tabs = computed(() => [
+    { id: 'presets' as const, label: t('Presets'), icon: 'ti ti-layout-collage' },
+    { id: 'general' as const, label: t('General'), icon: 'ti ti-settings' },
+    { id: 'header' as const, label: t('Header'), icon: 'ti ti-layout-navbar' },
+    { id: 'footer' as const, label: t('Footer'), icon: 'ti ti-layout-bottombar' },
+    { id: 'homepage' as const, label: t('Home'), icon: 'ti ti-home' },
+    { id: 'page' as const, label: t('Page'), icon: 'ti ti-layout-grid' },
+    { id: 'colors' as const, label: t('Colors'), icon: 'ti ti-palette' },
+    { id: 'typography' as const, label: t('Typography'), icon: 'ti ti-typography' },
+    { id: 'custom_code' as const, label: t('Custom Code'), icon: 'ti ti-code' },
+])
 
-const validTabs: TabId[] = tabs.map(t => t.id)
 const urlTab = new URLSearchParams(window.location.search).get('tab') as TabId | null
 // Presets is the landing tab, so it owns the clean URL (no ?tab) — every other
 // tab, including General, carries its own ?tab param.
-const activeTab = ref<TabId>(validTabs.includes(urlTab as TabId) ? (urlTab as TabId) : 'presets')
+const activeTab = ref<TabId>(VALID_TABS.includes(urlTab as TabId) ? (urlTab as TabId) : 'presets')
 
 watch(activeTab, (tab) => {
     const url = new URL(window.location.href)
@@ -910,13 +910,13 @@ const normalizeFooterLayout = (value: unknown): string => {
 const fontSizeOptions = ['12px', '13px', '14px', '15px', '16px', '18px', '20px'].map((value) => ({ value, label: value }))
 const headingWeightOptions = ['400', '500', '600', '700', '800'].map((value) => ({ value, label: value }))
 const lineHeightOptions = ['1.25', '1.375', '1.5', '1.625', '1.75', '2'].map((value) => ({ value, label: value }))
-const letterSpacingOptions = [
-    { value: 'tighter', label: 'Tighter' },
-    { value: 'tight', label: 'Tight' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'wide', label: 'Wide' },
-    { value: 'wider', label: 'Wider' },
-]
+const letterSpacingOptions = computed(() => [
+    { value: 'tighter', label: t('Tighter') },
+    { value: 'tight', label: t('Tight') },
+    { value: 'normal', label: t('Normal') },
+    { value: 'wide', label: t('Wide') },
+    { value: 'wider', label: t('Wider') },
+])
 // Each label is a live preview of the resulting tab title, so the admin picks by the
 // outcome rather than by naming a glyph. Sample page title mirrors a real tool page.
 const titleSeparatorOptions = computed(() => {
@@ -928,28 +928,28 @@ const titleSeparatorOptions = computed(() => {
     }))
 })
 
-const containerWidthOptions = [
-    { value: '1280px', label: 'Default' },
-    { value: 'full', label: 'Full Width' },
-    { value: '1080px', label: 'Boxed' },
-    { value: '1536px', label: 'Stretched' },
-]
-const gradientDirectionOptions = [
-    { value: 'to bottom', label: 'Top to Bottom' },
-    { value: 'to right', label: 'Left to Right' },
-    { value: 'to bottom right', label: 'Top Left to Bottom Right' },
-    { value: 'to bottom left', label: 'Top Right to Bottom Left' },
-]
-const gradientPaletteOptions = [
-    { value: 'aurora', label: 'Aurora Glow' },
-    { value: 'sunset', label: 'Sunset Pop' },
-    { value: 'royal', label: 'Royal Pulse' },
-    { value: 'mint_fire', label: 'Mint Fire' },
-    { value: 'neon_night', label: 'Neon Night' },
-    { value: 'gold_rush', label: 'Gold Rush' },
-    { value: 'light_glow', label: 'Light Glow' },
-    { value: 'light_warm', label: 'Light Warm' },
-]
+const containerWidthOptions = computed(() => [
+    { value: '1280px', label: t('Default') },
+    { value: 'full', label: t('Full Width') },
+    { value: '1080px', label: t('Boxed') },
+    { value: '1536px', label: t('Stretched') },
+])
+const gradientDirectionOptions = computed(() => [
+    { value: 'to bottom', label: t('Top to Bottom') },
+    { value: 'to right', label: t('Left to Right') },
+    { value: 'to bottom right', label: t('Top Left to Bottom Right') },
+    { value: 'to bottom left', label: t('Top Right to Bottom Left') },
+])
+const gradientPaletteOptions = computed(() => [
+    { value: 'aurora', label: t('Aurora Glow') },
+    { value: 'sunset', label: t('Sunset Pop') },
+    { value: 'royal', label: t('Royal Pulse') },
+    { value: 'mint_fire', label: t('Mint Fire') },
+    { value: 'neon_night', label: t('Neon Night') },
+    { value: 'gold_rush', label: t('Gold Rush') },
+    { value: 'light_glow', label: t('Light Glow') },
+    { value: 'light_warm', label: t('Light Warm') },
+])
 
 const currentSettingString = (key: string, fallback: string): string => props.settings[key] ?? fallback
 const currentSettingBoolean = (key: string, fallback: boolean): boolean => {
@@ -2322,8 +2322,8 @@ function handleConfirmRemoveItem(): void {
     }
 }
 const activeTabLabel = computed(() => {
-    const currentTab = tabs.find(tab => tab.id === activeTab.value)
-    return currentTab ? t(currentTab.label) : ''
+    const currentTab = tabs.value.find(tab => tab.id === activeTab.value)
+    return currentTab ? currentTab.label : ''
 })
 
 function confirmRestoreDefaults(): void {
@@ -2641,7 +2641,7 @@ watch(() => [
                                 <!-- Card body -->
                                 <div class="flex flex-1 flex-col gap-1 border-t border-gray-100 p-4 dark:border-surface-800">
                                     <div class="flex items-center justify-between gap-2">
-                                        <span class="font-semibold text-gray-900 dark:text-white">{{ preset.name }}</span>
+                                        <span class="font-semibold text-gray-900 dark:text-white">{{ t(preset.name) }}</span>
                                         <span
                                             v-if="preset.preview.mode"
                                             class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium capitalize text-gray-500 dark:bg-surface-800 dark:text-gray-400"
@@ -2650,7 +2650,7 @@ watch(() => [
                                             {{ t(preset.preview.mode === 'dark' ? 'Dark' : 'Light') }}
                                         </span>
                                     </div>
-                                    <p class="text-xs text-gray-500 dark:text-gray-200">{{ preset.description }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-200">{{ t(preset.description) }}</p>
                                 </div>
 
                                 <!-- Radio indicator -->
@@ -3859,7 +3859,7 @@ watch(() => [
                         >
                             <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-surface-800">
                                 <h3 class="text-sm font-bold text-gray-900 dark:text-white">
-                                    <i :class="sec.icon" class="mr-1.5 text-primary-500"></i>{{ sec.label }}
+                                    <i :class="sec.icon" class="mr-1.5 text-primary-500"></i>{{ t(sec.label) }}
                                 </h3>
                                 <div class="flex items-center gap-2">
                                     <span class="drag-handle cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">

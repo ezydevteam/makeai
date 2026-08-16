@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -47,25 +46,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Per-language UI strings. The composite index is prefixed on MySQL because `key` is
-        // TEXT and cannot be indexed whole; sqlite has no prefix syntax and no key-length
-        // limit, so it indexes the column directly.
-        Schema::create('translations', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('language_id')->constrained()->cascadeOnDelete();
-            $table->text('key');
-            $table->text('value');
-            $table->timestamps();
-        });
-
-        if (Schema::getConnection()->getDriverName() === 'mysql') {
-            DB::statement('CREATE INDEX translations_lang_key_index ON translations (language_id, `key`(191))');
-        } else {
-            Schema::table('translations', function (Blueprint $table) {
-                $table->index(['language_id'], 'translations_lang_key_index');
-            });
-        }
-
         Schema::create('password_history', function (Blueprint $table) {
             $table->id();
             $table->string('user_type');
@@ -101,6 +81,8 @@ return new class extends Migration
     {
         Schema::dropIfExists('login_history');
         Schema::dropIfExists('password_history');
+        // Not created any more (translations are files), but still dropped: a database
+        // built before the move still carries the table.
         Schema::dropIfExists('translations');
         Schema::dropIfExists('languages');
         Schema::dropIfExists('currencies');

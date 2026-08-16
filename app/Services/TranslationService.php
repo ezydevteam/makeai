@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Language;
-use App\Models\Translation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
@@ -20,10 +19,6 @@ class TranslationService
 
     public static function getForLocale(string $locale): array
     {
-        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
-            return [];
-        }
-
         // v2: entries whose value equals their key are no longer stored (see below).
         // The suffix invalidates caches written by the previous format.
         $cacheKey = "makeai:translations:v2:{$locale}";
@@ -38,7 +33,12 @@ class TranslationService
         }
 
         return Cache::remember($cacheKey, now()->addDay(), function () use ($locale) {
-            $defaultCode = Language::where('is_default', true)->value('code') ?: 'en';
+            // Catalogues are files now, so they are readable before the database exists —
+            // during install, or on a console command that boots without one. Only the
+            // "which language is default" lookup still needs a table.
+            $defaultCode = Schema::hasTable('languages')
+                ? (Language::where('is_default', true)->value('code') ?: 'en')
+                : 'en';
             $default = static::translationsFor($defaultCode);
             $current = $locale === $defaultCode ? collect() : static::translationsFor($locale);
 
@@ -54,12 +54,16 @@ class TranslationService
         });
     }
 
+    /**
+     * Read from lang/{code}.json rather than the `translations` table.
+     *
+     * The table is now only an index for the admin screen (see TranslationFileStore):
+     * making the render path depend on it is what allowed a migrate:fresh to silently
+     * un-translate an entire site, and what left every buyer's package with six languages
+     * and no strings in any of them.
+     */
     private static function translationsFor(string $langCode): Collection
     {
-        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
-            return collect();
-        }
-
         $cacheKey = "translations_{$langCode}";
         $cached = Cache::get($cacheKey);
 
@@ -75,16 +79,7 @@ class TranslationService
             Cache::forget($cacheKey);
         }
 
-        $language = Language::where('code', $langCode)->first();
-        if (! $language) {
-            Cache::put($cacheKey, [], now()->addDay());
-
-            return collect();
-        }
-
-        $translations = Translation::where('language_id', $language->id)
-            ->pluck('value', 'key')
-            ->toArray();
+        $translations = TranslationFileStore::get($langCode);
 
         Cache::put($cacheKey, $translations, now()->addDay());
 
@@ -113,21 +108,4 @@ class TranslationService
         }
     }
 
-    /**
-     * Sync a translation key across all languages if missing.
-     */
-    public static function syncKey(string $key): void
-    {
-        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
-            return;
-        }
-
-        $languages = Language::all();
-        foreach ($languages as $lang) {
-            Translation::firstOrCreate(
-                ['language_id' => $lang->id, 'key' => $key],
-                ['value' => $key]
-            );
-        }
-    }
 }

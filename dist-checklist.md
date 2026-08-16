@@ -36,6 +36,7 @@ Nothing ships until **every mandatory box is ticked**.
   - real SMTP host/user/pass, real OpenAI/Anthropic/Gemini keys
   - any `@gmail.com` / `@ezydev` / personal or internal e-mail or domain
 - [ ] ✋ No `APP_KEY=base64:…` real value committed in `.env.example` (must be blank — installer generates it).
+- [ ] 🤖 No developer-only keys left in the shipped `.env.example` — the `DEMO_*` block and `LICENSE_TEST_MODE` are cut out of a buyer package by the "Tailoring .env.example" step (gate: "developer-only … key(s) left in the shipped .env.example"). Any new key of that kind belongs inside a `# @build:demo-start … end` or `# @build:dev-only-start … end` fence in the repo's `.env.example`, or the gate will reject it.
 - [ ] ✋ No customer data, seeded real users, or production DB dump in `database/data/data.sql`.
 - [ ] ✋ No `.git/`, `.gitignore`-only internal folders (`.cursor`, `.agent`, `.agent-mem`, `.claude`, `.codex`, `.mcp*`, `.vscode`) in the zip. (ALLOWLIST excludes these — confirm.)
 

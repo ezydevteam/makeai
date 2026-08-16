@@ -1,17 +1,11 @@
 <div align="center">
-  <h2>MakeAI - The Ultimate AI SaaS Platform | No-Code Tool Builder</h2>
+  <h2>MakeAI - The Ultimate AI SaaS Platform | No-Code AI Tool Builder</h2>
   <p><strong>15 AI providers. 70+ models. 400+ ready-made AI tools. One platform you own outright.</strong></p>
 </div>
 
 <p>MakeAI is a complete, production-grade AI Software-as-a-Service application built on Laravel 13, Vue 3 and Tailwind 4. It is not a demo, a starter kit or a wrapper around one API &mdash; it is the whole business: 400+ AI tools across 25 categories, document chat, a visual tool builder, 9 payment gateways, subscriptions and credits, an affiliate program, a full blog and CMS, a REST API, and an admin panel built to run all of it.</p>
 
 <p>Install it, connect your own provider keys, set your own prices &mdash; and you are running your own AI business the same afternoon. <strong>No monthly platform fee, no revenue share, no vendor lock-in, no encrypted code.</strong> Every dollar your customers pay is yours, and the source is plain, readable Laravel and Vue you can modify however you like.</p>
-
-<div align="center">
-  <a href="https://t.me/+jtDehbPNvFxhMGE1" target="_blank">
-    <img src="https://cdn.ezydev.net/makeai/telegram_cta.webp" alt="Join the MakeAI community on Telegram" width="100%" />
-  </a>
-</div>
 
 <div align="center">
 <a href="https://makeai-demo.ezydev.net" target="_blank">
@@ -216,3 +210,61 @@
     <img src="https://cdn.ezydev.net/makeai/telegram.webp" alt="Join the MakeAI community on Telegram" width="100%" />
   </a>
 </div>
+
+
+Thank you for reviewing MakeAI.
+
+LIVE DEMO
+Frontend: https://makeai-demo.ezydev.net
+User panel:  user@demo.com  / demo12345
+Admin panel: https://makeai-demo.ezydev.net/admin/login
+             admin@demo.com / demo12345
+
+Note: the public demo runs in read-only demo mode, so settings saves are
+blocked there by design. A local install is fully writable.
+
+INSTALLATION
+The download contains an outer archive with documentation/, license.txt,
+readme.txt and script.zip. script.zip is the application: extract its
+contents into the web root. It creates index.php plus a core/ directory
+holding the application code, which the bundled .htaccess and web.config
+deny direct access to. Then browse to the domain and the guided web
+installer takes over.
+
+Requirements: PHP 8.3+, MySQL 8.0+ or MariaDB 10.4+, and the extensions
+listed in documentation/docs.html OR https://makeai-docs.ezydev.net
+No shell access or Composer required.
+
+LICENCE ACTIVATION
+Step 2 of the installer asks for an Envato purchase code. Please use:
+
+    00000000-0000-0000-0000-000000000001 (Regular license)
+    00000000-0000-0000-0000-000000000002 (Extended license)
+
+This is a reviewer code registered on our licence server. It activates
+as a Regular or Extended licence through the normal verification flow.
+
+AI FEATURES
+AI generation requires your own provider API key (OpenAI, Anthropic,
+Gemini and others are preconfigured). Add one under Admin > AI >
+Providers to test generation, or see the live demo above where keys are
+already configured.
+
+NOTES
+- addons/ ships empty by design. The five addons shown on the item page
+  are separate products and are not included in this item.
+- LicenseService uses base64_decode() on the Ed25519 signature and public
+  key during activation. This is signature decoding, not obfuscated code
+  — all source is plain, unencrypted PHP, Vue and TypeScript.
+- QUEUE_CONNECTION defaults to sync, so every feature works without a
+  queue worker. Cron and worker setup are documented for production.
+
+Happy to provide anything else you need — please just ask.
+
+
+ai, ai saas, ai content generator, ai writer, ai tools, ai chat,
+multi model, chatgpt, claude, rag, saas,
+content generator, chat with pdf, no code, laravel
+
+
+MakeAI - AI SaaS Platform | AI Content Generator, Document Chat & No-Code Tool Builder

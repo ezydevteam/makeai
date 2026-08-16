@@ -24,6 +24,9 @@ interface InstallProps {
     systemCheck?: Record<string, any[]>
     allPass?: boolean
     cronCommand?: string
+    // Second cron, shown on the review step. Whether the buyer confirms it decides
+    // which queue driver the install is finalised with.
+    queueCommand?: string
     // Flashed by the controller when it refuses a populated database on submit,
     // so the Database step can reveal the reset card on the Next click alone.
     dbState?: string | null
@@ -120,7 +123,12 @@ async function finalizeInstall() {
     installStatus.value = 'running'
 
     try {
-        const response = await axios.post(route('install.finalize'))
+        // Decides QUEUE_CONNECTION server-side. Sent from the review step's own
+        // checkbox rather than stored with the earlier steps, because it is a claim
+        // about the server, not a setting the buyer is choosing.
+        const response = await axios.post(route('install.finalize'), {
+            queue_worker_ready: props.formData?.step_6?.queue_worker_ready === true,
+        })
         if (response.data.success) {
             // Let the progress bar animate to 100% before swapping to the
             // success card.
@@ -197,6 +205,7 @@ async function finalizeInstall() {
                     :system-check="systemCheck"
                     :all-pass="allPass"
                     :cron-command="cronCommand"
+                    :queue-command="queueCommand"
                     :db-state="dbState"
                     :timezones="timezones"
                     :error="errorMessage"

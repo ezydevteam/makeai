@@ -1,10 +1,10 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "makeai/makeai",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "description": "MakeAI — an AI content, image and chat platform built on Laravel.",
+    "keywords": ["makeai", "ai", "saas", "laravel"],
+    "license": "proprietary",
     "require": {
         "php": "^8.3",
         "ext-bcmath": "*",

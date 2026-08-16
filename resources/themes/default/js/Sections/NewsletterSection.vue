@@ -140,7 +140,7 @@ onUnmounted(() => gsapCtx?.revert())
                         <div class="w-full">
                             <span v-if="asString(section.config.badge_text)" :class="badgeClass(backgroundStyle, asString(section.config.title_color, 'dark'))">
                                 <i class="ti ti-sparkles text-xs"></i>
-                                {{ asString(section.config.badge_text) }}
+                                {{ t(asString(section.config.badge_text)) }}
                             </span>
 
                             <!-- Title Wrapper with Left Position Icon -->
@@ -158,7 +158,7 @@ onUnmounted(() => gsapCtx?.revert())
                                         ? 'text-white'
                                         : titleColorClass(asString(section.config.title_color, 'dark'))
                                 ]">
-                                    {{ asString(section.config.heading ?? section.config.title, t('Stay in the Loop')) }}
+                                    {{ t(asString(section.config.heading ?? section.config.title, t('Stay in the Loop'))) }}
                                 </h2>
                             </div>
 
@@ -170,7 +170,7 @@ onUnmounted(() => gsapCtx?.revert())
                                     : subtitleColorClass(asString(section.config.title_color, 'dark'), backgroundStyle),
                                 asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : ''
                             ]">
-                                {{ asString(section.config.subheading ?? section.config.subtitle) }}
+                                {{ t(asString(section.config.subheading ?? section.config.subtitle)) }}
                             </p>
                         </div>
                     </div>
@@ -273,7 +273,7 @@ onUnmounted(() => gsapCtx?.revert())
                             'mt-6 text-center text-sm'
                         ]"
                     >
-                        {{ asString(section.config.privacy_text, t('No spam. Unsubscribe anytime.')) }}
+                        {{ t(asString(section.config.privacy_text, t('No spam. Unsubscribe anytime.'))) }}
                     </p>
                 </div>
             </div>

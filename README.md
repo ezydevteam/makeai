@@ -96,4 +96,6 @@ php artisan boost:install
 
 ## 📄 License
 
-MakeAI is open-sourced software licensed under the [MIT License](LICENSE).
+MakeAI is commercial software sold through Envato Market (CodeCanyon). Use is
+governed by the Envato Regular or Extended Licence purchased with it — see
+[LICENSE](LICENSE). It is not open-source.

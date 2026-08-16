@@ -87,9 +87,13 @@ class AiToolSeeder extends Seeder
             'model_override' => null,
             'temperature' => $this->temperatureFor($category->slug),
             'max_tokens_override' => $this->maxTokens($category->slug, $tool['slug']),
+            // 'premium', not 'pro_plan': only the levels in config/access-levels.php are
+            // understood by AccessLevelService, and 'pro_plan' was in none of them — it
+            // reported requiresAuth=false, so CheckCredits waved guests straight through
+            // tools meant to need a subscription, and neither access badge matched it.
             'access_level' => in_array($category->slug, ['legal-finance', 'business', 'development'], true)
                 && str_contains($tool['slug'], 'analysis')
-                ? 'pro_plan'
+                ? 'premium'
                 : 'inherit',
             'is_active' => true,
             'is_featured' => in_array($tool['slug'], $this->featuredSlugs(), true),

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import laravel from 'laravel-vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
@@ -6,18 +6,29 @@ import fs from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 // ─── Dev-server HTTPS ────────────────────────────────────────────────
-// The app is served by Laragon over https://makeai.test, so the Vite dev
-// server must share that origin/scheme — otherwise the browser blocks its
-// assets (http on an IP host = mixed content) and HMR fails.
+// When the app is served over https locally (Laragon, Valet, Herd), the Vite dev
+// server must share that origin/scheme — otherwise the browser blocks its assets
+// as mixed content and HMR fails. Point it at your local cert with three keys in
+// .env (NOT .env.example — these are per-machine and must never ship):
 //
-// Reuses Laragon's shared cert (covers *.test incl. makeai.test). Guarded by
-// existsSync so any machine/CI without the cert falls back to plain http and
-// `vite build` (which ignores `server`) is never affected. Override paths/host
-// with VITE_DEV_SSL_KEY / VITE_DEV_SSL_CERT / VITE_DEV_HOST.
-const devHost = process.env.VITE_DEV_HOST ?? 'makeai.test'
-const sslKeyPath = process.env.VITE_DEV_SSL_KEY ?? 'D:/laragon/etc/ssl/laragon.key'
-const sslCertPath = process.env.VITE_DEV_SSL_CERT ?? 'D:/laragon/etc/ssl/laragon.crt'
-const hasDevCerts = fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)
+//   VITE_DEV_HOST=myapp.test
+//   VITE_DEV_SSL_KEY=/path/to/cert.key
+//   VITE_DEV_SSL_CERT=/path/to/cert.crt
+//
+// Absent or pointing at a file that is not there, the dev server falls back to
+// plain http on localhost. `vite build` ignores `server` entirely, so a buyer
+// rebuilding the frontend is unaffected either way.
+//
+// Read via loadEnv rather than hardcoded: defaults baked in here are one
+// developer's machine layout, and this file ships to buyers.
+export default defineConfig(({ mode }) => {
+const env = loadEnv(mode, process.cwd(), '')
+
+const devHost = env.VITE_DEV_HOST || 'localhost'
+const sslKeyPath = env.VITE_DEV_SSL_KEY || ''
+const sslCertPath = env.VITE_DEV_SSL_CERT || ''
+const hasDevCerts = sslKeyPath !== '' && sslCertPath !== ''
+    && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)
 
 const httpsServer = hasDevCerts
     ? {
@@ -30,7 +41,7 @@ const httpsServer = hasDevCerts
       }
     : {}
 
-export default defineConfig({
+return {
     base: '/build/',
     plugins: [
         laravel({
@@ -84,4 +95,5 @@ export default defineConfig({
             ],
         },
     },
+}
 })

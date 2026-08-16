@@ -33,7 +33,10 @@
  *      irrelevant here.
  *   2. The addons in DEMO_ADDONS are BUNDLED, so the demo showcases the full product.
  *      The buyer package ships an empty addons/ because addons are sold separately.
- *   3. .env.example ships with DEMO_ENABLED=true pre-set.
+ *   3. The @build:demo block in .env.example is KEPT and uncommented, with
+ *      DEMO_ENABLED=true pre-set. A buyer package has that whole block cut out — see
+ *      the "Tailoring .env.example" step. The @build:dev-only block (LICENSE_TEST_MODE)
+ *      is cut from both.
  *
  * The demo's own DemoReset command marks the license valid so the bundled addons can
  * activate (AddonService::activate() refuses on an unverified license). That makes this
@@ -67,7 +70,11 @@ const DOCS_SITE = 'https://makeai-docs.ezydev.net';
  * guards on File::isDirectory() so an empty one is a no-op at boot.
  */
 const ALLOW_DIRS = [
-    'app', 'bootstrap', 'config', 'database', 'resources', 'routes',
+    // `lang` holds the per-language translation catalogues (lang/{code}.json), which are
+    // the system of record for translations — not the database. It has to ship for a buyer
+    // to receive any translated strings at all, and it has to be writable for the admin
+    // translation screen to save (see STORAGE_SKELETON, which creates it either way).
+    'app', 'bootstrap', 'config', 'database', 'lang', 'resources', 'routes',
 ];
 
 const ALLOW_FILES = [
@@ -207,6 +214,10 @@ const STORAGE_SKELETON = [
     'storage/framework/views',
     'storage/logs',
     'bootstrap/cache',
+    // The admin translation screen writes lang/{code}.json here. Listed so the directory
+    // exists and is chmod-ed with the rest of the writable tree even when the package
+    // ships no catalogues yet — otherwise the first save fails on a fresh install.
+    'lang',
 ];
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -478,6 +489,35 @@ function findFiles(string $root, string $pattern, ?callable $filter = null): arr
     return $found;
 }
 
+/**
+ * Rewrites the `# @build:{name}-start … # @build:{name}-end` fence in an .env file.
+ *
+ * $rewrite receives the fenced body WITHOUT the two marker lines and returns what
+ * takes its place; returning '' drops the block entirely. The markers themselves
+ * never survive into a package either way.
+ *
+ * Exactly one fence must be present. A missing or duplicated marker is fatal rather
+ * than a no-op: the whole point of the fence is to keep developer-only keys out of a
+ * customer's package, and a pattern that silently matched nothing would ship them.
+ */
+function rewriteEnvBlock(string $env, string $name, callable $rewrite): string
+{
+    $marker  = preg_quote($name, '/');
+    $pattern = '/^# @build:' . $marker . '-start\b[^\r\n]*\R(.*?)^# @build:' . $marker . '-end\b[^\r\n]*\R/ms';
+
+    if (preg_match_all($pattern, $env, $matches) !== 1) {
+        fail("expected exactly one @build:{$name} fence in .env.example — a marker is missing or duplicated");
+    }
+
+    $result = preg_replace_callback($pattern, fn ($m) => $rewrite($m[1]), $env, 1);
+
+    if ($result === null) {
+        fail("could not rewrite the @build:{$name} fence in .env.example");
+    }
+
+    return $result;
+}
+
 // ─── 1. Build dependencies ───────────────────────────────────────────────────
 
 echo "Building MakeAI v{$version}\n";
@@ -583,6 +623,74 @@ foreach ($demo ? [] : STUB_FILES as $target => $source) {
     info($target);
 }
 
+// The theme's default homepage ships image URLs under /assets/image/demo-assets/ — the
+// social-proof brand logos and the image-carousel screenshots. That directory is copied
+// into the WEBROOT for a demo build (see the demo asset step below) and for nobody else,
+// so on a buyer's fresh install every one of those URLs 404s and the homepage renders a
+// row of broken images before they have configured anything.
+//
+// Blanking the value rather than pointing it somewhere else is deliberate: both sections
+// already degrade gracefully on an empty image — ImageCarouselSection renders its
+// `ti ti-photo` placeholder tile and StatsBarSection falls back to the brand's name as
+// text — so an empty string is the one value that produces a finished-looking page with
+// no asset behind it. The buyer then fills these in from the admin appearance screens.
+//
+// Applied to the presets too: a buyer who applies "Creative Studio" would otherwise hit
+// exactly the same 404s the default homepage was just fixed for.
+step($demo ? 'Keeping demo imagery in theme defaults (demo ships the assets)' : 'Blanking demo-asset image URLs in theme defaults');
+
+if (! $demo) {
+    // findFiles() returns paths relative to the root it was given, so the preset
+    // directory has to go back on the front before any of these are opened.
+    $presetDir = $appRoot . '/resources/themes/default/presets';
+
+    $themeFiles = array_merge(
+        [$appRoot . '/resources/themes/default/settings.json'],
+        array_map(
+            fn (string $relative): string => $presetDir . DIRECTORY_SEPARATOR . $relative,
+            findFiles($presetDir, '*.json'),
+        ),
+    );
+
+    $blankedTotal = 0;
+
+    foreach ($themeFiles as $themeFile) {
+        if (! is_file($themeFile)) {
+            continue;
+        }
+
+        $json = (string) file_get_contents($themeFile);
+
+        // Only the value of a JSON string is rewritten, so the key ("image", "image_url",
+        // "background_image", …) does not have to be enumerated here — a new section type
+        // referencing demo-assets is covered the day it is added.
+        $blanked = preg_replace('#"/assets/image/demo-assets/[^"]*"#', '""', $json, -1, $count);
+
+        if ($blanked === null) {
+            fail('could not rewrite demo-asset URLs in ' . basename($themeFile));
+        }
+
+        if ($count === 0) {
+            continue;
+        }
+
+        // A malformed rewrite would ship a theme whose settings.json cannot be decoded,
+        // which fails at runtime as a blank site rather than anywhere near this script.
+        if (json_decode($blanked) === null) {
+            fail('blanking demo-asset URLs produced invalid JSON in ' . basename($themeFile));
+        }
+
+        if (file_put_contents($themeFile, $blanked) === false) {
+            fail('could not write ' . basename($themeFile));
+        }
+
+        $blankedTotal += $count;
+        info(sprintf('%-28s %d URL(s)', basename($themeFile), $count));
+    }
+
+    info($blankedTotal . ' demo-asset URL(s) blanked across ' . count($themeFiles) . ' theme file(s)');
+}
+
 // ─── 3. Install production dependencies into the staging copy ────────────────
 
 step('Installing production dependencies (composer --no-dev)');
@@ -616,6 +724,14 @@ if ($noSlim) {
     $prunedFiles = ['*.md', '*.dist', 'phpunit.xml*', '.travis.yml', '.editorconfig', 'Makefile'];
     $removed     = 0;
 
+    /**
+     * Kept despite the `*.md` rule. Most bundled packages are MIT, which requires their
+     * licence text to travel with the code — and Laravel's is LICENSE.md, so the blanket
+     * markdown prune was silently stripping exactly the file the licence obliges us to
+     * keep. license.txt tells the buyer these live under core/vendor/, so they must.
+     */
+    $keptFiles = ['LICENSE*', 'LICENCE*', 'COPYING*', 'NOTICE*'];
+
     $items = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($appRoot . '/vendor', RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::CHILD_FIRST
@@ -627,7 +743,9 @@ if ($noSlim) {
         if ($item->isDir() && in_array($name, $prunedDirs, true)) {
             rmTree($item->getPathname());
             $removed++;
-        } elseif ($item->isFile() && matchesAny($name, $prunedFiles)) {
+        // Uppercased for the keep test only: the patterns are uppercase and fnmatch is
+        // case-sensitive, so `license.md` would otherwise slip past and be deleted.
+        } elseif ($item->isFile() && matchesAny($name, $prunedFiles) && ! matchesAny(strtoupper($name), $keptFiles)) {
             @unlink($item->getPathname());
             $removed++;
         }
@@ -689,6 +807,14 @@ if (is_file($viteManifest)) {
     info('manifest.json mirrored to build/ root');
 }
 
+// distribution/favicon.ico is a brand-neutral placeholder, not MakeAI's mark. It is the
+// one piece of branding a buyer's install cannot correct for itself: data.sql ships
+// site_favicon_ico and site_favicon_png null, so app.blade.php emits no <link rel="icon">
+// and the browser falls back to this file — while the wizard REQUIRES the buyer's own
+// site name, so the header already reads theirs. Shipping the real mark here put MakeAI's
+// icon in the tab of every buyer's site, beside their own name, until they noticed.
+// Shipping nothing is worse still: a 404 on /favicon.ico in every access log and a blank
+// tab. The demo build swaps its own mark back in below.
 foreach (['index.php', '.htaccess', 'robots.txt', 'favicon.ico'] as $file) {
     $source = $srcDir . '/distribution/' . $file;
     if (! is_file($source)) {
@@ -697,6 +823,20 @@ foreach (['index.php', '.htaccess', 'robots.txt', 'favicon.ico'] as $file) {
     copy($source, $webroot . DIRECTORY_SEPARATOR . $file);
 }
 info('index.php, .htaccess, robots.txt, favicon.ico placed');
+
+// The demo IS MakeAI, so it wants the real one. Done here rather than by pointing the
+// loop above at a different source, so the placeholder stays the default that a forgotten
+// branch cannot undo.
+if ($demo) {
+    $demoIcon = $srcDir . '/public/assets/image/demo-assets/logo/favicon.ico';
+
+    if (! is_file($demoIcon)) {
+        fail('public/assets/image/demo-assets/logo/favicon.ico is missing — the demo would ship the buyer placeholder');
+    }
+
+    copy($demoIcon, $webroot . '/favicon.ico');
+    info('favicon.ico replaced with the demo mark');
+}
 
 // Defence in depth: Apache's root rules live inside <IfModule mod_rewrite.c>,
 // and nginx ignores .htaccess entirely. This second file denies the app
@@ -879,40 +1019,158 @@ if ($demo) {
     info("{$assetFiles} files copied");
 }
 
-// The shipped .env.example keeps the whole demo block commented out so a buyer cannot
-// enable a data-destroying reset by accident. The demo host needs the opposite default,
-// and asking the operator to hand-edit it is exactly the step that gets skipped.
-if ($demo) {
-    step('Enabling demo mode in .env.example');
+// The repo's .env.example carries two developer-only regions behind @build: fences, and
+// neither one belongs in a customer's package. The demo block documents a switch that
+// wipes the database on a six-hourly timer — 76 commented keys a buyer can only get
+// into trouble with — and the dev-only block documents the license bypass. Both come
+// out of a buyer package here rather than by hand, because by hand means eventually not
+// at all. A --demo build is the demo block's one consumer, and it needs it uncommented.
+step('Tailoring .env.example');
 
-    $envPath = $appRoot . DIRECTORY_SEPARATOR . '.env.example';
-    $env     = file_get_contents($envPath);
+$envPath = $appRoot . DIRECTORY_SEPARATOR . '.env.example';
+$env     = file_get_contents($envPath);
 
-    if ($env === false) {
-        fail('could not read the staged .env.example');
+if ($env === false) {
+    fail('could not read the staged .env.example');
+}
+
+$uncommented = 0;
+$flipped     = 0;
+
+$env = rewriteEnvBlock($env, 'demo', function (string $block) use ($demo, &$uncommented, &$flipped) {
+    if (! $demo) {
+        return '';
     }
 
-    // Uncomment the DEMO_* block in place rather than appending a second copy — a
+    // Uncomment the DEMO_* keys in place rather than appending a second copy — a
     // duplicate key later in the file would silently win over the one above it.
     // Digits are part of the character class on purpose: DEMO_2CHECKOUT_* would
     // otherwise stay commented out and that gateway would silently never provision.
-    $env = preg_replace('/^# (DEMO_[A-Z0-9_]+=)/m', '$1', $env, -1, $uncommented);
+    $block = preg_replace('/^# (DEMO_[A-Z0-9_]+=)/m', '$1', $block, -1, $uncommented);
+    $block = str_replace('DEMO_ENABLED=false', 'DEMO_ENABLED=true', $block, $flipped);
 
-    if ($uncommented === 0) {
-        fail('no commented DEMO_* keys found in .env.example — the demo preset cannot be applied');
+    return $block;
+});
+
+if ($demo && ($uncommented === 0 || $flipped === 0)) {
+    fail('the @build:demo block has no commented DEMO_* keys or no DEMO_ENABLED=false — the demo preset cannot be applied');
+}
+
+// Dropped from the demo package too: demo:reset marks the license valid on its own, so
+// the demo host has no use for the bypass either.
+$env = rewriteEnvBlock($env, 'dev-only', fn () => '');
+
+// Cutting a fence leaves the blank line above it stacked on the blank line below it.
+$env = rtrim((string) preg_replace('/\R{3,}/', "\n\n", $env)) . "\n";
+
+if (file_put_contents($envPath, $env) === false) {
+    fail('could not write the staged .env.example');
+}
+
+info($demo
+    ? "demo block kept ({$uncommented} DEMO_* keys uncommented, DEMO_ENABLED=true), dev-only block removed"
+    : 'demo and dev-only blocks removed');
+
+// PurchaseCode carries sha256 hashes of two fake purchase codes that activate a Regular
+// or Extended license without ever reaching the license server, behind LICENSE_TEST_MODE.
+// Cutting that key out of .env.example hid the switch and nothing else: config/app.php
+// still read the variable, the mechanism shipped intact, and the docblock named both codes
+// in plaintext. One line added to core/.env and a copy-paste out of the comment activated
+// any install for free — the entire licensing system defeated by anyone who bought a single
+// copy and ran grep. It has to be absent from the shipped code, not merely undocumented:
+// .env belongs to whoever holds the package, so no env-driven gate can defend it.
+//
+// LicenseService, AddonLicenseService and ThemeLicenseService all reach test mode through
+// these two methods, so neutering the pair closes core, addon and theme activation together.
+//
+// The demo build keeps it. That package installs only on the seller's own host, demo mode
+// blocks every write verb and publishes its own credentials, and demo:reset re-establishes
+// the license itself without going near a purchase code.
+if (! $demo) {
+    step('Compiling out license test mode');
+
+    $purchaseCodePath = $appRoot . '/app/Support/PurchaseCode.php';
+
+    if (! is_file($purchaseCodePath)) {
+        fail('app/Support/PurchaseCode.php is missing from the staged package');
     }
 
-    $env = str_replace('DEMO_ENABLED=false', 'DEMO_ENABLED=true', $env, $flipped);
+    $purchaseCode = (string) file_get_contents($purchaseCodePath);
 
-    if ($flipped === 0) {
-        fail('DEMO_ENABLED=false not found in .env.example — the demo preset cannot be applied');
+    // Every edit asserts its own match count. A refactor that renames the constant or
+    // reformats the method must fail the build rather than quietly ship the bypass —
+    // silence is precisely how this survived the last release.
+    $cut = static function (string $subject, string $pattern, string $replacement, int $expected, string $what): string {
+        $found = preg_match_all($pattern, $subject);
+
+        if ($found !== $expected) {
+            fail("expected {$expected} {$what} in app/Support/PurchaseCode.php, found {$found} — "
+                . 'the license bypass could not be compiled out');
+        }
+
+        // preg_replace_callback, not preg_replace: a literal replacement containing $ or \
+        // would otherwise be read as a backreference.
+        return (string) preg_replace_callback($pattern, fn () => $replacement, $subject, $expected);
+    };
+
+    $purchaseCode = $cut(
+        $purchaseCode,
+        '/private const TEST_CODE_HASHES = \[.*?\];/s',
+        'private const TEST_CODE_HASHES = [];',
+        1,
+        'TEST_CODE_HASHES constant'
+    );
+
+    $purchaseCode = $cut(
+        $purchaseCode,
+        '/^[ \t]*\*[ \t]*TEST-LICENSE-0000-(?:REGULAR|EXTENDED).*\R/m',
+        '',
+        2,
+        'plaintext test code(s) in the docblock'
+    );
+
+    $purchaseCode = $cut(
+        $purchaseCode,
+        "/return filter_var\(config\('app\.license_test_mode', false\), FILTER_VALIDATE_BOOLEAN\);/",
+        'return false; // compiled out of released packages by scripts/build-release.php',
+        1,
+        'testModeActive() body'
+    );
+
+    if (file_put_contents($purchaseCodePath, $purchaseCode) === false) {
+        fail('could not write the hardened app/Support/PurchaseCode.php');
     }
 
-    if (file_put_contents($envPath, $env) === false) {
-        fail('could not write the demo .env.example');
+    info('TEST_CODE_HASHES emptied, testModeActive() forced false, plaintext codes removed');
+
+    // AppServiceProvider warns at boot when LICENSE_TEST_MODE is set in production. That is
+    // a useful guard in a developer checkout and pure noise in a buyer's: the flag no longer
+    // does anything once the code above has run, so the message would announce a CRITICAL
+    // problem that does not exist, in the log of someone who cannot act on it — while naming
+    // the bypass flag to anyone reading that log.
+    $providerPath = $appRoot . '/app/Providers/AppServiceProvider.php';
+
+    if (! is_file($providerPath)) {
+        fail('app/Providers/AppServiceProvider.php is missing from the staged package');
     }
 
-    info("{$uncommented} DEMO_* keys uncommented, DEMO_ENABLED=true");
+    $provider = (string) file_get_contents($providerPath);
+    $warning = '/^[ \t]*if \(config\(\'app\.license_test_mode\'\).*?\R(?:.*?\R)??[ \t]*\}\R\R/m';
+
+    $found = preg_match_all($warning, $provider);
+
+    if ($found !== 1) {
+        fail("expected 1 LICENSE_TEST_MODE production warning in app/Providers/AppServiceProvider.php, "
+            . "found {$found} — it could not be removed from the buyer package");
+    }
+
+    $provider = (string) preg_replace_callback($warning, fn () => '', $provider, 1);
+
+    if (file_put_contents($providerPath, $provider) === false) {
+        fail('could not write the trimmed app/Providers/AppServiceProvider.php');
+    }
+
+    info('LICENSE_TEST_MODE production warning removed from AppServiceProvider');
 }
 
 step('Creating writable directory skeleton');
@@ -950,6 +1208,83 @@ foreach ($mustExist as $label => $path) {
 
     if (! file_exists($path)) {
         $failures[] = "required file missing: {$label}";
+    }
+}
+
+// The fence rewrite above already fails hard on a missing marker, so this gate exists
+// for the case it cannot see: a DEMO_* or LICENSE_TEST_MODE key added OUTSIDE either
+// fence. It is checked against the shipped file, which is the only thing that matters.
+$shippedEnv = (string) @file_get_contents($appRoot . '/.env.example');
+
+foreach (['/^#?\s*DEMO_[A-Z0-9_]+=/m' => 'DEMO_*', '/^#?\s*LICENSE_TEST_MODE=/m' => 'LICENSE_TEST_MODE'] as $pattern => $label) {
+    $checksRun++;
+
+    // A demo package is supposed to carry DEMO_* keys; LICENSE_TEST_MODE it is not.
+    if ($demo && $label === 'DEMO_*') {
+        if (! str_contains($shippedEnv, "\nDEMO_ENABLED=true")) {
+            $failures[] = 'demo package .env.example does not set DEMO_ENABLED=true';
+        }
+
+        continue;
+    }
+
+    if (preg_match($pattern, $shippedEnv)) {
+        $failures[] = "developer-only {$label} key(s) left in the shipped .env.example — "
+            . 'move them inside a @build: fence';
+    }
+}
+
+// No shipped account may have a password anyone could look up. The install wizard
+// overwrites the seeded admin, but it writes INSTALLED=true first and an install that
+// fails partway leaves whatever the dump carried — so a guessable hash in data.sql is a
+// live login on that buyer's site. installer:export-data scrubs this; the gate is here
+// because the cost of it silently not having run is somebody else's compromised site.
+$dumpPath = $appRoot . '/database/data/data.sql';
+
+if (is_file($dumpPath)) {
+    $checksRun++;
+    $dump = (string) file_get_contents($dumpPath);
+
+    // Cheap enough to just try them: the dump holds one admin row, not a user table.
+    $weak = ['admin123', 'password', 'admin', '12345678', '123456', 'secret', 'demo12345',
+        'makeai123', 'admin@123', 'Admin@123', 'password123', 'changeme', 'letmein'];
+
+    // A demo package publishes its own sign-in credentials on the login page, so those
+    // are guessable by design and cannot be a build failure. Every OTHER account in that
+    // dump still must not be — which is exactly how the seeded admin@makeai.com account
+    // was found sitting on the public demo with a password shipped in every copy of the
+    // product. Read from the staged .env.example, which the demo preset has already
+    // uncommented, so this tracks whatever credentials that package actually publishes.
+    $exempt = [];
+
+    if ($demo) {
+        foreach (['DEMO_ADMIN_PASSWORD', 'DEMO_USER_PASSWORD'] as $key) {
+            if (preg_match('/^' . $key . '=(.*)$/m', $shippedEnv, $found)) {
+                $value = trim(trim($found[1]), '"\'');
+
+                if ($value !== '') {
+                    $exempt[] = $value;
+                }
+            }
+        }
+
+        if ($exempt !== []) {
+            info('weak-password gate: exempting published demo credentials (' . implode(', ', $exempt) . ')');
+        }
+    }
+
+    $weak = array_values(array_diff($weak, $exempt));
+
+    preg_match_all('/\$2[aby]\$\d{2}\$[.\/A-Za-z0-9]{53}/', $dump, $hashes);
+
+    foreach (array_unique($hashes[0]) as $hash) {
+        foreach ($weak as $candidate) {
+            if (password_verify($candidate, $hash)) {
+                $failures[] = "database/data/data.sql ships an account whose password is '{$candidate}' — "
+                    . 'regenerate it with `php artisan installer:export-data --fresh`';
+                break 2;
+            }
+        }
     }
 }
 
@@ -1141,6 +1476,18 @@ if ($demo) {
             . 'servable logo or favicon source';
     }
 
+    // The demo wears the real mark; the buyer placeholder in distribution/ must have been
+    // swapped out. Checked by content because both files are named favicon.ico and the
+    // copy that does it is easy to lose in a refactor.
+    $checksRun++;
+
+    $demoIcon = $srcDir . '/public/assets/image/demo-assets/logo/favicon.ico';
+
+    if (is_file($demoIcon) && md5_file($webroot . '/favicon.ico') !== md5_file($demoIcon)) {
+        $failures[] = 'the webroot favicon.ico is not the demo mark — the demo would ship the neutral '
+            . 'buyer placeholder in its browser tab';
+    }
+
     // Each bundled addon must have arrived whole. A truncated copy activates and then
     // 500s on its first route, which is worse than not shipping it at all.
     foreach (DEMO_ADDONS as $slug) {
@@ -1167,6 +1514,96 @@ foreach ($expectedStubs as $dir => $allowed) {
     $unexpected = array_diff(scandir($path) ?: [], ['.', '..'], $allowed);
     foreach ($unexpected as $file) {
         $failures[] = "{$dir}/{$file} leaked into the package (only the reference stub should ship)";
+    }
+}
+
+// The reverse of the demo check above: a buyer package must not wear MakeAI's mark in
+// the browser tab. The wizard requires the buyer's own site name and data.sql leaves both
+// favicon settings null, so this file is what their visitors actually see — and nothing
+// downstream would ever report it, because the package installs and looks correct to
+// everyone except the buyer, on their own domain.
+if (! $demo) {
+    $checksRun++;
+
+    $demoIcon = $srcDir . '/public/assets/image/demo-assets/logo/favicon.ico';
+
+    if (is_file($demoIcon) && md5_file($webroot . '/favicon.ico') === md5_file($demoIcon)) {
+        $failures[] = "the webroot favicon.ico is MakeAI's own mark — every buyer's site would show it "
+            . 'in the tab beside their own name. distribution/favicon.ico must be the neutral placeholder.';
+    }
+
+    // Proves the step above actually ran against the file that ships. Checked on the staged
+    // package rather than the repo, because the repo copy is meant to keep test mode.
+    $checksRun++;
+
+    $shippedPurchaseCode = (string) @file_get_contents($appRoot . '/app/Support/PurchaseCode.php');
+
+    if ($shippedPurchaseCode === '') {
+        $failures[] = 'app/Support/PurchaseCode.php is unreadable in the package — the license bypass '
+            . 'cannot be confirmed closed';
+    } else {
+        if (str_contains($shippedPurchaseCode, 'TEST-LICENSE')) {
+            $failures[] = 'a plaintext test purchase code is still in app/Support/PurchaseCode.php — '
+                . 'buyers could read it and activate for free';
+        }
+
+        if (! str_contains($shippedPurchaseCode, 'TEST_CODE_HASHES = []')) {
+            $failures[] = 'TEST_CODE_HASHES is not empty in the shipped app/Support/PurchaseCode.php — '
+                . 'a fake purchase code would still activate this build';
+        }
+
+        if (str_contains($shippedPurchaseCode, 'license_test_mode')) {
+            $failures[] = 'app/Support/PurchaseCode.php still reads LICENSE_TEST_MODE — one line in '
+                . "core/.env would re-enable the bypass on any buyer's install";
+        }
+    }
+
+    // The codes leaked a second way, and checking one PHP file did not see it: the
+    // installer's license step rendered them in a developer banner, so they shipped in
+    // plaintext inside build/assets/StepLicense-*.js — readable from view-source, no PHP
+    // involved, in a package that had already passed the gate above. So scan everything a
+    // person can actually read: the compiled bundle and the source that ships beside it.
+    // vendor/ is excluded because it is neither ours nor small.
+    $checksRun++;
+
+    $codeLeaks = [];
+    $scanExtensions = ['js', 'css', 'ts', 'vue', 'php', 'json', 'html', 'md'];
+
+    foreach ([$webroot . '/build', $appRoot . '/resources', $appRoot . '/app'] as $scanRoot) {
+        if (! is_dir($scanRoot)) {
+            continue;
+        }
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($scanRoot, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($files as $file) {
+            if (! $file->isFile() || ! in_array(strtolower($file->getExtension()), $scanExtensions, true)) {
+                continue;
+            }
+
+            if (str_contains((string) @file_get_contents($file->getPathname()), 'TEST-LICENSE')) {
+                $codeLeaks[] = ltrim(str_replace($stageRoot, '', $file->getPathname()), '\\/');
+            }
+        }
+    }
+
+    if ($codeLeaks !== []) {
+        $failures[] = 'a plaintext test purchase code ships in ' . count($codeLeaks) . ' file(s) — '
+            . implode(', ', array_slice($codeLeaks, 0, 5))
+            . ' — and anyone who reads one activates for free';
+    }
+
+    // Proves the AppServiceProvider trim above ran. The message cannot be true in a package
+    // where test mode is compiled out, so its presence means the removal silently missed.
+    $checksRun++;
+
+    $shippedProvider = (string) @file_get_contents($appRoot . '/app/Providers/AppServiceProvider.php');
+
+    if (str_contains($shippedProvider, 'LICENSE_TEST_MODE is enabled')) {
+        $failures[] = 'AppServiceProvider still logs the LICENSE_TEST_MODE production warning — '
+            . "buyers would get a CRITICAL log line about a flag that does nothing in their build";
     }
 }
 
@@ -1358,7 +1795,10 @@ file_put_contents($wrapper . '/readme.txt', implode("\n", [
     '',
     'REQUIREMENTS',
     '------------',
-    '  PHP 8.3 or newer, MySQL 5.7+ / MariaDB 10.3+',
+    // Kept in step with the same statement in .env.example. MySQL 5.7 reached end of
+    // life in October 2023; claiming it here only invites support tickets from hosts
+    // nobody tests against.
+    '  PHP 8.3 or newer, MySQL 8.0+ / MariaDB 10.4+',
     '  Extensions: pdo, pdo_mysql, mbstring, json, openssl, tokenizer, xml,',
     '              dom, iconv, ctype, bcmath, curl, fileinfo, zip',
     '',

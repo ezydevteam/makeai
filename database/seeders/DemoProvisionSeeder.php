@@ -50,6 +50,7 @@ class DemoProvisionSeeder extends Seeder
             'extensions' => $this->provisionExtensions(...),
             'captcha' => $this->provisionCaptcha(...),
             'branding' => $this->provisionBranding(...),
+            'tool access' => $this->provisionToolAccess(...),
         ];
 
         foreach ($steps as $label => $step) {
@@ -74,6 +75,14 @@ class DemoProvisionSeeder extends Seeder
      * The setting stores the COPY's relative key, never the source path: media_url()
      * resolves stored keys against the public disk, so a value of 'demo-assets/logo.svg'
      * would render as '/storage/demo-assets/logo.svg' and 404.
+     *
+     * That key carries a hash of the file's own bytes. Every other image in the product
+     * gets a random filename from store_public_upload(), so replacing one produces a new
+     * url; this copy used to keep the source filename, which made '/storage/branding/
+     * logo-light.png' a stable url whose contents silently changed whenever new brand art
+     * shipped. Browsers went on serving the previous image from cache — favicons most
+     * stubbornly of all — so a refreshed demo logo appeared not to have shipped at all.
+     * Hashing the name means new art is a new url and old art cannot be served.
      */
     private function provisionBranding(): void
     {
@@ -114,8 +123,17 @@ class DemoProvisionSeeder extends Seeder
                 continue;
             }
 
-            $key = 'branding/'.$file;
-            Storage::disk('public')->put($key, (string) file_get_contents($source));
+            $contents = (string) file_get_contents($source);
+
+            // demo:sweep-uploads deletes branding/ wholesale at the start of every reset,
+            // so hashed names replace the previous set rather than piling up beside it.
+            $extension = pathinfo($file, PATHINFO_EXTENSION);
+            $key = 'branding/'
+                .pathinfo($file, PATHINFO_FILENAME)
+                .'-'.substr(md5($contents), 0, 8)
+                .($extension !== '' ? '.'.$extension : '');
+
+            Storage::disk('public')->put($key, $contents);
             settings_set($settingKey, $key, 'string', 'branding');
             $provisioned[] = $file;
         }
@@ -365,6 +383,39 @@ class DemoProvisionSeeder extends Seeder
         settings_set('external_captcha_enabled', $enabled, 'boolean', 'external_apis');
 
         $this->note('captcha: recaptcha keys stored, guard '.($enabled ? 'ON' : 'off (set DEMO_RECAPTCHA_ENABLED=true to switch on)'));
+    }
+
+    /**
+     * Open the tool catalogue to signed-out visitors on the demo.
+     *
+     * A demo whose whole catalogue answers "please sign in" shows a login form, not the
+     * product — and the person most likely to bounce off it is an Envato reviewer or a
+     * prospective buyer who will not register to look around. Guest level gives them a
+     * length-capped free preview (ToolPage renders it as "Free preview — no login or
+     * credits required"), which is the thing worth showing.
+     *
+     * Set on the CATEGORIES, so the tools' own 'inherit' resolves through them: it leaves
+     * the two 'premium' tools gated as intended, and one row per category is reversible
+     * from the admin, where the global default_tool_access_level setting is not — nothing
+     * writes that setting, so it is effectively a constant.
+     *
+     * Runs on every demo:reset because migrate:fresh drops these rows, and the six-hourly
+     * reset would otherwise put the demo back behind a login twice a shift.
+     */
+    private function provisionToolAccess(): void
+    {
+        $categories = \App\Models\Category::query()
+            ->aiTools()
+            ->where(function ($query) {
+                $query->whereNull('access_level')->orWhere('access_level', 'inherit');
+            })
+            ->update(['access_level' => 'guest']);
+
+        // The catalogue caches its serialized list for an hour and resolves access from
+        // these rows, so without this the demo keeps serving the pre-reset levels.
+        \App\Services\AI\ToolCatalogCacheService::invalidateAll();
+
+        $this->note("tool access: {$categories} categor(y|ies) opened to guests");
     }
 
     private function note(string $message, bool $warn = false): void

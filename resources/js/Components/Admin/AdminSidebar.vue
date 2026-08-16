@@ -282,12 +282,12 @@ for (const item of addonMenuItems.value) {
         </div>
       </div>
 
-      <!-- AI Mangement -->
+      <!-- AI Management -->
       <div v-if="can('ai.tools')">
-        <Tooltip :content="t('AI Mangement')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Tooltip :content="t('AI Management')" placement="right" :full-width="true" :disabled="!collapsed">
           <button @click="toggleGroup('ai')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('ai') || isAiManagementActive(), 'open': isGroupOpen('ai') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>
-            <span v-show="!collapsed" class="flex-1 text-left">{{ t('AI Mangement') }}</span>
+            <span v-show="!collapsed" class="flex-1 text-left">{{ t('AI Management') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
         </Tooltip>
@@ -582,7 +582,7 @@ for (const item of addonMenuItems.value) {
         <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Addons') }}</div>
         <template v-for="(group, slug) in addonGroups" :key="slug">
           <template v-if="group.items.length > 1">
-            <Tooltip :content="group.name" placement="right" :full-width="true" :disabled="!collapsed">
+            <Tooltip :content="t(group.name)" placement="right" :full-width="true" :disabled="!collapsed">
               <button
                 @click="toggleGroup('addon-' + slug)"
                 class="sidebar-item w-full"
@@ -593,7 +593,7 @@ for (const item of addonMenuItems.value) {
                 }"
               >
                 <i v-if="group.icon" :class="group.icon" class="sidebar-icon"></i>
-                <span v-show="!collapsed" class="flex-1 text-left">{{ group.name }}</span>
+                <span v-show="!collapsed" class="flex-1 text-left">{{ t(group.name) }}</span>
                 <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
@@ -606,13 +606,13 @@ for (const item of addonMenuItems.value) {
                 :href="route(item.route, item.route_params || {})"
                 class="sidebar-subitem"
                 :class="{ active: item.route_pattern ? route().current(item.route_pattern, item.route_params || {}) : false }"
-              >{{ item.label }}</Link>
+              >{{ t(item.label) }}</Link>
             </div>
           </template>
-          <Tooltip v-else v-for="item in group.items" :key="item.route ?? slug" :content="item.label" placement="right" :full-width="true" :disabled="!collapsed">
+          <Tooltip v-else v-for="item in group.items" :key="item.route ?? slug" :content="t(item.label)" placement="right" :full-width="true" :disabled="!collapsed">
             <Link :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: item.route_pattern ? route().current(item.route_pattern, item.route_params || {}) : false }">
               <i v-if="item.icon" :class="item.icon" class="sidebar-icon"></i>
-              <span v-show="!collapsed">{{ item.label }}</span>
+              <span v-show="!collapsed">{{ t(item.label) }}</span>
             </Link>
           </Tooltip>
         </template>

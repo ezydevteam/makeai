@@ -3,24 +3,22 @@
 namespace App\Console\Commands;
 
 use App\Models\Language;
-use App\Models\Translation;
-use App\Services\TranslationService;
+use App\Services\TranslationFileStore;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 class ApplyTranslations extends Command
 {
     protected $signature = 'translations:apply {code} {path}';
 
-    protected $description = 'Apply a JSON map of {translation_id: translated_value} to a language.';
+    protected $description = 'Merge a JSON map of {"source string": "translated value"} into lang/{code}.json.';
 
     public function handle(): int
     {
         $language = Language::where('code', $this->argument('code'))->firstOrFail();
 
         $path = $this->argument('path');
-        $fullPath = str_starts_with($path, '/') ? $path : storage_path('app/'.$path);
+        $fullPath = is_file($path) ? $path : storage_path('app/'.$path);
 
         if (! File::exists($fullPath)) {
             $this->error("File not found: {$fullPath}");
@@ -36,26 +34,40 @@ class ApplyTranslations extends Command
             return self::FAILURE;
         }
 
-        $updated = 0;
-        $missing = 0;
+        // Keyed by the source string, not by a database id. The old format was
+        // {translation_id: value}, which broke the moment anything renumbered the table —
+        // and migrate:fresh renumbered all of it, silently mapping saved translations onto
+        // whichever unrelated strings happened to land on those ids.
+        $pairs = [];
 
-        DB::transaction(function () use ($map, $language, &$updated, &$missing) {
-            foreach ($map as $id => $value) {
-                $rows = Translation::where('id', (int) $id)
-                    ->where('language_id', $language->id)
-                    ->update(['value' => $value]);
-
-                if ($rows > 0) {
-                    $updated++;
-                } else {
-                    $missing++;
-                }
+        foreach ($map as $key => $value) {
+            if (! is_string($key) || ! is_string($value)) {
+                continue;
             }
-        });
 
-        TranslationService::clearCache($language->code);
+            $pairs[$key] = $value;
+        }
 
-        $this->info("Updated {$updated} translations, {$missing} ids not found.");
+        if ($pairs === []) {
+            $this->error('No usable entries — expected {"source string": "translated value"}.');
+
+            return self::FAILURE;
+        }
+
+        if (! TranslationFileStore::merge($language->code, $pairs)) {
+            $this->error("Could not write lang/{$language->code}.json — is the lang directory writable?");
+
+            return self::FAILURE;
+        }
+
+        $total = count(TranslationFileStore::get($language->code));
+
+        $this->info(sprintf(
+            'Applied %d entries to lang/%s.json (%d total).',
+            count($pairs),
+            $language->code,
+            $total
+        ));
 
         return self::SUCCESS;
     }

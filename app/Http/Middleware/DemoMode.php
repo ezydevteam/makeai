@@ -28,7 +28,12 @@ class DemoMode
         'admin.logout',
         'admin.2fa.verify',
         // Presentation-only preferences.
-        'locale.switch',
+        //
+        // 'locale.switch' is deliberately NOT here. It is not purely presentational: it
+        // writes the chosen locale to the session and, for a signed-in visitor, persists it
+        // onto the user row — and the demo's shared accounts mean one visitor's choice would
+        // greet the next one in a language they did not pick. The switcher is hidden in demo
+        // mode (LanguageSwitcher.vue), so this block is the backstop for a direct POST.
         'profile.theme',
         // Ad impression/click counters. These only increment analytics totals — nothing
         // is created or destroyed — and AdSection fires the view POST on every page that

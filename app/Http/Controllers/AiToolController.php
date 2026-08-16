@@ -223,6 +223,14 @@ class AiToolController extends Controller
         // Use cached max_tokens_override
         $effectiveMaxTokens = $toolData['max_tokens_override'] ?? (int) settings('default_max_tokens', 2000);
 
+        // Resolved here rather than in the page, and outside $toolData's cached portion so a
+        // change to default_tool_access_level takes effect immediately. ToolPage.vue used to
+        // walk tool → category itself and fall back to 'guest' for the last step, where the
+        // server falls back to settings('default_tool_access_level', 'login'). An `inherit`
+        // tool therefore showed a signed-out visitor an enabled Generate button and no
+        // sign-in CTA, and CheckCredits then refused the request with a 401.
+        $toolData['effective_access_level'] = $tool->getEffectiveAccessLevel();
+
         $toolData['favorites_count'] = $tool->favorites()->count();
         $toolData['is_favorited'] = auth()->check()
             ? $tool->favorites()->where('user_id', auth()->id())->exists()

@@ -12,7 +12,7 @@ const year = new Date().getFullYear()
                 <div class="text-center mb-6">
                     <img :src="logo" alt="MakeAI" title="MakeAI" class="mx-auto h-12 w-auto" />
                     <h1 class="mt-4 text-2xl font-bold tracking-tight text-slate-900">
-                        Thanks for purchasing <span class="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 bg-clip-text !text-transparent">MakeAI</span>
+                        Thanks for purchasing MakeAI
                     </h1>
                     <p class="mt-1 text-sm text-slate-500">Let's get your installation set up.</p>
                 </div>

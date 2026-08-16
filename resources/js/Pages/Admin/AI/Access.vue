@@ -79,12 +79,16 @@ const searchFocused = ref(false)
 const selectedIds = ref<number[]>([])
 const bulkAction = ref<string | number | null>('')
 
+// Mirrors config/access-levels.php, which is the only vocabulary AccessLevelService
+// understands. The previous fallback offered 'public', 'login_required', 'free_plan' and
+// 'pro_plan' — four values that exist nowhere in that config, so anything saved with one
+// resolved to requiresAuth=false and silently ungated the tool. The server normally sends
+// the real list via the accessLevels prop; this is only the safety net behind it.
 const accessLevels = computed(() => props.accessLevels ?? [
     { value: 'inherit', label: t('Inherit (Default)') },
-    { value: 'public', label: t('Public (No Login)') },
-    { value: 'login_required', label: t('Login Required') },
-    { value: 'free_plan', label: t('Free Plan') },
-    { value: 'pro_plan', label: t('Pro Plan') },
+    { value: 'guest', label: t('Guest (Free)') },
+    { value: 'login', label: t('Login Required') },
+    { value: 'premium', label: t('Premium (Any Plan)') },
 ])
 
 const accessFilterOptions = computed(() => [
@@ -144,7 +148,6 @@ const getAccessLevelBadgeClass = (level: string) => {
         case 'free_plan':
         case 'free':
             return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20'
-        case 'pro_plan':
         case 'premium':
             return 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20'
         default:

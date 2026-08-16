@@ -221,10 +221,13 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('localization/languages/{language}/default', [LanguageController::class, 'setDefault'])->name('admin.languages.default');
         Route::delete('localization/languages/{language}', [LanguageController::class, 'destroy'])->name('admin.languages.delete');
 
+        // Entries are addressed by their source string, which is the key in
+        // lang/{code}.json. It travels in the body, never the URL: keys contain spaces,
+        // slashes, punctuation and non-ASCII text.
         Route::get('localization/translations/{language}', [TranslationController::class, 'index'])->name('admin.translations.index');
         Route::post('localization/translations/{language}/bulk', [TranslationController::class, 'bulkUpdate'])->name('admin.translations.bulk_update');
-        Route::post('localization/translations/{translation}', [TranslationController::class, 'update'])->name('admin.translations.update');
-        Route::post('localization/translations/{translation}/ai', [TranslationController::class, 'aiTranslate'])->name('admin.translations.ai');
+        Route::post('localization/translations/{language}/entry', [TranslationController::class, 'update'])->name('admin.translations.update');
+        Route::post('localization/translations/{language}/entry/ai', [TranslationController::class, 'aiTranslate'])->name('admin.translations.ai');
         Route::post('localization/translations/{language}/ai-all', [TranslationController::class, 'aiTranslateAll'])->name('admin.translations.ai_all');
     });
 

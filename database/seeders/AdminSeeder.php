@@ -188,11 +188,22 @@ class AdminSeeder extends Seeder
         // ═══════════════════════════════════════════
         // 4. Create Default Super Admin
         // ═══════════════════════════════════════════
+        // The password comes from the environment, and defaults to random bytes nobody
+        // holds. This row reaches two places beyond a developer's laptop: the shipped
+        // data.sql (scrubbed again by installer:export-data, belt and braces) and the
+        // public demo site, whose own admin is admin@demo.com — this one is an extra
+        // super-admin nobody advertises, and a baked-in password made it a live login.
+        //
+        // Set SEED_ADMIN_PASSWORD in your local .env to keep a known password for
+        // development. It sits inside the dev-only fence in .env.example, so it is
+        // stripped from every built package and can never be set by a buyer.
+        $seedPassword = (string) env('SEED_ADMIN_PASSWORD', '');
+
         Admin::firstOrCreate(
             ['email' => 'admin@makeai.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make($seedPassword !== '' ? $seedPassword : bin2hex(random_bytes(32))),
                 'role_id' => $superAdmin->id,
                 'is_active' => true,
             ]

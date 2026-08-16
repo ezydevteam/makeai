@@ -59,7 +59,7 @@ class ToolCatalogCacheService
                         $q->active()->ofType('ai_tool')->where('slug', $categorySlug);
                     });
                 })
-                ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
+                ->with(['category:id,parent_id,access_level,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
@@ -75,7 +75,7 @@ class ToolCatalogCacheService
                 ->active()
                 ->where('slug', $slug)
                 ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
-                ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
+                ->with(['category:id,parent_id,access_level,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
                 ->firstOrFail();
 
             return array_merge($this->serializeTool($tool, true), [
@@ -217,7 +217,7 @@ class ToolCatalogCacheService
             ->where('id', '!=', $tool->id)
             ->where('category_id', $tool->category_id)
             ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
-            ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
+            ->with(['category:id,parent_id,access_level,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
             ->orderByDesc('usage_count')
             ->orderBy('name')
             ->limit(6)
@@ -262,6 +262,10 @@ class ToolCatalogCacheService
             'tags' => $tool->tags ?? [],
             'output_type' => $tool->output_type ?? 'markdown',
             'access_level' => $tool->access_level,
+            // Database-only half of the access chain (tool → category → ancestors). Safe to
+            // cache; applyGlobalOverrides() turns it into effective_access_level per request
+            // by applying the default_tool_access_level setting.
+            'access_level_resolved' => $tool->resolvedAccessLevel(),
             'is_featured' => (bool) $tool->is_featured,
             'is_embeddable' => $this->rawFlag($tool, 'is_embeddable', false),
             'requires_login' => (bool) ($tool->category?->requires_login ?? false),
@@ -390,6 +394,16 @@ class ToolCatalogCacheService
         $tool['show_faqs'] = (bool) ($tool['show_faqs'] ?? true) && settings('global_tools_show_faqs_enabled', true);
         $tool['show_reviews'] = (bool) ($tool['show_reviews'] ?? false) && settings('global_tools_show_reviews_enabled', true);
         $tool['is_embeddable'] = (bool) ($tool['is_embeddable'] ?? false) && settings('global_tools_embeddable_enabled', true);
+
+        // The level the server will actually enforce, so listing pages stop deriving it
+        // themselves. CategoryPage and ToolsDirectory both walked tool → category and
+        // treated anything unresolved as free-for-guests; the category's access_level was
+        // never even serialized, so the walk always fell through and every inherit tool
+        // showed as Free regardless of what CheckCredits would do with it.
+        $resolved = $tool['access_level_resolved'] ?? 'inherit';
+        $tool['effective_access_level'] = $resolved === 'inherit'
+            ? settings('default_tool_access_level', 'login')
+            : $resolved;
 
         return $tool;
     }

@@ -36,6 +36,8 @@ interface Tool {
     color: string
     is_featured: boolean
     access_level: string
+    /** Server-resolved level (tool → category → default_tool_access_level). Prefer this. */
+    effective_access_level?: string
     tags?: string[]
     views_count?: number
 }
@@ -141,14 +143,18 @@ function formatViews(views: number): string {
     return views.toString()
 }
 
+// Resolved by the server (ToolCatalogCacheService::applyGlobalOverrides). Walking
+// tool → category here could not work: serializeCategory() never sent the category's
+// access_level, so the branch was dead and every `inherit` tool read as free-for-guests
+// no matter what CheckCredits would enforce on it.
+function effectiveLevel(tool: Tool): string {
+    return tool.effective_access_level || 'login'
+}
+
 function isProTool(tool: Tool): boolean {
-    const level = tool.access_level || 'inherit'
-    if (level === 'premium' || level.startsWith('plan:')) return true
-    if (level === 'inherit' && tool.category?.access_level) {
-        const catLevel = tool.category.access_level
-        return catLevel === 'premium' || catLevel.startsWith('plan:')
-    }
-    return false
+    const level = effectiveLevel(tool)
+
+    return level === 'premium' || level.startsWith('plan:')
 }
 
 function onFeaturedSwiper(swiper: SwiperClass) {

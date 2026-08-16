@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { usePage } from '@inertiajs/vue3'
+import { ref } from 'vue'
 import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
 import ErrorAlert from './ErrorAlert.vue'
 
@@ -8,9 +7,6 @@ const props = defineProps<{
     formData: Record<string, any>
     error?: string | null
 }>()
-
-const page = usePage()
-const licenseTestMode = computed(() => !!page.props.licenseTestMode)
 
 const purchaseCode = ref(props.formData?.step_2?.purchase_code ?? '')
 
@@ -43,15 +39,6 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
                     class="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
                 />
             </label>
-
-            <div v-if="licenseTestMode" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                <p class="font-semibold">Developer test mode active</p>
-                <p class="mt-1 text-xs">Use one of these fake codes to test license-gated features without contacting Envato:</p>
-                <ul class="mt-2 list-inside list-disc space-y-1 font-mono text-xs">
-                    <li>TEST-LICENSE-0000-REGULAR</li>
-                    <li>TEST-LICENSE-0000-EXTENDED</li>
-                </ul>
-            </div>
 
             <div class="rounded-xl border border-[#b7d3ff] bg-[#edf4ff] p-4 text-sm text-[#1757bc]">
                 <p class="font-semibold">Why activate?</p>

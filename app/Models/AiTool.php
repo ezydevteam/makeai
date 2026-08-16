@@ -361,24 +361,29 @@ class AiTool extends Model
 
     // ─── Access Control ─────────────────────────
 
-    public function getEffectiveAccessLevel(): string
+    /**
+     * The level this tool or its category chain defines, or 'inherit' when none of them do.
+     *
+     * The cacheable half of getEffectiveAccessLevel() — see Category::resolvedAccessLevel().
+     */
+    public function resolvedAccessLevel(): string
     {
         $level = $this->access_level ?? 'inherit';
 
-        if ($level === 'inherit') {
-            // Check category first
-            if ($this->category) {
-                $categoryLevel = $this->category->getEffectiveAccessLevel();
-                if ($categoryLevel !== 'inherit') {
-                    return $categoryLevel;
-                }
-            }
-
-            // Fall back to global default
-            return settings('default_tool_access_level', 'login');
+        if ($level === 'inherit' && $this->category) {
+            return $this->category->resolvedAccessLevel();
         }
 
         return $level;
+    }
+
+    public function getEffectiveAccessLevel(): string
+    {
+        $level = $this->resolvedAccessLevel();
+
+        return $level === 'inherit'
+            ? settings('default_tool_access_level', 'login')
+            : $level;
     }
 
     public function isProRequired(): bool

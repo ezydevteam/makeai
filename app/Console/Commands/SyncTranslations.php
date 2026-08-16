@@ -2,30 +2,38 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Controllers\Admin\TranslationController;
 use App\Models\Language;
-use App\Models\Translation;
-use App\Services\TranslationService;
+use App\Services\TranslationFileStore;
+use App\Services\TranslationKeyScanner;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
 
 class SyncTranslations extends Command
 {
-    protected $signature = 'translations:sync {--dry-run : Show missing keys without writing them}';
+    protected $signature = 'translations:sync
+        {--dry-run : Report what would change without writing}
+        {--prune : Drop catalogue entries whose source string no longer exists}';
 
-    protected $description = 'Scan PHP and Vue files for translation keys and sync missing rows.';
-
-    /**
-     * @var array<int, string>
-     */
-    private array $paths = [
-        'app',
-        'resources/js',
-        'resources/views',
-    ];
+    protected $description = 'Refresh the translation key cache and report catalogue coverage per language.';
 
     public function handle(): int
     {
-        $languages = Language::query()->where('is_active', true)->get(['id', 'code']);
+        // Catalogues are files now, so there are no rows to create. What this command does
+        // is drop the cached key list — so newly added strings show up immediately instead
+        // of when the cache expires — and report where each language stands.
+        TranslationController::forgetKeyCache();
+
+        $keys = $this->collectKeys();
+
+        if ($keys === []) {
+            $this->warn('No translation keys found — check the scanned paths.');
+
+            return self::SUCCESS;
+        }
+
+        $this->info(count($keys).' translatable strings found in the source.');
+
+        $languages = Language::query()->where('is_active', true)->get(['id', 'code', 'is_default']);
 
         if ($languages->isEmpty()) {
             $this->warn('No active languages found.');
@@ -33,44 +41,42 @@ class SyncTranslations extends Command
             return self::SUCCESS;
         }
 
-        $keys = $this->collectKeys();
-
-        if ($keys === []) {
-            $this->info('No translation keys found.');
-
-            return self::SUCCESS;
-        }
-
-        $created = 0;
         $dryRun = (bool) $this->option('dry-run');
+        $prune = (bool) $this->option('prune');
+        $rows = [];
 
         foreach ($languages as $language) {
-            $existing = Translation::query()
-                ->where('language_id', $language->id)
-                ->pluck('key')
-                ->all();
+            $catalogue = TranslationFileStore::get($language->code);
+            $orphans = array_diff(array_keys($catalogue), $keys);
 
-            $missing = array_values(array_diff($keys, $existing));
+            if ($prune && $orphans !== [] && ! $dryRun) {
+                $catalogue = array_diff_key($catalogue, array_flip($orphans));
 
-            if ($dryRun) {
-                $this->line($language->code.': '.count($missing).' missing keys');
+                if (! TranslationFileStore::write($language->code, $catalogue)) {
+                    $this->error("Could not write lang/{$language->code}.json — is the lang directory writable?");
 
-                continue;
+                    return self::FAILURE;
+                }
             }
 
-            foreach ($missing as $key) {
-                Translation::query()->create([
-                    'language_id' => $language->id,
-                    'key' => $key,
-                    'value' => $key,
-                ]);
-                $created++;
-            }
+            $translated = count($catalogue);
 
-            TranslationService::clearCache($language->code);
+            $rows[] = [
+                $language->code.($language->is_default ? ' (default)' : ''),
+                $translated,
+                count($keys) - $translated,
+                sprintf('%d%%', count($keys) > 0 ? round($translated / count($keys) * 100) : 0),
+                count($orphans),
+            ];
         }
 
-        $this->info($dryRun ? 'Dry run complete.' : "Synced {$created} translation rows.");
+        $this->table(['Language', 'Translated', 'Missing', 'Coverage', 'Orphaned'], $rows);
+
+        if ($dryRun) {
+            $this->comment('Dry run — nothing was written.');
+        } elseif (! $prune) {
+            $this->comment('Pass --prune to drop orphaned entries whose source string is gone.');
+        }
 
         return self::SUCCESS;
     }
@@ -80,55 +86,6 @@ class SyncTranslations extends Command
      */
     private function collectKeys(): array
     {
-        $keys = [];
-
-        foreach ($this->paths as $path) {
-            $fullPath = base_path($path);
-
-            if (! File::exists($fullPath)) {
-                continue;
-            }
-
-            foreach (File::allFiles($fullPath) as $file) {
-                $extension = $file->getExtension();
-
-                if (! in_array($extension, ['php', 'vue', 'ts'], true)) {
-                    continue;
-                }
-
-                $contents = File::get($file->getPathname());
-
-                foreach ($this->extractKeys($contents) as $key) {
-                    $keys[$key] = $key;
-                }
-            }
-        }
-
-        ksort($keys);
-
-        return array_values($keys);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function extractKeys(string $contents): array
-    {
-        $keys = [];
-        $patterns = [
-            '/(?<![A-Za-z0-9_])translate\(\s*[\'"]([^\'"]+)[\'"]/',
-            '/(?<![A-Za-z0-9_])t\(\s*[\'"]([^\'"]+)[\'"]/',
-            '/\$t\(\s*[\'"]([^\'"]+)[\'"]/',
-        ];
-
-        foreach ($patterns as $pattern) {
-            preg_match_all($pattern, $contents, $matches);
-
-            foreach ($matches[1] ?? [] as $key) {
-                $keys[] = stripcslashes($key);
-            }
-        }
-
-        return $keys;
+        return TranslationKeyScanner::scan();
     }
 }

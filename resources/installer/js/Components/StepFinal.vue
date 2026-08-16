@@ -1,28 +1,43 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import ErrorAlert from './ErrorAlert.vue'
 
 const props = defineProps<{
     formData: Record<string, any>
     error?: string | null
     cronCommand?: string
+    queueCommand?: string
 }>()
 
-const copied = ref(false)
+const copied = ref('')
 
-const copyCron = async () => {
-    if (!props.cronCommand) return
+const copy = async (text: string | undefined, which: string) => {
+    if (!text) return
 
     try {
-        await navigator.clipboard.writeText(props.cronCommand)
-        copied.value = true
-        setTimeout(() => (copied.value = false), 2000)
+        await navigator.clipboard.writeText(text)
+        copied.value = which
+        setTimeout(() => (copied.value = ''), 2000)
     } catch {
         // Clipboard access is blocked over plain HTTP in most browsers, and a
         // fresh install is usually reached over HTTP. The command stays visible
         // and selectable, so failing silently costs the buyer nothing.
     }
 }
+
+// Decides QUEUE_CONNECTION at finalize. Unchecked means `sync` — jobs run inside
+// the request, which is slower but always works. Checked moves the install to
+// redis/database, where a job is stored and never runs unless the worker cron is
+// really there, so this must be the buyer's own claim rather than a guess.
+const queueWorkerReady = ref(false)
+
+watch(
+    queueWorkerReady,
+    (ready) => {
+        props.formData.step_6 = { ...(props.formData.step_6 ?? {}), queue_worker_ready: ready }
+    },
+    { immediate: true },
+)
 
 const steps = props.formData
 
@@ -98,9 +113,9 @@ const items = [
                 <button
                     type="button"
                     class="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100"
-                    @click="copyCron"
+                    @click="copy(cronCommand, 'schedule')"
                 >
-                    {{ copied ? 'Copied' : 'Copy' }}
+                    {{ copied === 'schedule' ? 'Copied' : 'Copy' }}
                 </button>
             </div>
 
@@ -110,6 +125,48 @@ const items = [
                 <span class="font-mono">php</span> — see the documentation folder in your
                 download if the job does not run.
             </p>
+        </div>
+
+        <!-- Optional second cron. Its presence decides QUEUE_CONNECTION, so the
+             question is asked here rather than assumed: without a worker, jobs on
+             the redis/database drivers are stored and never run, and the first
+             thing anyone notices is that sign-in codes stop arriving. -->
+        <div v-if="queueCommand" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-sm font-semibold text-slate-800">Background jobs (optional)</p>
+            <p class="mt-1 text-xs text-slate-600">
+                By default jobs run inside the page request — everything works, but pages that
+                send email feel slower. Adding a second cron job lets them run in the
+                background instead.
+            </p>
+
+            <div class="mt-3 flex items-start gap-2">
+                <code
+                    class="flex-1 overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800"
+                >{{ queueCommand }}</code>
+                <button
+                    type="button"
+                    class="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                    @click="copy(queueCommand, 'queue')"
+                >
+                    {{ copied === 'queue' ? 'Copied' : 'Copy' }}
+                </button>
+            </div>
+
+            <label class="mt-3 flex cursor-pointer items-start gap-2">
+                <input
+                    v-model="queueWorkerReady"
+                    type="checkbox"
+                    class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-[#1757bc] focus:ring-[#1757bc]"
+                />
+                <span class="text-xs text-slate-700">
+                    I have added this queue worker cron job.
+                    <span class="block text-slate-500">
+                        Only tick this once the job actually exists. If you tick it without one,
+                        emails and sign-in codes will be queued and never sent. You can change
+                        this later in <span class="font-mono">core/.env</span>.
+                    </span>
+                </span>
+            </label>
         </div>
     </div>
 </template>

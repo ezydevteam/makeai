@@ -507,7 +507,7 @@ onUnmounted(() => gsapCtx?.revert())
                     <div class="w-full">
                         <div v-if="asString(section.config.badge_text)" :class="[badgeClass(asString(section.config.card_bg_style || section.config.background_style, 'default'), asString(section.config.title_color, 'dark'))]">
                             <i class="ti ti-sparkles text-xs"></i>
-                            {{ asString(section.config.badge_text) }}
+                            {{ t(asString(section.config.badge_text)) }}
                         </div>
                         <!-- Title Wrapper with Left Position Icon -->
                         <div :class="['flex items-center gap-3', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
@@ -517,9 +517,9 @@ onUnmounted(() => gsapCtx?.revert())
                             ]">
                                 <i :class="asString(section.config.icon)"></i>
                             </div>
-                            <h2 v-if="asString(section.config.title)" :class="titleClass">{{ asString(section.config.title, t('AI Tools Showcase')) }}</h2>
+                            <h2 v-if="asString(section.config.title)" :class="titleClass">{{ t(asString(section.config.title, t('AI Tools Showcase'))) }}</h2>
                         </div>
-                        <p v-if="asString(section.config.subtitle)" :class="subtitleClass">{{ asString(section.config.subtitle) }}</p>
+                        <p v-if="asString(section.config.subtitle)" :class="subtitleClass">{{ t(asString(section.config.subtitle)) }}</p>
                     </div>
                 </div>
 
@@ -696,7 +696,7 @@ onUnmounted(() => gsapCtx?.revert())
                 <div v-if="asString(section.config.primary_text) && asString(section.config.primary_link)" :class="['mt-12 flex flex-col gap-4 sm:flex-row', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'items-center justify-center' : 'items-start justify-start']">
                     <Link :href="asString(section.config.primary_link, '/ai-tools')" :class="[heroButtonClass(asString(section.config.primary_style, 'primary')), heroButtonShapeClass(asString(section.config.primary_shape, 'rounded_xl'))]" class="inline-flex w-full items-center justify-center gap-3 px-8 py-4 font-black transition-colors sm:w-auto">
                         <i v-if="asString(section.config.primary_icon) && asString(section.config.primary_icon_position, 'left') !== 'right'" :class="[asString(section.config.primary_icon), 'block shrink-0 text-lg leading-none']"></i>
-                        {{ asString(section.config.primary_text) }}
+                        {{ t(asString(section.config.primary_text)) }}
                         <i v-if="asString(section.config.primary_icon) && asString(section.config.primary_icon_position, 'left') === 'right'" :class="[asString(section.config.primary_icon), 'block shrink-0 text-lg leading-none']"></i>
                     </Link>
                 </div>

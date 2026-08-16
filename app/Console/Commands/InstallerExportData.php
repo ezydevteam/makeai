@@ -239,7 +239,12 @@ class InstallerExportData extends Command
     {
         // License: ship un-activated. The buyer activates with their own purchase
         // code; a shipped "valid" state would bypass licensing entirely.
-        settings_set('license_purchase_code', '', 'encrypted', 'license');
+        //
+        // null, not '': encodeForStore() encrypts anything non-null, so an empty string
+        // here ships as ciphertext of "" bound to the DEVELOPER's APP_KEY — a value no
+        // buyer install can ever decrypt. null stores null, which is what a
+        // never-configured install actually looks like.
+        settings_set('license_purchase_code', null, 'encrypted', 'license');
         settings_set('license_buyer', '', 'string', 'license');
         settings_set('license_purchased_at', '', 'string', 'license');
         settings_set('license_supported_until', '', 'string', 'license');
@@ -258,6 +263,11 @@ class InstallerExportData extends Command
         settings_set('mail_from_address', '', 'string', 'mail');
         settings_set('mail_host', '', 'string', 'mail');
         settings_set('mail_username', '', 'string', 'mail');
+        // The port is part of the dev transport identity too: a local Mailpit/Mailhog
+        // box listens on 1025, and shipping that left every buyer's mail screen
+        // pre-filled with a port no real SMTP provider uses. 587 is the submission
+        // port that matches the tls default below.
+        settings_set('mail_port', 587, 'integer', 'mail');
         settings_set('mail_password', null, 'encrypted', 'mail');
         settings_set('sendgrid_api_key', null, 'encrypted', 'mail');
         settings_set('ses_key', null, 'encrypted', 'mail');
@@ -272,7 +282,36 @@ class InstallerExportData extends Command
         settings_set('site_og_image', null, 'string', 'branding');
         settings_set('site_url', '', 'string', 'general');
 
+        $this->sanitizeSeededAdmin();
+
         $this->info('✔ Sanitized license, mail, branding and site settings for distribution.');
+    }
+
+    /**
+     * Replace the seeded super-admin's password with one nobody knows.
+     *
+     * AdminSeeder creates admin@makeai.com with a convenience password for local
+     * development, and that row is what the dump carries into every buyer's database.
+     * The install wizard overwrites it (name, email and password) from the admin step,
+     * so on a successful install this hash is never used — but the wizard writes
+     * INSTALLED=true BEFORE that step, and reports success even when the step is
+     * skipped. Any install that fails partway therefore went live with a password
+     * published in every copy of the product.
+     *
+     * Random bytes, not a fixed placeholder: there must be no shared secret to look up.
+     * If provisioning fails the buyer has no admin login at all — a visibly broken
+     * install, which is the safe direction to fail in.
+     */
+    private function sanitizeSeededAdmin(): void
+    {
+        $unusable = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT);
+
+        $scrubbed = DB::table('admins')->update([
+            'password' => $unusable,
+            'remember_token' => null,
+        ]);
+
+        $this->info("✔ Scrubbed the password on {$scrubbed} seeded admin account(s).");
     }
 
     /**
